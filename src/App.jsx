@@ -1830,6 +1830,28 @@ export default function App() {
     }
   }, [students]);
 
+  // Lets a teacher fix a mistake in a class record from the "Class records" history page:
+  // reopens that day+student as unrecorded and jumps to Attendance, where the normal
+  // edit/save flow (text or Hifz) already exists.
+  const editHistoricalRecord = async (dateStr, studentId) => {
+    try {
+      const { error } = await supabase
+        .from("attendance_records").update({ recorded: false }).eq("student_id", studentId).eq("record_date", dateStr);
+      if (error) throw error;
+    } catch {
+      showToast("Couldn't reopen this record. Please try again.");
+      return;
+    }
+    setAttendanceByDate((prev) => {
+      const next = { ...prev };
+      delete next[dateStr];
+      return next;
+    });
+    setSection("attendance");
+    setRecordDate(dateStr);
+    showToast("Record reopened — find it under pending classes to edit");
+  };
+
   const weekdayAbbrev = (dateStr) => {
     const [y, m, d] = dateStr.split("-").map(Number);
     return DAY_ORDER[new Date(y, m - 1, d).getDay()];
@@ -4057,15 +4079,26 @@ export default function App() {
                                               <div className="lc-expand-panel" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px", paddingLeft: "8px" }}>
                                                 {entries.map((rec) => (
                                                   <div className="lc-card" key={g.date + rec.studentId}>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                                                      <div style={{ fontWeight: 600 }}>{rec.studentName}</div>
-                                                      {rec.status && (
-                                                        <span className={`lc-badge ${rec.status === "present" ? "lc-badge-paid" : "lc-badge-pending"}`}>
-                                                          {rec.status === "present" ? "Present" : "Absent"}
-                                                        </span>
-                                                      )}
+                                                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                                                      <div>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                                          <div style={{ fontWeight: 600 }}>{rec.studentName}</div>
+                                                          {rec.status && (
+                                                            <span className={`lc-badge ${rec.status === "present" ? "lc-badge-paid" : "lc-badge-pending"}`}>
+                                                              {rec.status === "present" ? "Present" : "Absent"}
+                                                            </span>
+                                                          )}
+                                                        </div>
+                                                        {renderRecordBody(rec)}
+                                                      </div>
+                                                      <button
+                                                        type="button"
+                                                        className="lc-btn no-print"
+                                                        onClick={() => editHistoricalRecord(g.date, rec.studentId)}
+                                                      >
+                                                        Edit
+                                                      </button>
                                                     </div>
-                                                    {renderRecordBody(rec)}
                                                   </div>
                                                 ))}
                                               </div>
