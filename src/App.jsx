@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Users, GraduationCap, Wallet, ArrowRight, ChevronRight, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw } from "lucide-react";
+import { Users, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, ListChecks, Phone } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 
 const LOGO_DATA_URI = "data:image/png;base64,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";
@@ -442,6 +442,13 @@ const HIFZ_SECTIONS = [
   { key: "longMuraja", label: "Long Muraja'ah" },
 ];
 
+const emptyHifzSection = () => ({ startSurah: "", startAyah: "", endSurah: "", endAyah: "", mistakes: "0" });
+const emptyHifzDraft = () => ({
+  hifz: emptyHifzSection(),
+  shortMuraja: emptyHifzSection(),
+  longMuraja: emptyHifzSection(),
+});
+
 function fmtTime12(t) {
   if (!t) return "";
   const [h, m] = t.split(":").map(Number);
@@ -814,7 +821,7 @@ function TeacherPortalLayout({ activeSection, navItems, teacherDisplayName, onLo
   );
 }
 
-// Shared shell for the Admin and Staff portals — same gradient sidebar,
+// Shared shell for the Admin portal — same gradient sidebar,
 // Islamic pattern assets, and page chrome as TeacherPortalLayout (reusing
 // TP_SHARED_STYLES so nothing is duplicated), reskinned with an admin
 // avatar and an optional "Teacher login" shortcut alongside Log out.
@@ -897,6 +904,82 @@ function AdminPortalLayout({ activeSection, navItems, portalLabel, displayName, 
   );
 }
 
+// Shared shell for the Student Portal — same gradient sidebar, Islamic
+// pattern assets, and page chrome as TeacherPortalLayout/AdminPortalLayout
+// (reusing TP_SHARED_STYLES), reskinned with a student avatar.
+function StudentPortalLayout({ activeSection, navItems, studentDisplayName, onLogout, children }) {
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKeyDown = (e) => { if (e.key === "Escape") setNavOpen(false); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [navOpen]);
+
+  const sidebar = (
+    <nav className="tp-sidebar" aria-label="Student portal navigation">
+      <img src={TP_PATTERN_SIDEBAR_URL} className="tp-sidebar-pattern" alt="" aria-hidden="true" />
+      <div className="tp-sidebar-logo"><img src={LOGO_WHITE_DATA_URI} alt="" /></div>
+      <div className="tp-sidebar-brand">Aflaah Quran Class</div>
+      <div className="tp-sidebar-role">Student Portal</div>
+      <div className="tp-avatar-row">
+        <span className="tp-avatar" aria-hidden="true"><User size={22} /></span>
+        <div>
+          <div className="tp-avatar-name">{studentDisplayName}</div>
+          <div className="tp-avatar-role">Student</div>
+        </div>
+      </div>
+      <div className="tp-nav">
+        {navItems.map(({ key, label, icon: Icon, onClick }) => (
+          <button
+            key={key}
+            type="button"
+            className={`tp-nav-item ${activeSection === key ? "tp-nav-item-active" : ""}`}
+            aria-current={activeSection === key ? "page" : undefined}
+            onClick={() => { onClick(); setNavOpen(false); }}
+          >
+            <Icon size={18} aria-hidden="true" />
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="tp-sidebar-spacer" />
+      <button type="button" className="tp-logout" onClick={onLogout}>
+        <LogOut size={16} aria-hidden="true" />
+        Log out
+      </button>
+    </nav>
+  );
+
+  return (
+    <div className="tp-shell">
+      <style>{TP_SHARED_STYLES}</style>
+      <div className="tp-mobile-bar no-print">
+        <span className="tp-mobile-bar-brand">
+          <img src={LOGO_WHITE_DATA_URI} alt="" />
+          Student Portal
+        </span>
+        <button
+          type="button"
+          className="tp-mobile-toggle"
+          aria-label={navOpen ? "Close menu" : "Open menu"}
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((v) => !v)}
+        >
+          {navOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+        </button>
+      </div>
+      {navOpen && <div className="tp-backdrop no-print" onClick={() => setNavOpen(false)} />}
+      <div className={`tp-sidebar-wrap no-print ${navOpen ? "tp-sidebar-wrap-open" : ""}`}>{sidebar}</div>
+      <div className="tp-content">
+        <img src={TP_PATTERN_MAIN_URL} className="tp-page-pattern" alt="" aria-hidden="true" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -951,10 +1034,10 @@ export default function App() {
 
   // ---- Auth / roles ----
   // Real Supabase Auth: email + password go to supabase.auth.signInWithPassword().
-  // Once signed in, we read the caller's row from `profiles` (role: admin|teacher|staff)
+  // Once signed in, we read the caller's row from `profiles` (role: admin|teacher)
   // to decide which portal to show. RLS on every table enforces this server-side
   // too, so this is UX routing, not the actual security boundary.
-  const [role, setRole] = useState("admin"); // admin | teacher | staff
+  const [role, setRole] = useState("admin"); // admin | teacher | student
   const [authView, setAuthView] = useState("checking"); // checking | login | app
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminEmailInput, setAdminEmailInput] = useState("");
@@ -962,8 +1045,7 @@ export default function App() {
   const [adminLoginError, setAdminLoginError] = useState("");
   const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [loggedInTeacherId, setLoggedInTeacherId] = useState(null);
-  const [loggedInStaffId, setLoggedInStaffId] = useState(null);
-  const [staffPerms, setStaffPerms] = useState(null); // { canManageClassesStudents, canManagePayments } | null
+  const [loggedInStudentId, setLoggedInStudentId] = useState(null);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
@@ -993,7 +1075,7 @@ export default function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
         setRole("admin"); setIsAdminAuthenticated(false); setLoggedInTeacherId(null);
-        setLoggedInStaffId(null); setStaffPerms(null); setAuthView("login");
+        setLoggedInStudentId(null); setAuthView("login");
       }
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
@@ -1029,38 +1111,22 @@ export default function App() {
       setRole("admin"); setIsAdminAuthenticated(true); setAuthView("app");
       return;
     }
-    const { data: staffRow } = await supabase
-      .from("admin_staff").select("*").eq("user_id", userId).maybeSingle();
-    if (staffRow) {
-      routeStaffIn(staffRow);
-      return;
-    }
     const { data: teacherRow } = await supabase
       .from("teachers").select("id").eq("user_id", userId).maybeSingle();
-    if (!teacherRow) {
+    if (teacherRow) {
+      setRole("teacher"); setLoggedInTeacherId(teacherRow.id); setAuthView("app"); setSection("timetable");
+      return;
+    }
+    const { data: studentRow } = await supabase
+      .from("students").select("id").eq("user_id", userId).maybeSingle();
+    if (!studentRow) {
       await supabase.auth.signOut();
-      setLoginError("This login isn't linked to a teacher or staff record yet. Ask the admin to link it.");
+      setLoginError("This login isn't linked to a teacher or student record yet. Ask the admin to link it.");
       setAccountType("teacher");
       setAuthView("login");
       return;
     }
-    setRole("teacher"); setLoggedInTeacherId(teacherRow.id); setAuthView("app"); setSection("timetable");
-  };
-
-  // Shared by session-restore routing and the admin-login form: puts a linked
-  // staff account into the app shell, landing on the first section their
-  // permissions actually grant (falling back to Tasks if they have neither).
-  const routeStaffIn = (staffRow) => {
-    const canClasses = !!staffRow.can_manage_classes_students;
-    const canPayments = !!staffRow.can_manage_payments;
-    setRole("staff");
-    setIsAdminAuthenticated(true);
-    setLoggedInStaffId(staffRow.id);
-    setStaffPerms({ canManageClassesStudents: canClasses, canManagePayments: canPayments });
-    setAuthView("app");
-    if (canClasses) { setSection("classes"); setClassesView("classes"); }
-    else if (canPayments) { setSection("finance"); setFinanceView("payments"); }
-    else setSection("tasks");
+    setRole("student"); setLoggedInStudentId(studentRow.id); setAuthView("app"); setSection("dashboard");
   };
 
   const signInAdmin = async () => {
@@ -1083,17 +1149,8 @@ export default function App() {
       setAdminLoginLoading(false);
       return;
     }
-    if (profile && profile.role === "staff") {
-      const { data: staffRow } = await supabase.from("admin_staff").select("*").eq("user_id", data.user.id).maybeSingle();
-      if (staffRow) {
-        routeStaffIn(staffRow);
-        setAdminEmailInput(""); setAdminPasswordInput("");
-        setAdminLoginLoading(false);
-        return;
-      }
-    }
     await supabase.auth.signOut();
-    setAdminLoginError("This account isn't an admin or staff account.");
+    setAdminLoginError("This account isn't an admin account.");
     setAdminLoginLoading(false);
   };
 
@@ -1123,15 +1180,30 @@ export default function App() {
     setTeacherLoginLoading(false);
   };
 
-  // Integration point: student accounts have no backend yet. When student
-  // accounts are added (e.g. a `student` profiles.role plus a lookup table
-  // mirroring `teachers`/`admin_staff`), replace this stub with a real
-  // supabase.auth.signInWithPassword() call and a routeSignedInUser-style
-  // lookup, following the exact pattern signInTeacher uses above.
   const signInStudent = async () => {
     const email = studentEmail.trim().toLowerCase();
     if (!email || !studentPassword) { setStudentLoginError("Enter an email and password."); return; }
-    setStudentLoginError("Student sign-in isn't connected yet. Please contact the admin.");
+    setStudentLoginLoading(true);
+    setStudentLoginError("");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: studentPassword });
+    if (error || !data.user) {
+      setStudentLoginError("Incorrect email or password.");
+      setStudentLoginLoading(false);
+      return;
+    }
+    const { data: studentRow } = await supabase.from("students").select("id").eq("user_id", data.user.id).maybeSingle();
+    if (!studentRow) {
+      await supabase.auth.signOut();
+      setStudentLoginError("This login isn't linked to a student record yet. Ask the admin to link it under Students.");
+      setStudentLoginLoading(false);
+      return;
+    }
+    setRole("student");
+    setLoggedInStudentId(studentRow.id);
+    setAuthView("app");
+    setSection("dashboard");
+    setStudentEmail(""); setStudentPassword("");
+    setStudentLoginLoading(false);
   };
 
   const accountTypeFields = {
@@ -1168,7 +1240,6 @@ export default function App() {
   const signOutUser = async () => {
     await supabase.auth.signOut();
     setRole("admin"); setIsAdminAuthenticated(false); setLoggedInTeacherId(null);
-    setLoggedInStaffId(null); setStaffPerms(null);
     setAuthView("login");
   };
 
@@ -1180,12 +1251,13 @@ export default function App() {
     name: s.name, class_id: s.classId || null, class_name: s.className || null,
     fee: Number(s.fee) || 0, phone: s.phone || null, teacher_id: s.teacherId || null,
     teacher_share_percent: Number(s.sharePercent) || 0, schedule: s.schedule || null,
-    joined_month: s.joinedMonth || null,
+    joined_month: s.joinedMonth || null, email: s.email || null,
   });
   const STUDENT_FROM_DB = (r) => ({
-    id: r.id, name: r.name, classId: r.class_id, className: r.class_name,
+    id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, className: r.class_name,
     fee: r.fee, phone: r.phone, teacherId: r.teacher_id,
     sharePercent: r.teacher_share_percent, schedule: r.schedule, joinedMonth: r.joined_month,
+    email: r.email,
   });
   const TEACHER_TO_DB = (t) => ({
     name: t.name, subject: t.subject || null, phone: t.phone || null, email: t.email || null,
@@ -1203,24 +1275,6 @@ export default function App() {
   });
   const HOLIDAY_TO_DB = (h) => ({ label: h.label, start_date: h.startDate, end_date: h.endDate });
   const HOLIDAY_FROM_DB = (r) => ({ id: r.id, label: r.label, startDate: r.start_date, endDate: r.end_date });
-  const ADMIN_STAFF_TO_DB = (s) => ({
-    name: s.name, email: s.email || null, phone: s.phone || null,
-    can_manage_classes_students: !!s.canManageClassesStudents,
-    can_manage_payments: !!s.canManagePayments,
-  });
-  const ADMIN_STAFF_FROM_DB = (r) => ({
-    id: r.id, userId: r.user_id, name: r.name, email: r.email, phone: r.phone,
-    canManageClassesStudents: !!r.can_manage_classes_students,
-    canManagePayments: !!r.can_manage_payments,
-  });
-  const TASK_TO_DB = (t) => ({
-    title: t.title, notes: t.notes || null, assigned_to: t.assignedTo || null,
-    due_date: t.dueDate || null, done: !!t.done,
-  });
-  const TASK_FROM_DB = (r) => ({
-    id: r.id, title: r.title, notes: r.notes, assignedTo: r.assigned_to,
-    dueDate: r.due_date, done: !!r.done,
-  });
   const INVESTMENT_TO_DB = (i) => ({
     description: i.description, amount: Number(i.amount) || 0,
     start_date: i.startDate, end_date: i.endDate || null, notes: i.notes || null,
@@ -1274,12 +1328,13 @@ export default function App() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
-  const [noteDrafts, setNoteDrafts] = useState({});
-  const [noteModeDrafts, setNoteModeDrafts] = useState({});
-  const [hifzDrafts, setHifzDrafts] = useState({});
-  const [reschedulingStudentId, setReschedulingStudentId] = useState(null);
-  const [rDays, setRDays] = useState([]);
-  const [rescheduleTargetDate, setRescheduleTargetDate] = useState("");
+  const [openClassName, setOpenClassName] = useState(null); // which class is open in Day view; null = class list
+  const [attDraft, setAttDraft] = useState({}); // unsaved present/absent picks for the open class
+  const [attReschedule, setAttReschedule] = useState(null); // null | { type: "day" } | { type: "class", className }
+  const [attRescheduleDate, setAttRescheduleDate] = useState("");
+  const [attRescheduleStart, setAttRescheduleStart] = useState("");
+  const [attRescheduleEnd, setAttRescheduleEnd] = useState("");
+  const [attRescheduleError, setAttRescheduleError] = useState("");
   const [attCalendarYear, setAttCalendarYear] = useState(() => new Date().getFullYear());
   const [attCalendarMonth0, setAttCalendarMonth0] = useState(() => new Date().getMonth());
   const [attStudentId, setAttStudentId] = useState("");
@@ -1287,15 +1342,18 @@ export default function App() {
   const [attDetailOpen, setAttDetailOpen] = useState(false);
   const [attendanceBulkLoaded, setAttendanceBulkLoaded] = useState(false);
   const [attendanceBulkLoading, setAttendanceBulkLoading] = useState(false);
-  const [rStart, setRStart] = useState("");
-  const [rEnd, setREnd] = useState("");
-  const [rescheduleError, setRescheduleError] = useState("");
 
   // ---- Class records history (teacher portal) ----
   const [allRecords, setAllRecords] = useState([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [hifzReportStudentId, setHifzReportStudentId] = useState("");
   const [expandedClasses, setExpandedClasses] = useState(new Set());
+
+  // ---- Add a class record (teacher portal, "Class records" page) ----
+  const [crStudentId, setCrStudentId] = useState("");
+  const [crMode, setCrMode] = useState("text"); // text | hifz
+  const [crNoteDraft, setCrNoteDraft] = useState("");
+  const [crHifzDraft, setCrHifzDraft] = useState(emptyHifzDraft());
 
   const toggleClassExpand = (key) => {
     setExpandedClasses((prev) => {
@@ -1315,9 +1373,6 @@ export default function App() {
     return Array.from(map.entries()).map(([className, entries]) => ({ className, entries }));
   };
 
-  const [totalRevenue, setTotalRevenue] = useState(0);
-  const [revenueLoading, setRevenueLoading] = useState(true);
-
   // Student form
   const [showStudentForm, setShowStudentForm] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
@@ -1330,6 +1385,7 @@ export default function App() {
   const [sPhone, setSPhone] = useState("");
   const [sSharePercent, setSSharePercent] = useState("0");
   const [sJoinedMonth, setSJoinedMonth] = useState("");
+  const [sEmail, setSEmail] = useState("");
 
   // Teacher form
   const [showTeacherForm, setShowTeacherForm] = useState(false);
@@ -1361,30 +1417,33 @@ export default function App() {
   const [hEndDate, setHEndDate] = useState("");
   const [holidayFormError, setHolidayFormError] = useState("");
 
-  // Admin staff (restricted-access admin logins) form
-  const [adminStaffView, setAdminStaffView] = useState("staff"); // staff | tasks
-  const [adminStaff, setAdminStaff] = useState([]);
-  const [showStaffForm, setShowStaffForm] = useState(false);
-  const [editingStaffId, setEditingStaffId] = useState(null);
-  const [stName, setStName] = useState("");
-  const [stEmail, setStEmail] = useState("");
-  const [stPhone, setStPhone] = useState("");
-  const [stCanClasses, setStCanClasses] = useState(false);
-  const [stCanPayments, setStCanPayments] = useState(false);
-  const [staffSearch, setStaffSearch] = useState("");
-  const [linkStaffLoginError, setLinkStaffLoginError] = useState("");
-  const [linkStaffLoginLoadingId, setLinkStaffLoginLoadingId] = useState(null);
-
-  // Tasks (admin assigns work to admin staff)
-  const [tasks, setTasks] = useState([]);
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [editingTaskId, setEditingTaskId] = useState(null);
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskNotes, setTaskNotes] = useState("");
-  const [taskAssignedTo, setTaskAssignedTo] = useState("");
-  const [taskDueDate, setTaskDueDate] = useState("");
-
   const [payDrafts, setPayDrafts] = useState({});
+
+  // ---- Admin Attendance (Student Records + Follow-up Alerts) ----
+  const [adminAttendanceView, setAdminAttendanceView] = useState("records"); // records | alerts
+  const [adminAttSearch, setAdminAttSearch] = useState("");
+  const [adminAttClassId, setAdminAttClassId] = useState("");
+  const [adminAttContactFilter, setAdminAttContactFilter] = useState("");
+  const [adminAttRangeStart, setAdminAttRangeStart] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+  });
+  const [adminAttRangeEnd, setAdminAttRangeEnd] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [adminAttRecordsLoaded, setAdminAttRecordsLoaded] = useState(false);
+  const [adminAttRecordsLoading, setAdminAttRecordsLoading] = useState(false);
+  const [adminAllAttendance, setAdminAllAttendance] = useState([]); // flat rows: { date, studentId, status }
+  const [adminAttPage, setAdminAttPage] = useState(1);
+  const [adminAttPageSize, setAdminAttPageSize] = useState(20);
+  const [adminAttViewStudentId, setAdminAttViewStudentId] = useState(null);
+  const [followUps, setFollowUps] = useState([]); // { studentId, contactStatus, remarks, remarkDraft }
+  const [followUpDrafts, setFollowUpDrafts] = useState({}); // studentId -> { remarks, contacted }
+  const [followUpSavingId, setFollowUpSavingId] = useState(null);
+  const [unrecordedDismissals, setUnrecordedDismissals] = useState([]); // { teacherId, dismissedAt }
+  const [adminAttUnrecordedTeacherId, setAdminAttUnrecordedTeacherId] = useState(null);
+  const [unrecordedDismissingId, setUnrecordedDismissingId] = useState(null);
 
   useEffect(() => {
     if (authView !== "app") return;
@@ -1393,13 +1452,11 @@ export default function App() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [studentsRes, teachersRes, classesRes, holidaysRes, adminStaffRes, tasksRes, investmentsRes] = await Promise.all([
+        const [studentsRes, teachersRes, classesRes, holidaysRes, investmentsRes] = await Promise.all([
           supabase.from("students").select("*"),
           supabase.from("teachers").select("*"),
           supabase.from("classes").select("*"),
           supabase.from("holidays").select("*"),
-          supabase.from("admin_staff").select("*"),
-          supabase.from("tasks").select("*"),
           supabase.from("investments").select("*"),
         ]);
         if (studentsRes.error) throw studentsRes.error;
@@ -1411,8 +1468,6 @@ export default function App() {
           setTeachers(teachersRes.data.map(TEACHER_FROM_DB));
           setClasses(classesRes.data.map(CLASS_FROM_DB));
           setHolidays(holidaysRes.data.map(HOLIDAY_FROM_DB));
-          if (!adminStaffRes.error) setAdminStaff(adminStaffRes.data.map(ADMIN_STAFF_FROM_DB));
-          if (!tasksRes.error) setTasks(tasksRes.data.map(TASK_FROM_DB));
           if (!investmentsRes.error) setInvestments(investmentsRes.data.map(INVESTMENT_FROM_DB));
         }
       } catch {
@@ -1480,22 +1535,6 @@ export default function App() {
     }
   };
 
-  const refreshTotalRevenue = useCallback(async () => {
-    setRevenueLoading(true);
-    try {
-      const { data, error } = await supabase.from("payments").select("amount_paid").eq("paid", true);
-      if (error) throw error;
-      const sum = (data || []).reduce((acc, r) => acc + (r.amount_paid || 0), 0);
-      setTotalRevenue(sum);
-    } catch {
-      setTotalRevenue(0);
-    } finally {
-      setRevenueLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { if (authView === "app") refreshTotalRevenue(); }, [refreshTotalRevenue, authView]);
-
   const saveMonthPayments = async (key, data) => {
     const previous = paymentsByMonth[key] || {};
     setPaymentsByMonth((prev) => ({ ...prev, [key]: data }));
@@ -1515,7 +1554,6 @@ export default function App() {
         if (error) throw error;
       }
       setSaveError(null);
-      refreshTotalRevenue();
     } catch {
       setPaymentsByMonth((prev) => ({ ...prev, [key]: previous }));
       setSaveError("Save failed. Your change may not persist.");
@@ -1830,26 +1868,17 @@ export default function App() {
     }
   }, [students]);
 
-  // Lets a teacher fix a mistake in a class record from the "Class records" history page:
-  // reopens that day+student as unrecorded and jumps to Attendance, where the normal
-  // edit/save flow (text or Hifz) already exists.
-  const editHistoricalRecord = async (dateStr, studentId) => {
-    try {
-      const { error } = await supabase
-        .from("attendance_records").update({ recorded: false }).eq("student_id", studentId).eq("record_date", dateStr);
-      if (error) throw error;
-    } catch {
-      showToast("Couldn't reopen this record. Please try again.");
-      return;
-    }
-    setAttendanceByDate((prev) => {
-      const next = { ...prev };
-      delete next[dateStr];
-      return next;
-    });
-    setSection("attendance");
-    setRecordDate(dateStr);
-    showToast("Record reopened — find it under pending classes to edit");
+  // Lets a teacher fix a mistake in a class record from the "Class records" history
+  // list: loads it straight into the "Add a class record" form above, ready to edit and re-save.
+  const editHistoricalRecord = (rec) => {
+    setRecordDate(rec.date);
+    setCrStudentId(rec.studentId);
+    setCrMode(rec.recordType || "text");
+    setCrNoteDraft(rec.note || "");
+    setCrHifzDraft(rec.recordType === "hifz" && (rec.hifz || rec.shortMuraja || rec.longMuraja)
+      ? { hifz: rec.hifz || emptyHifzSection(), shortMuraja: rec.shortMuraja || emptyHifzSection(), longMuraja: rec.longMuraja || emptyHifzSection() }
+      : emptyHifzDraft());
+    showToast("Loaded into the form above — edit and save to update");
   };
 
   const weekdayAbbrev = (dateStr) => {
@@ -1876,7 +1905,7 @@ export default function App() {
   // ---- Students ----
   const resetStudentForm = () => {
     setSName(""); setSClassId(""); setSFee(""); setSPhone(""); setSSharePercent("0");
-    setSJoinedMonth(month);
+    setSJoinedMonth(month); setSEmail("");
     setShowStudentForm(false); setEditingStudentId(null);
   };
 
@@ -1901,6 +1930,7 @@ export default function App() {
       sharePercent,
       schedule,
       joinedMonth: sJoinedMonth || month,
+      email: sEmail.trim(),
     };
     if (editingStudentId) {
       saveStudents(students.map((s) => (s.id === editingStudentId ? { ...s, ...payload } : s)));
@@ -1918,6 +1948,7 @@ export default function App() {
     setSPhone(s.phone || "");
     setSSharePercent(s.sharePercent != null ? String(s.sharePercent) : "0");
     setSJoinedMonth(s.joinedMonth || month);
+    setSEmail(s.email || "");
     setShowStudentForm(true);
   };
 
@@ -2072,128 +2103,77 @@ export default function App() {
 
   const removeHoliday = (id) => saveHolidays(holidays.filter((h) => h.id !== id));
 
-  // ---- Admin staff (restricted-access admin logins) ----
-  const saveAdminStaff = async (list) => {
-    const previous = adminStaff;
-    setAdminStaff(list);
+  // ---- Admin Attendance: all attendance records + follow-up tracking ----
+  const loadAdminAttendance = useCallback(async () => {
+    setAdminAttRecordsLoading(true);
     try {
-      const authoritative = await syncTable("admin_staff", previous, list, ADMIN_STAFF_TO_DB, ADMIN_STAFF_FROM_DB);
-      setAdminStaff(authoritative);
-      setSaveError(null);
-    } catch {
-      setAdminStaff(previous);
-      setSaveError("Save failed. Your change may not persist.");
+      const [attRes, followUpRes, dismissalsRes] = await Promise.all([
+        supabase.from("attendance_records").select("student_id, record_date, status"),
+        supabase.from("attendance_followups").select("*"),
+        supabase.from("unrecorded_dismissals").select("*"),
+      ]);
+      if (!attRes.error) {
+        setAdminAllAttendance((attRes.data || []).map((r) => ({ studentId: r.student_id, date: r.record_date, status: r.status || null })));
+      }
+      if (!followUpRes.error) {
+        setFollowUps((followUpRes.data || []).map((r) => ({
+          studentId: r.student_id, contactStatus: r.contact_status || "not_contacted", remarks: r.remarks || "", updatedAt: r.updated_at,
+        })));
+      }
+      if (!dismissalsRes.error) {
+        setUnrecordedDismissals((dismissalsRes.data || []).map((r) => ({ teacherId: r.teacher_id, dismissedAt: r.dismissed_at })));
+      }
+    } catch { /* leave whatever was loaded before */ }
+    setAdminAttRecordsLoading(false);
+    setAdminAttRecordsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (role === "admin" && section === "attendance" && !adminAttRecordsLoaded && !adminAttRecordsLoading) {
+      loadAdminAttendance();
     }
-  };
+  }, [role, section, adminAttRecordsLoaded, adminAttRecordsLoading, loadAdminAttendance]);
 
-  const resetStaffForm = () => {
-    setStName(""); setStEmail(""); setStPhone(""); setStCanClasses(false); setStCanPayments(false);
-    setShowStaffForm(false); setEditingStaffId(null);
-  };
-
-  const handleSaveStaff = () => {
-    const name = stName.trim();
-    if (!name) return;
-    const email = stEmail.trim().toLowerCase();
-    const payload = {
-      name, email, phone: stPhone.trim(),
-      canManageClassesStudents: stCanClasses, canManagePayments: stCanPayments,
-    };
-    if (editingStaffId) {
-      saveAdminStaff(adminStaff.map((s) => (s.id === editingStaffId ? { ...s, ...payload } : s)));
-      showToast(`Saved changes for ${name}`);
-    } else {
-      saveAdminStaff([...adminStaff, { id: uid(), userId: null, ...payload }]);
-      showToast(`${name} added`);
-    }
-    resetStaffForm();
-  };
-
-  // Links an EXISTING Supabase Auth login to this staff record by email, same
-  // pattern as linking a teacher login — passwords stay entirely in Supabase Auth.
-  const linkStaffLogin = async (staffId, email) => {
-    const trimmedEmail = (email || "").trim();
-    if (!trimmedEmail) { setLinkStaffLoginError("Add an email for this staff member first."); return; }
-    setLinkStaffLoginLoadingId(staffId);
-    setLinkStaffLoginError("");
-    const { error } = await supabase.rpc("admin_link_staff_by_email", {
-      p_staff_id: staffId, p_email: trimmedEmail,
-    });
-    setLinkStaffLoginLoadingId(null);
-    if (error) {
-      setLinkStaffLoginError(error.message || "Couldn't link that login.");
-      return;
-    }
-    showToast("Login linked");
-    const { data } = await supabase.from("admin_staff").select("*");
-    if (data) setAdminStaff(data.map(ADMIN_STAFF_FROM_DB));
-  };
-
-  const startEditStaff = (s) => {
-    setEditingStaffId(s.id);
-    setStName(s.name); setStEmail(s.email || ""); setStPhone(s.phone || "");
-    setStCanClasses(!!s.canManageClassesStudents); setStCanPayments(!!s.canManagePayments);
-    setShowStaffForm(true);
-  };
-
-  const removeStaff = (id) => saveAdminStaff(adminStaff.filter((s) => s.id !== id));
-
-  const staffName = (id) => adminStaff.find((s) => s.id === id)?.name || "Unassigned";
-
-  // ---- Tasks (admin assigns work to admin staff) ----
-  const saveTasks = async (list) => {
-    const previous = tasks;
-    setTasks(list);
+  const saveFollowUp = async (studentId, contactStatus, remarks) => {
+    setFollowUpSavingId(studentId);
     try {
-      const authoritative = await syncTable("tasks", previous, list, TASK_TO_DB, TASK_FROM_DB);
-      setTasks(authoritative);
-      setSaveError(null);
-    } catch {
-      setTasks(previous);
-      setSaveError("Save failed. Your change may not persist.");
-    }
-  };
-
-  const resetTaskForm = () => {
-    setTaskTitle(""); setTaskNotes(""); setTaskAssignedTo(""); setTaskDueDate("");
-    setShowTaskForm(false); setEditingTaskId(null);
-  };
-
-  const handleSaveTask = () => {
-    const title = taskTitle.trim();
-    if (!title || !taskAssignedTo) return;
-    const payload = { title, notes: taskNotes.trim(), assignedTo: taskAssignedTo, dueDate: taskDueDate || "" };
-    if (editingTaskId) {
-      saveTasks(tasks.map((t) => (t.id === editingTaskId ? { ...t, ...payload } : t)));
-      showToast("Task updated");
-    } else {
-      saveTasks([...tasks, { id: uid(), done: false, ...payload }]);
-      showToast("Task assigned");
-    }
-    resetTaskForm();
-  };
-
-  const startEditTask = (t) => {
-    setEditingTaskId(t.id);
-    setTaskTitle(t.title); setTaskNotes(t.notes || ""); setTaskAssignedTo(t.assignedTo || ""); setTaskDueDate(t.dueDate || "");
-    setShowTaskForm(true);
-  };
-
-  const removeTask = (id) => saveTasks(tasks.filter((t) => t.id !== id));
-
-  // Staff only ever toggles their own task's done state — a narrow, targeted
-  // update (rather than routing through saveTasks/syncTable) so it can never
-  // touch title/notes/assignment, matching what their RLS grant actually needs.
-  const toggleTaskDone = async (taskId, done) => {
-    const previous = tasks;
-    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, done } : t)));
-    try {
-      const { error } = await supabase.from("tasks").update({ done }).eq("id", taskId);
+      const { data, error } = await supabase
+        .from("attendance_followups")
+        .upsert({ student_id: studentId, contact_status: contactStatus, remarks, updated_at: new Date().toISOString() }, { onConflict: "student_id" })
+        .select()
+        .single();
       if (error) throw error;
+      setFollowUps((prev) => {
+        const next = prev.filter((f) => f.studentId !== studentId);
+        next.push({ studentId, contactStatus: data.contact_status, remarks: data.remarks || "", updatedAt: data.updated_at });
+        return next;
+      });
+      setFollowUpDrafts((prev) => { const n = { ...prev }; delete n[studentId]; return n; });
+      showToast("Follow-up saved");
     } catch {
-      setTasks(previous);
-      setSaveError("Save failed. Your change may not persist.");
+      showToast("Couldn't save follow-up. Please try again.");
     }
+    setFollowUpSavingId(null);
+  };
+
+  // Dismisses every currently-unrecorded class for one teacher from the alert
+  // list. Any class still unrecorded from AFTER this moment (a later missed
+  // day) reopens the alert — it isn't a blanket permanent mute.
+  const dismissUnrecordedForTeacher = async (teacherId) => {
+    setUnrecordedDismissingId(teacherId);
+    try {
+      const dismissedAt = new Date().toISOString();
+      const { error } = await supabase
+        .from("unrecorded_dismissals")
+        .upsert({ teacher_id: teacherId, dismissed_at: dismissedAt }, { onConflict: "teacher_id" });
+      if (error) throw error;
+      setUnrecordedDismissals((prev) => [...prev.filter((d) => d.teacherId !== teacherId), { teacherId, dismissedAt }]);
+      if (adminAttUnrecordedTeacherId === teacherId) setAdminAttUnrecordedTeacherId(null);
+      showToast("Dismissed");
+    } catch {
+      showToast("Couldn't dismiss. Please try again.");
+    }
+    setUnrecordedDismissingId(null);
   };
 
   // ---- Investments ----
@@ -2313,6 +2293,31 @@ export default function App() {
     if (data) setTeachers(data.map(TEACHER_FROM_DB));
   };
 
+  const [linkStudentLoginError, setLinkStudentLoginError] = useState("");
+  const [linkStudentLoginLoadingId, setLinkStudentLoginLoadingId] = useState(null);
+
+  // Links an EXISTING Supabase Auth login (created in the dashboard, or by the
+  // student signing up) to this student record by email. Real passwords are
+  // never handled by this app — Supabase Auth owns them.
+  const linkStudentLogin = async (studentId, email) => {
+    const trimmedEmail = (email || "").trim();
+    if (!trimmedEmail) { setLinkStudentLoginError("Add an email for this student first."); return; }
+    setLinkStudentLoginLoadingId(studentId);
+    setLinkStudentLoginError("");
+    const { error } = await supabase.rpc("admin_link_student_by_email", {
+      p_student_id: studentId, p_email: trimmedEmail,
+    });
+    setLinkStudentLoginLoadingId(null);
+    if (error) {
+      setLinkStudentLoginError(error.message || "Couldn't link that login.");
+      return;
+    }
+    showToast("Login linked");
+    // Refresh so the student's userId shows as linked in the UI.
+    const { data } = await supabase.from("students").select("*");
+    if (data) setStudents(data.map(STUDENT_FROM_DB));
+  };
+
   const startEditTeacher = (t) => {
     setEditingTeacherId(t.id);
     setTName(t.name); setTSubject(t.subject || ""); setTPhone(t.phone || "");
@@ -2327,6 +2332,7 @@ export default function App() {
   };
 
   const teacherName = (id) => teachers.find((t) => t.id === id)?.name || "Unassigned";
+  const studentName = (id) => students.find((s) => s.id === id)?.name || "Student";
 
   // ---- Finance derived ----
   const activeStudents = useMemo(
@@ -2346,6 +2352,34 @@ export default function App() {
   }, [activeStudents, monthData]);
 
   const pendingStudents = activeStudents.filter((s) => !(monthData[s.id] && monthData[s.id].paid));
+
+  // ---- Dashboard: month-by-month performance table ----
+  const DASHBOARD_MONTHLY_SPAN = 6;
+  const dashboardMonthKeys = useMemo(() => {
+    const keys = [];
+    for (let i = 0; i < DASHBOARD_MONTHLY_SPAN; i++) keys.push(shiftMonth(month, -i));
+    return keys;
+  }, [month]);
+
+  useEffect(() => {
+    if (authView !== "app" || role !== "admin") return;
+    dashboardMonthKeys.forEach((key) => loadMonthPayments(key));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dashboardMonthKeys, authView, role]);
+
+  const monthlyPerformance = useMemo(() => {
+    return dashboardMonthKeys.map((key) => {
+      const monthMap = paymentsByMonth[key] || {};
+      const active = students.filter((s) => isEnrolledInMonth(s, key));
+      let expected = 0, received = 0;
+      active.forEach((s) => {
+        expected += s.fee;
+        const rec = monthMap[s.id];
+        if (rec && rec.paid) received += rec.amountPaid || 0;
+      });
+      return { key, expected, received, pending: Math.max(0, expected - received) };
+    });
+  }, [dashboardMonthKeys, paymentsByMonth, students]);
 
   const salaryByTeacher = useMemo(() => {
     const rows = teachers.map((t) => ({ teacherId: t.id, name: t.name, collected: 0, payout: 0, studentCount: 0 }));
@@ -2992,12 +3026,11 @@ export default function App() {
                 ? getSessionsForDate(selectedDate).filter((r) => r.studentId === attStudentId)
                 : [];
 
-              const statusLabels = { present: "Present", absent: "Absent", cancelled: "Cancelled" };
               const setStatus = (studentId, status) => {
                 const current = dayRecords[studentId] || {};
                 const updated = { ...dayRecords, [studentId]: { ...current, status, rescheduledTo: undefined, rescheduledStartTime: undefined, rescheduledEndTime: undefined } };
                 saveAttendanceForDate(selectedDate, updated);
-                showToast(`Saved: ${statusLabels[status] || status}`);
+                showToast(status === "present" ? "Saved: Present" : "Saved: Absent");
               };
               const setStatusBulk = (studentIds, status) => {
                 const updated = { ...dayRecords };
@@ -3006,52 +3039,17 @@ export default function App() {
                   updated[studentId] = { ...current, status, rescheduledTo: undefined, rescheduledStartTime: undefined, rescheduledEndTime: undefined };
                 });
                 saveAttendanceForDate(selectedDate, updated);
-                showToast(`Marked ${studentIds.length} student${studentIds.length === 1 ? "" : "s"} as ${statusLabels[status] || status}`);
+                showToast(`Marked ${studentIds.length} student${studentIds.length === 1 ? "" : "s"} as ${status === "present" ? "Present" : "Absent"}`);
               };
 
-              const startReschedule = (r) => {
-                setReschedulingStudentId(r.studentId);
-                setRescheduleTargetDate("");
-                setRStart(r.startTime);
-                setREnd(r.endTime);
-                setRescheduleError("");
-              };
-              const cancelReschedule = () => {
-                setReschedulingStudentId(null);
-                setRescheduleTargetDate("");
-                setRescheduleError("");
-              };
               const undoReschedule = (studentId) => {
                 const current = dayRecords[studentId] || {};
                 const updated = { ...dayRecords, [studentId]: { ...current, status: undefined, rescheduledTo: undefined, rescheduledStartTime: undefined, rescheduledEndTime: undefined } };
                 saveAttendanceForDate(selectedDate, updated);
                 showToast("Move undone");
               };
-              const saveReschedule = (studentId) => {
-                if (!rescheduleTargetDate) { setRescheduleError("Pick a new date."); return; }
-                if (!rStart || !rEnd || rStart >= rEnd) { setRescheduleError("Set a valid start and end time."); return; }
-                const targetSessions = getSessionsForDate(rescheduleTargetDate).filter((s) => s.studentId !== studentId);
-                const clash = targetSessions.find((s) => timesOverlap(rStart, rEnd, s.startTime, s.endTime));
-                if (clash) {
-                  setRescheduleError(`Clashes with ${clash.studentName}'s class on ${rescheduleTargetDate} at that time.`);
-                  return;
-                }
-                const current = dayRecords[studentId] || {};
-                const updated = {
-                  ...dayRecords,
-                  [studentId]: { ...current, status: "rescheduled", rescheduledTo: rescheduleTargetDate, rescheduledStartTime: rStart, rescheduledEndTime: rEnd },
-                };
-                saveAttendanceForDate(selectedDate, updated);
-                setReschedulingStudentId(null);
-                setRescheduleTargetDate("");
-                setRescheduleError("");
-                showToast(`Class moved to ${rescheduleTargetDate}`);
-              };
 
-              const closeDetail = () => {
-                setAttDetailOpen(false);
-                cancelReschedule();
-              };
+              const closeDetail = () => setAttDetailOpen(false);
 
               const statusBadge = (status) => {
                 if (status === "present") return <span className="lc-badge lc-badge-paid">Present</span>;
@@ -3060,72 +3058,118 @@ export default function App() {
                 return null;
               };
 
-              // ---- Day view (merged former "Records" section) ----
               const daySessions = scheduleRows
                 .filter((r) => r.teacherId === loggedInTeacherId && r.day === selectedWeekday)
                 .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+              const dayGroups = groupByClass(daySessions);
+              const openGroup = openClassName ? dayGroups.find((g) => g.className === openClassName) : null;
 
-              const getNoteDraft = (studentId) => {
-                const key = `${recordDate}:${studentId}`;
-                if (noteDrafts[key] !== undefined) return noteDrafts[key];
-                return (dayRecords[studentId] && dayRecords[studentId].note) || "";
-              };
-              const saveNote = (studentId) => {
-                const key = `${recordDate}:${studentId}`;
-                const note = noteDrafts[key] !== undefined ? noteDrafts[key] : (dayRecords[studentId]?.note || "");
-                const current = dayRecords[studentId] || {};
-                const updated = { ...dayRecords, [studentId]: { ...current, note, recordType: "text", recorded: true } };
-                saveAttendanceForDate(recordDate, updated);
-                showToast("Class record saved");
-              };
-
-              const getNoteMode = (studentId) => {
-                const key = `${recordDate}:${studentId}`;
-                if (noteModeDrafts[key] !== undefined) return noteModeDrafts[key];
-                return (dayRecords[studentId] && dayRecords[studentId].recordType) || "text";
-              };
-              const setNoteMode = (studentId, mode) => {
-                setNoteModeDrafts((prev) => ({ ...prev, [`${recordDate}:${studentId}`]: mode }));
-              };
-
-              const emptySection = () => ({ startSurah: "", startAyah: "", endSurah: "", endAyah: "", mistakes: "0" });
-              const emptyHifz = () => ({
-                hifz: emptySection(),
-                shortMuraja: emptySection(),
-                longMuraja: emptySection(),
-              });
-              const getHifzDraft = (studentId) => {
-                const key = `${recordDate}:${studentId}`;
-                if (hifzDrafts[key]) return hifzDrafts[key];
-                const rec = dayRecords[studentId];
-                if (rec && (rec.hifz || rec.shortMuraja || rec.longMuraja)) {
-                  return {
-                    hifz: rec.hifz || emptySection(),
-                    shortMuraja: rec.shortMuraja || emptySection(),
-                    longMuraja: rec.longMuraja || emptySection(),
-                  };
+              // ---- Unmarked attendance: this teacher's own past classes (last 14 days,
+              // already ended) with no present/absent mark saved yet ----
+              const teacherUnmarked = (() => {
+                const now = new Date();
+                const nowTimeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+                const LOOKBACK_DAYS = 14;
+                const groups = new Map();
+                for (let i = 0; i < LOOKBACK_DAYS; i++) {
+                  const d = new Date(now);
+                  d.setDate(d.getDate() - i);
+                  const dateStr = fmtDateStr(d);
+                  if (isHoliday(dateStr)) continue;
+                  const isToday = dateStr === todayStr;
+                  const weekday = weekdayAbbrev(dateStr);
+                  const dateRecords = attendanceByDate[dateStr] || {};
+                  scheduleRows.filter((r) => r.teacherId === loggedInTeacherId && r.day === weekday).forEach((r) => {
+                    if (isToday && r.endTime > nowTimeStr) return; // class hasn't ended yet today
+                    const st = (dateRecords[r.studentId] || {}).status;
+                    if (st) return; // already marked
+                    const key = `${dateStr}|${r.className}`;
+                    if (!groups.has(key)) groups.set(key, { date: dateStr, className: r.className, entries: [] });
+                    groups.get(key).entries.push(r);
+                  });
                 }
-                return emptyHifz();
-              };
-              const setHifzField = (studentId, hifzSection, field, value) => {
-                const key = `${recordDate}:${studentId}`;
-                setHifzDrafts((prev) => {
-                  const current = prev[key] || getHifzDraft(studentId);
-                  return { ...prev, [key]: { ...current, [hifzSection]: { ...current[hifzSection], [field]: value } } };
+                return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date) || a.className.localeCompare(b.className));
+              })();
+
+              const jumpToUnmarked = (dateStr, className, entries) => {
+                setRecordDate(dateStr);
+                const freshRecords = attendanceByDate[dateStr] || {};
+                const draft = {};
+                entries.forEach((r) => {
+                  const st = (freshRecords[r.studentId] || {}).status;
+                  draft[r.studentId] = st === "present" || st === "absent" ? st : undefined;
                 });
-              };
-              const saveHifzRecord = (studentId) => {
-                const draft = getHifzDraft(studentId);
-                const current = dayRecords[studentId] || {};
-                const updated = { ...dayRecords, [studentId]: { ...current, ...draft, recordType: "hifz", recorded: true } };
-                saveAttendanceForDate(recordDate, updated);
-                showToast("Hifz record saved");
+                setAttDraft(draft);
+                setOpenClassName(className);
               };
 
-              const unrecordSession = (studentId) => {
-                const current = dayRecords[studentId] || {};
-                const updated = { ...dayRecords, [studentId]: { ...current, recorded: false } };
-                saveAttendanceForDate(recordDate, updated);
+              // ---- Whole-day / whole-class reschedule ----
+              const startBulkReschedule = (scope) => {
+                setAttReschedule(scope);
+                setAttRescheduleDate("");
+                setAttRescheduleStart("");
+                setAttRescheduleEnd("");
+                setAttRescheduleError("");
+              };
+              const cancelBulkReschedule = () => {
+                setAttReschedule(null);
+                setAttRescheduleError("");
+              };
+              const confirmBulkReschedule = () => {
+                if (!attRescheduleDate) { setAttRescheduleError("Pick a new date."); return; }
+                if (!attRescheduleStart || !attRescheduleEnd || attRescheduleStart >= attRescheduleEnd) { setAttRescheduleError("Set a valid start and end time."); return; }
+                const targets = attReschedule.type === "day"
+                  ? daySessions
+                  : daySessions.filter((r) => r.className === attReschedule.className);
+                const updated = { ...dayRecords };
+                let moved = 0, clashed = 0;
+                targets.forEach((r) => {
+                  const clash = getSessionsForDate(attRescheduleDate)
+                    .filter((s) => s.studentId !== r.studentId)
+                    .find((s) => timesOverlap(attRescheduleStart, attRescheduleEnd, s.startTime, s.endTime));
+                  if (clash) { clashed++; return; }
+                  const current = updated[r.studentId] || {};
+                  updated[r.studentId] = { ...current, status: "rescheduled", rescheduledTo: attRescheduleDate, rescheduledStartTime: attRescheduleStart, rescheduledEndTime: attRescheduleEnd };
+                  moved++;
+                });
+                saveAttendanceForDate(selectedDate, updated);
+                setAttReschedule(null);
+                showToast(moved === 0 ? "No classes moved — all clashed with existing sessions." : clashed > 0 ? `Moved ${moved}, skipped ${clashed} (time clash)` : `Moved ${moved} to ${attRescheduleDate}`);
+              };
+
+              // ---- Class detail draft (Save / Reset / Cancel) ----
+              const draftFromSaved = (entries) => {
+                const draft = {};
+                entries.forEach((r) => {
+                  const st = (dayRecords[r.studentId] || {}).status;
+                  draft[r.studentId] = st === "present" || st === "absent" ? st : undefined;
+                });
+                return draft;
+              };
+              const openClass = (className, entries) => {
+                setAttDraft(draftFromSaved(entries));
+                setOpenClassName(className);
+              };
+              const closeClass = () => {
+                setOpenClassName(null);
+                setAttDraft({});
+                cancelBulkReschedule();
+              };
+              const resetDraft = () => {
+                if (!openGroup) return;
+                setAttDraft(draftFromSaved(openGroup.entries));
+              };
+              const saveDraft = () => {
+                if (!openGroup) return;
+                const updated = { ...dayRecords };
+                openGroup.entries.forEach((r) => {
+                  const val = attDraft[r.studentId];
+                  if (!val) return;
+                  const current = updated[r.studentId] || {};
+                  updated[r.studentId] = { ...current, status: val, rescheduledTo: undefined, rescheduledStartTime: undefined, rescheduledEndTime: undefined };
+                });
+                saveAttendanceForDate(selectedDate, updated);
+                showToast("Attendance saved");
               };
 
               // Build the month calendar grid
@@ -3204,6 +3248,37 @@ export default function App() {
               })();
 
               const attSubtitle = teacherName(loggedInTeacherId);
+
+              const viewAllRecords = () => {
+                setSection("classRecords");
+                loadAllTeacherRecords(loggedInTeacherId);
+              };
+
+              const rescheduleBox = attReschedule && (
+                <div className="lc-card" style={{ marginBottom: "18px", background: C.g }}>
+                  <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "10px" }}>
+                    {attReschedule.type === "day" ? `Move the whole day (${daySessions.length} class${daySessions.length === 1 ? "" : "es"})` : `Move all of ${attReschedule.className}`}
+                  </div>
+                  <label style={{ fontSize: "12px", color: C.a }}>New date</label>
+                  <input className="lc-input" style={{ marginBottom: "10px" }} type="date" value={attRescheduleDate} onChange={(e) => setAttRescheduleDate(e.target.value)} />
+                  <div className="lc-form-grid" style={{ marginBottom: "10px" }}>
+                    <div>
+                      <label style={{ fontSize: "12px", color: C.a }}>Start time</label>
+                      <input className="lc-input" type="time" value={attRescheduleStart} onChange={(e) => setAttRescheduleStart(e.target.value)} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "12px", color: C.a }}>End time</label>
+                      <input className="lc-input" type="time" value={attRescheduleEnd} onChange={(e) => setAttRescheduleEnd(e.target.value)} />
+                    </div>
+                  </div>
+                  {attRescheduleError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "10px" }}>{attRescheduleError}</div>}
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <button className="lc-btn lc-btn-primary" style={{ flex: 1 }} onClick={confirmBulkReschedule}>Move classes</button>
+                    <button className="lc-btn" onClick={cancelBulkReschedule}>Cancel</button>
+                  </div>
+                </div>
+              );
+
               return (
                 <div className="tp-attendance-page">
                   <style>{`
@@ -3214,6 +3289,13 @@ export default function App() {
                     @media (max-width: 640px) {
                       .tp-attendance-page { padding: 20px; }
                     }
+                    .tp-att-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+                    .tp-att-table th { text-align: left; color: #5B6B79; font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; padding: 10px; border-bottom: 1px solid #D3E9F7; }
+                    .tp-att-table th.tp-att-radio-col { text-align: center; }
+                    .tp-att-table td { padding: 10px; border-bottom: 1px solid #E7F2FA; vertical-align: middle; }
+                    .tp-att-table td.tp-att-radio-col { text-align: center; }
+                    .tp-att-radio { width: 20px; height: 20px; cursor: pointer; }
+                    .tp-alert-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #D9573A; color: #FFFFFF; font-size: 11px; font-weight: 700; margin-left: 8px; }
                   `}</style>
                   <div className="tp-header">
                     <div className="tp-title-group">
@@ -3231,7 +3313,7 @@ export default function App() {
                           type="date"
                           aria-label="Selected date"
                           value={recordDate}
-                          onChange={(e) => setRecordDate(e.target.value)}
+                          onChange={(e) => { setRecordDate(e.target.value); closeClass(); }}
                         />
                       </label>
                       {attendanceView === "calendar" && attendanceBulkLoading && (
@@ -3243,301 +3325,198 @@ export default function App() {
                   </div>
 
                   <div className="tp-card">
-                    <div className="tp-segment" role="group" aria-label="Attendance view">
-                      <button
-                        type="button"
-                        aria-pressed={attendanceView === "day"}
-                        className={`tp-segment-btn ${attendanceView === "day" ? "tp-segment-btn-active" : ""}`}
-                        onClick={() => setAttendanceView("day")}
-                      >
-                        Day view
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={attendanceView === "calendar"}
-                        className={`tp-segment-btn ${attendanceView === "calendar" ? "tp-segment-btn-active" : ""}`}
-                        onClick={() => setAttendanceView("calendar")}
-                      >
-                        Calendar view
-                      </button>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "18px" }}>
+                      <div className="tp-segment" role="group" aria-label="Attendance view" style={{ margin: 0 }}>
+                        <button
+                          type="button"
+                          aria-pressed={attendanceView === "day"}
+                          className={`tp-segment-btn ${attendanceView === "day" ? "tp-segment-btn-active" : ""}`}
+                          onClick={() => { setAttendanceView("day"); closeClass(); }}
+                        >
+                          Day view
+                          {attendanceBulkLoaded && teacherUnmarked.length > 0 && <span className="tp-alert-badge">{teacherUnmarked.length}</span>}
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={attendanceView === "calendar"}
+                          className={`tp-segment-btn ${attendanceView === "calendar" ? "tp-segment-btn-active" : ""}`}
+                          onClick={() => setAttendanceView("calendar")}
+                        >
+                          Calendar view
+                        </button>
+                      </div>
+                      {attendanceView === "day" && !openClassName && daySessions.length > 0 && (
+                        <button type="button" className="lc-btn no-print" onClick={() => startBulkReschedule({ type: "day" })}>
+                          <CalendarDays size={14} aria-hidden="true" style={{ marginRight: "6px", verticalAlign: "-2px" }} />
+                          Reschedule Whole Day
+                        </button>
+                      )}
                     </div>
 
                   {attendanceView === "day" && (
                     <>
-                      <div className="tp-subtext">
-                        Showing classes scheduled for {selectedWeekday}, {recordDate}
-                      </div>
+                      {!openClassName ? (
+                        <>
+                          <div className="tp-subtext">
+                            Showing classes scheduled for {selectedWeekday}, {recordDate}
+                          </div>
 
-                      {daySessions.length === 0 ? (
-                        <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No classes scheduled for you on this day.</div>
+                          {attendanceBulkLoaded && teacherUnmarked.length > 0 && (
+                            <div className="lc-card" style={{ marginBottom: "18px", borderColor: "#EAB5A2", background: "#FBEAE6" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontWeight: 700, color: C.b }}>
+                                <AlertTriangle size={16} aria-hidden="true" />
+                                {teacherUnmarked.length} unmarked class{teacherUnmarked.length === 1 ? "" : "es"} from previous days
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                {teacherUnmarked.map((g) => (
+                                  <button
+                                    key={`${g.date}|${g.className}`}
+                                    type="button"
+                                    className="lc-btn"
+                                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", background: "#FFFFFF" }}
+                                    onClick={() => jumpToUnmarked(g.date, g.className, g.entries)}
+                                  >
+                                    <span>{weekdayAbbrev(g.date)}, {g.date} — {g.className}</span>
+                                    <span style={{ fontSize: "12px", color: C.a }}>{g.entries.length} student{g.entries.length === 1 ? "" : "s"}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {attReschedule && attReschedule.type === "day" && rescheduleBox}
+
+                          {dayGroups.length === 0 ? (
+                            <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No classes scheduled for you on this day.</div>
+                          ) : (
+                            <div>
+                              {dayGroups.map(({ className, entries }) => {
+                                const code = classCode(className);
+                                const badge = classBadgeStyle(code);
+                                return (
+                                  <button
+                                    key={className}
+                                    type="button"
+                                    className="tp-accordion-row"
+                                    onClick={() => openClass(className, entries)}
+                                  >
+                                    <ChevronRight size={18} className="tp-accordion-chevron" aria-hidden="true" />
+                                    <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{code}</span>
+                                    <span className="tp-accordion-title">{className}</span>
+                                    <span className="tp-count-badge">{entries.length} student{entries.length === 1 ? "" : "s"}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
                       ) : (() => {
-                        const pending = daySessions.filter((r) => !(dayRecords[r.studentId] && dayRecords[r.studentId].recorded));
-                        const recorded = daySessions.filter((r) => dayRecords[r.studentId] && dayRecords[r.studentId].recorded);
-                        const pendingGroups = groupByClass(pending);
-                        const recordedGroups = groupByClass(recorded);
+                        if (!openGroup) return null;
+                        const { className, entries } = openGroup;
+                        const code = classCode(className);
+                        const badge = classBadgeStyle(code);
+                        const presentCount = entries.filter((r) => attDraft[r.studentId] === "present").length;
+                        const absentCount = entries.filter((r) => attDraft[r.studentId] === "absent").length;
+                        const timeLabel = entries.length > 0 ? `${fmtTime12(entries[0].startTime)} – ${fmtTime12(entries[0].endTime)}` : "";
                         return (
                           <>
-                            {pendingGroups.length === 0 ? (
-                              <div className="lc-card" style={{ marginBottom: "18px" }}>
-                                <div className="lc-celebrate" style={{ color: C.d, fontSize: "14px" }}><PartyPopper size={16} aria-hidden="true" />All of today's classes are recorded.</div>
-                              </div>
-                            ) : (
-                              <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "22px" }}>
-                                {pendingGroups.map(({ className, entries }) => {
-                                  const key = `pending:${className}`;
-                                  const isOpen = expandedClasses.has(key);
-                                  const groupStudentIds = entries.map((r) => r.studentId);
-                                  const code = classCode(className);
-                                  const badge = classBadgeStyle(code);
-                                  return (
-                                    <div key={key}>
-                                      <button
-                                        type="button"
-                                        className="tp-accordion-row"
-                                        aria-expanded={isOpen}
-                                        onClick={() => toggleClassExpand(key)}
-                                      >
-                                        <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
-                                        <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{code}</span>
-                                        <span className="tp-accordion-title">{className}</span>
-                                        <span className="tp-count-badge">{entries.length} student{entries.length === 1 ? "" : "s"}</span>
-                                      </button>
+                            <button type="button" className="lc-btn no-print" style={{ marginBottom: "14px" }} onClick={closeClass}>
+                              <ChevronLeft size={14} aria-hidden="true" style={{ marginRight: "4px", verticalAlign: "-2px" }} />
+                              All classes
+                            </button>
 
-                                      {isOpen && (
-                                        <div className="lc-expand-panel" style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "10px", paddingLeft: "8px" }}>
-                                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                                            <button className="lc-btn" style={{ fontSize: "12px", padding: "4px 10px" }} onClick={() => setStatusBulk(groupStudentIds, "present")}>Mark all present</button>
-                                            <button className="lc-btn" style={{ fontSize: "12px", padding: "4px 10px" }} onClick={() => setStatusBulk(groupStudentIds, "absent")}>Mark all absent</button>
-                                            <button className="lc-btn" style={{ fontSize: "12px", padding: "4px 10px" }} onClick={() => setStatusBulk(groupStudentIds, "cancelled")}>Mark all cancelled</button>
-                                          </div>
-                                          {entries.map((r) => {
-                                            const rec = dayRecords[r.studentId] || {};
-                                            return (
-                                              <div className="lc-card" key={r.studentId + r.startTime}>
-                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "10px" }}>
-                                                  <div>
-                                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                      <div style={{ fontWeight: 600 }}>{r.studentName}</div>
-                                                      {rec.status && statusBadge(rec.status)}
-                                                    </div>
-                                                    <div style={{ fontSize: "12px", color: C.a }}>
-                                                      {fmtTime12(r.startTime)} – {fmtTime12(r.endTime)}
-                                                    </div>
-                                                  </div>
-                                                </div>
-
-                                                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
-                                                  <button
-                                                    className="lc-btn"
-                                                    style={{ padding: "6px 10px", fontSize: "12px", ...(rec.status === "present" ? { background: C.i, borderColor: C.d, color: C.d } : {}) }}
-                                                    onClick={() => setStatus(r.studentId, "present")}
-                                                  >
-                                                    Present
-                                                  </button>
-                                                  <button
-                                                    className="lc-btn"
-                                                    style={{ padding: "6px 10px", fontSize: "12px", ...(rec.status === "absent" ? { background: C.h, borderColor: C.b, color: C.b } : {}) }}
-                                                    onClick={() => setStatus(r.studentId, "absent")}
-                                                  >
-                                                    Absent
-                                                  </button>
-                                                  <button
-                                                    className="lc-btn"
-                                                    style={{ padding: "6px 10px", fontSize: "12px", ...(rec.status === "cancelled" ? { background: C.x, borderColor: C.n, color: C.k } : {}) }}
-                                                    onClick={() => setStatus(r.studentId, "cancelled")}
-                                                  >
-                                                    Cancelled
-                                                  </button>
-                                                  {rec.status === "rescheduled" ? (
-                                                    <button className="lc-btn" style={{ padding: "6px 10px", fontSize: "12px" }} onClick={() => undoReschedule(r.studentId)}>Undo move</button>
-                                                  ) : (
-                                                    <button className="lc-btn" style={{ padding: "6px 10px", fontSize: "12px" }} onClick={() => { setAttStudentId(r.studentId); startReschedule(r); }}>Reschedule</button>
-                                                  )}
-                                                </div>
-
-                                                {reschedulingStudentId === r.studentId && (
-                                                  <div style={{ background: C.g, border: "1px solid #D3E9F7", borderRadius: "10px", padding: "12px", marginBottom: "12px" }}>
-                                                    <div style={{ fontSize: "12px", color: C.a, marginBottom: "8px" }}>Move this class to a new date</div>
-                                                    <label style={{ fontSize: "12px", color: C.a }}>New date</label>
-                                                    <input className="lc-input" style={{ marginBottom: "10px" }} type="date" value={rescheduleTargetDate} onChange={(e) => setRescheduleTargetDate(e.target.value)} />
-                                                    <div className="lc-form-grid" style={{ marginBottom: "10px" }}>
-                                                      <div>
-                                                        <label style={{ fontSize: "12px", color: C.a }}>Start time</label>
-                                                        <input className="lc-input" type="time" value={rStart} onChange={(e) => setRStart(e.target.value)} />
-                                                      </div>
-                                                      <div>
-                                                        <label style={{ fontSize: "12px", color: C.a }}>End time</label>
-                                                        <input className="lc-input" type="time" value={rEnd} onChange={(e) => setREnd(e.target.value)} />
-                                                      </div>
-                                                    </div>
-                                                    {rescheduleError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "10px" }}>{rescheduleError}</div>}
-                                                    <div style={{ display: "flex", gap: "10px" }}>
-                                                      <button className="lc-btn lc-btn-primary" style={{ flex: 1 }} onClick={() => saveReschedule(r.studentId)}>Move class</button>
-                                                      <button className="lc-btn" onClick={cancelReschedule}>Cancel</button>
-                                                    </div>
-                                                  </div>
-                                                )}
-
-                                                {(() => {
-                                                  const mode = getNoteMode(r.studentId);
-                                                  const hifzDraft = getHifzDraft(r.studentId);
-                                                  return (
-                                                    <>
-                                                      <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
-                                                        <div className={`lc-subtab ${mode === "text" ? "lc-subtab-active" : ""}`} onClick={() => setNoteMode(r.studentId, "text")}>Text note</div>
-                                                        <div className={`lc-subtab ${mode === "hifz" ? "lc-subtab-active" : ""}`} onClick={() => setNoteMode(r.studentId, "hifz")}>Hifz record</div>
-                                                      </div>
-
-                                                      {mode === "text" ? (
-                                                        <>
-                                                          <label style={{ fontSize: "12px", color: C.a }}>Class notes / progress</label>
-                                                          <textarea
-                                                            className="lc-input"
-                                                            rows={2}
-                                                            style={{ resize: "vertical", marginBottom: "8px" }}
-                                                            value={getNoteDraft(r.studentId)}
-                                                            onChange={(e) => setNoteDrafts((prev) => ({ ...prev, [`${recordDate}:${r.studentId}`]: e.target.value }))}
-                                                            placeholder="What was covered, homework, progress notes…"
-                                                          />
-                                                          <button className="lc-btn lc-btn-primary" onClick={() => saveNote(r.studentId)}>Save</button>
-                                                        </>
-                                                      ) : (
-                                                        <>
-                                                          {HIFZ_SECTIONS.map(({ key, label }) => (
-                                                            <div key={key} style={{ marginBottom: "14px", background: C.g, border: "1px solid #D3E9F7", borderRadius: "10px", padding: "10px" }}>
-                                                              <div style={{ fontSize: "12px", color: C.a, marginBottom: "8px", fontWeight: 600 }}>{label}</div>
-
-                                                              <div style={{ fontSize: "11px", color: C.a, marginBottom: "3px" }}>Starting point</div>
-                                                              <div className="lc-form-grid" style={{ marginBottom: "8px" }}>
-                                                                <div>
-                                                                  <label style={{ fontSize: "11px", color: C.a }}>Surah</label>
-                                                                  <SearchableSelect
-                                                                    value={hifzDraft[key].startSurah}
-                                                                    onChange={(val) => setHifzField(r.studentId, key, "startSurah", val)}
-                                                                    placeholder="Select surah"
-                                                                    options={SURAH_OPTIONS}
-                                                                  />
-                                                                </div>
-                                                                <div>
-                                                                  <label style={{ fontSize: "11px", color: C.a }}>Ayah</label>
-                                                                  <input
-                                                                    className="lc-input"
-                                                                    type="number"
-                                                                    min="1"
-                                                                    value={hifzDraft[key].startAyah}
-                                                                    onChange={(e) => setHifzField(r.studentId, key, "startAyah", e.target.value)}
-                                                                    placeholder="Ayah #"
-                                                                  />
-                                                                </div>
-                                                              </div>
-
-                                                              <div style={{ fontSize: "11px", color: C.a, marginBottom: "3px" }}>Ending point</div>
-                                                              <div className="lc-form-grid" style={{ marginBottom: "8px" }}>
-                                                                <div>
-                                                                  <label style={{ fontSize: "11px", color: C.a }}>Surah</label>
-                                                                  <SearchableSelect
-                                                                    value={hifzDraft[key].endSurah}
-                                                                    onChange={(val) => setHifzField(r.studentId, key, "endSurah", val)}
-                                                                    placeholder="Select surah"
-                                                                    options={SURAH_OPTIONS}
-                                                                  />
-                                                                </div>
-                                                                <div>
-                                                                  <label style={{ fontSize: "11px", color: C.a }}>Ayah</label>
-                                                                  <input
-                                                                    className="lc-input"
-                                                                    type="number"
-                                                                    min="1"
-                                                                    value={hifzDraft[key].endAyah}
-                                                                    onChange={(e) => setHifzField(r.studentId, key, "endAyah", e.target.value)}
-                                                                    placeholder="Ayah #"
-                                                                  />
-                                                                </div>
-                                                              </div>
-
-                                                              <label style={{ fontSize: "11px", color: C.a }}>Mistakes</label>
-                                                              <input
-                                                                className="lc-input"
-                                                                type="number"
-                                                                min="0"
-                                                                style={{ maxWidth: "120px" }}
-                                                                value={hifzDraft[key].mistakes}
-                                                                onChange={(e) => setHifzField(r.studentId, key, "mistakes", e.target.value)}
-                                                              />
-                                                            </div>
-                                                          ))}
-                                                          <button className="lc-btn lc-btn-primary" onClick={() => saveHifzRecord(r.studentId)}>Save</button>
-                                                        </>
-                                                      )}
-                                                    </>
-                                                  );
-                                                })()}
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {recordedGroups.length > 0 && (
-                              <>
-                                <div style={{ fontSize: "13px", fontWeight: 600, color: C.a, marginBottom: "10px" }}>
-                                  Recorded classes ({recorded.length})
+                            <div className="lc-card" style={{ marginBottom: "18px" }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                  <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{code}</span>
+                                  <div>
+                                    <div style={{ fontWeight: 700, fontSize: "16px" }}>{className}</div>
+                                    <div style={{ fontSize: "12px", color: C.a }}>{timeLabel} · {entries.length} student{entries.length === 1 ? "" : "s"}</div>
+                                  </div>
                                 </div>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                                  {recordedGroups.map(({ className, entries }) => {
-                                    const key = `recorded:${className}`;
-                                    const isOpen = expandedClasses.has(key);
-                                    const code = classCode(className);
-                                    const badge = classBadgeStyle(code);
-                                    return (
-                                      <div key={key}>
-                                        <button
-                                          type="button"
-                                          className="tp-accordion-row"
-                                          aria-expanded={isOpen}
-                                          onClick={() => toggleClassExpand(key)}
-                                        >
-                                          <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
-                                          <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{code}</span>
-                                          <span className="tp-accordion-title">{className}</span>
-                                          <span className="tp-count-badge">{entries.length} student{entries.length === 1 ? "" : "s"}</span>
-                                        </button>
+                                <button type="button" className="lc-btn no-print" onClick={() => startBulkReschedule({ type: "class", className })}>
+                                  <CalendarDays size={14} aria-hidden="true" style={{ marginRight: "6px", verticalAlign: "-2px" }} />
+                                  Reschedule Whole Class
+                                </button>
+                              </div>
 
-                                        {isOpen && (
-                                          <div className="lc-expand-panel" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px", paddingLeft: "8px" }}>
-                                            {entries.map((r) => {
-                                              const rec = dayRecords[r.studentId] || {};
-                                              return (
-                                                <div className="lc-card" key={r.studentId + r.startTime} style={{ background: C.g }}>
-                                                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-                                                    <div>
-                                                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                        <div style={{ fontWeight: 600 }}>{r.studentName}</div>
-                                                        {rec.status && statusBadge(rec.status)}
-                                                      </div>
-                                                      <div style={{ fontSize: "12px", color: C.a, marginTop: "2px" }}>
-                                                        {fmtTime12(r.startTime)} – {fmtTime12(r.endTime)}
-                                                      </div>
-                                                      {renderRecordBody(rec)}
-                                                    </div>
-                                                    <button className="lc-btn" onClick={() => unrecordSession(r.studentId)}>Edit</button>
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
+                              {attReschedule && attReschedule.type === "class" && attReschedule.className === className && rescheduleBox}
+
+                              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "18px" }}>
+                                <span className="lc-badge lc-badge-paid" style={{ fontSize: "13px", padding: "6px 14px" }}>{presentCount} Present</span>
+                                <span className="lc-badge lc-badge-pending" style={{ fontSize: "13px", padding: "6px 14px" }}>{absentCount} Absent</span>
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px", marginBottom: "10px" }}>
+                                <div style={{ fontSize: "13px", fontWeight: 600 }}>Mark attendance for each student</div>
+                                <button
+                                  type="button"
+                                  className="lc-btn"
+                                  style={{ fontSize: "12px", padding: "4px 10px" }}
+                                  onClick={() => setAttDraft((prev) => {
+                                    const next = { ...prev };
+                                    entries.forEach((r) => { next[r.studentId] = "present"; });
+                                    return next;
                                   })}
-                                </div>
-                              </>
-                            )}
+                                >
+                                  Select all present
+                                </button>
+                              </div>
+                              <div className="lc-table-wrap">
+                                <table className="tp-att-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Student</th>
+                                      <th className="tp-att-radio-col">Present</th>
+                                      <th className="tp-att-radio-col">Absent</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {entries.map((r) => (
+                                      <tr key={r.studentId}>
+                                        <td>{r.studentName}</td>
+                                        <td className="tp-att-radio-col">
+                                          <input
+                                            type="radio"
+                                            className="tp-att-radio"
+                                            style={{ accentColor: C.d }}
+                                            aria-label={`${r.studentName} present`}
+                                            checked={attDraft[r.studentId] === "present"}
+                                            onChange={() => setAttDraft((prev) => ({ ...prev, [r.studentId]: "present" }))}
+                                          />
+                                        </td>
+                                        <td className="tp-att-radio-col">
+                                          <input
+                                            type="radio"
+                                            className="tp-att-radio"
+                                            style={{ accentColor: C.b }}
+                                            aria-label={`${r.studentName} absent`}
+                                            checked={attDraft[r.studentId] === "absent"}
+                                            onChange={() => setAttDraft((prev) => ({ ...prev, [r.studentId]: "absent" }))}
+                                          />
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+
+                              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "18px" }}>
+                                <button type="button" className="lc-btn lc-btn-primary" onClick={saveDraft}>Save Attendance</button>
+                                <button type="button" className="lc-btn" onClick={resetDraft}>Reset</button>
+                                <button type="button" className="lc-btn" onClick={closeClass}>Cancel</button>
+                              </div>
+                            </div>
+
+                            <div className="lc-quick-link" onClick={viewAllRecords}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                <Clock size={16} color={C.a} aria-hidden="true" />
+                                <span style={{ fontSize: "13px", color: C.w }}>Recent Attendance Records</span>
+                              </div>
+                              <span style={{ fontSize: "13px", color: TP.blue, display: "flex", alignItems: "center", gap: "4px" }}>
+                                View all records <ChevronRight size={14} aria-hidden="true" />
+                              </span>
+                            </div>
                           </>
                         );
                       })()}
@@ -3600,7 +3579,6 @@ export default function App() {
                                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                                     <button className="lc-btn" onClick={() => setStatusBulk(sessionStudentIds, "present")}>Mark all present</button>
                                     <button className="lc-btn" onClick={() => setStatusBulk(sessionStudentIds, "absent")}>Mark all absent</button>
-                                    <button className="lc-btn" onClick={() => setStatusBulk(sessionStudentIds, "cancelled")}>Mark all cancelled</button>
                                   </div>
                                 </>
                               )}
@@ -3638,13 +3616,6 @@ export default function App() {
                                           onClick={() => setStatus(s.id, "absent")}
                                         >
                                           Absent
-                                        </button>
-                                        <button
-                                          className="lc-btn"
-                                          style={{ padding: "6px 10px", fontSize: "12px", ...(rec.status === "cancelled" ? { background: C.x, borderColor: C.n, color: C.k } : {}) }}
-                                          onClick={() => setStatus(s.id, "cancelled")}
-                                        >
-                                          Cancelled
                                         </button>
                                       </div>
                                     )}
@@ -3755,7 +3726,7 @@ export default function App() {
                         })}
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "14px" }}>
-                        {Object.entries({ present: CheckCircle2, absent: XCircle, cancelled: Ban, moved: Repeat2, pending: Clock, holiday: Sun }).map(([key, Icon]) => {
+                        {Object.entries({ present: CheckCircle2, absent: XCircle, moved: Repeat2, pending: Clock, holiday: Sun }).map(([key, Icon]) => {
                           const t = ATT_STATUS_THEME[key];
                           return (
                             <span
@@ -3802,27 +3773,6 @@ export default function App() {
 
                               {isMovedAway ? (
                                 <button className="lc-btn" style={{ width: "100%" }} onClick={() => undoReschedule(r.studentId)}>Undo move</button>
-                              ) : reschedulingStudentId === r.studentId ? (
-                                <div style={{ background: C.g, border: "1px solid #D3E9F7", borderRadius: "10px", padding: "12px" }}>
-                                  <div style={{ fontSize: "12px", color: C.a, marginBottom: "8px" }}>Move this class to a new date</div>
-                                  <label style={{ fontSize: "12px", color: C.a }}>New date</label>
-                                  <input className="lc-input" style={{ marginBottom: "10px" }} type="date" value={rescheduleTargetDate} onChange={(e) => setRescheduleTargetDate(e.target.value)} />
-                                  <div className="lc-form-grid" style={{ marginBottom: "10px" }}>
-                                    <div>
-                                      <label style={{ fontSize: "12px", color: C.a }}>Start time</label>
-                                      <input className="lc-input" type="time" value={rStart} onChange={(e) => setRStart(e.target.value)} />
-                                    </div>
-                                    <div>
-                                      <label style={{ fontSize: "12px", color: C.a }}>End time</label>
-                                      <input className="lc-input" type="time" value={rEnd} onChange={(e) => setREnd(e.target.value)} />
-                                    </div>
-                                  </div>
-                                  {rescheduleError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "10px" }}>{rescheduleError}</div>}
-                                  <div style={{ display: "flex", gap: "10px" }}>
-                                    <button className="lc-btn lc-btn-primary" style={{ flex: 1 }} onClick={() => saveReschedule(r.studentId)}>Move class</button>
-                                    <button className="lc-btn" onClick={cancelReschedule}>Cancel</button>
-                                  </div>
-                                </div>
                               ) : (
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                                   <button
@@ -3839,14 +3789,6 @@ export default function App() {
                                   >
                                     Absent
                                   </button>
-                                  <button
-                                    className="lc-btn lc-btn-tap"
-                                    style={rec.status === "cancelled" ? { background: C.x, borderColor: C.n, color: C.k } : {}}
-                                    onClick={() => setStatus(r.studentId, "cancelled")}
-                                  >
-                                    Cancelled
-                                  </button>
-                                  <button className="lc-btn lc-btn-tap" onClick={() => startReschedule(r)}>Reschedule</button>
                                 </div>
                               )}
                             </div>
@@ -3931,6 +3873,42 @@ export default function App() {
 
               const recordsSubtitle = teacherName(loggedInTeacherId);
 
+              // ---- Add a class record (text note or Hifz progress) ----
+              const crStudents = students
+                .filter((s) => s.teacherId === loggedInTeacherId)
+                .slice()
+                .sort((a, b) => a.name.localeCompare(b.name));
+              const crSelectStudent = (studentId) => {
+                setCrStudentId(studentId);
+                const rec = (attendanceByDate[recordDate] || {})[studentId];
+                setCrMode((rec && rec.recordType) || "text");
+                setCrNoteDraft((rec && rec.note) || "");
+                setCrHifzDraft(rec && (rec.hifz || rec.shortMuraja || rec.longMuraja)
+                  ? { hifz: rec.hifz || emptyHifzSection(), shortMuraja: rec.shortMuraja || emptyHifzSection(), longMuraja: rec.longMuraja || emptyHifzSection() }
+                  : emptyHifzDraft());
+              };
+              const crSetHifzField = (hifzSection, field, value) => {
+                setCrHifzDraft((prev) => ({ ...prev, [hifzSection]: { ...prev[hifzSection], [field]: value } }));
+              };
+              const crSaveNote = async () => {
+                if (!crStudentId) return;
+                const dayRecordsNow = attendanceByDate[recordDate] || {};
+                const current = dayRecordsNow[crStudentId] || {};
+                const updated = { ...dayRecordsNow, [crStudentId]: { ...current, note: crNoteDraft, recordType: "text", recorded: true } };
+                await saveAttendanceForDate(recordDate, updated);
+                showToast("Class record saved");
+                loadAllTeacherRecords(loggedInTeacherId);
+              };
+              const crSaveHifz = async () => {
+                if (!crStudentId) return;
+                const dayRecordsNow = attendanceByDate[recordDate] || {};
+                const current = dayRecordsNow[crStudentId] || {};
+                const updated = { ...dayRecordsNow, [crStudentId]: { ...current, ...crHifzDraft, recordType: "hifz", recorded: true } };
+                await saveAttendanceForDate(recordDate, updated);
+                showToast("Hifz record saved");
+                loadAllTeacherRecords(loggedInTeacherId);
+              };
+
               return (
                 <div className="tp-classrecords-page">
                   <style>{`
@@ -3968,6 +3946,116 @@ export default function App() {
                   <div className="tp-card">
                     <div className="tp-subtext">
                       Every class you've saved a record for, grouped by month, most recent first.
+                    </div>
+
+                    <div className="lc-card no-print" style={{ marginBottom: "22px" }}>
+                      <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px" }}>Add a class record</div>
+                      <div className="lc-form-grid" style={{ marginBottom: "12px" }}>
+                        <div>
+                          <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Date</label>
+                          <input className="lc-input" type="date" value={recordDate} onChange={(e) => setRecordDate(e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Student</label>
+                          <SearchableSelect
+                            value={crStudentId}
+                            onChange={crSelectStudent}
+                            placeholder="Select a student…"
+                            options={crStudents.map((s) => ({ value: s.id, label: s.name }))}
+                          />
+                        </div>
+                      </div>
+
+                      {crStudentId && (
+                        <>
+                          <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                            <div className={`lc-subtab ${crMode === "text" ? "lc-subtab-active" : ""}`} onClick={() => setCrMode("text")}>Text note</div>
+                            <div className={`lc-subtab ${crMode === "hifz" ? "lc-subtab-active" : ""}`} onClick={() => setCrMode("hifz")}>Hifz record</div>
+                          </div>
+
+                          {crMode === "text" ? (
+                            <>
+                              <label style={{ fontSize: "12px", color: C.a }}>Class notes / progress</label>
+                              <textarea
+                                className="lc-input"
+                                rows={2}
+                                style={{ resize: "vertical", marginBottom: "8px" }}
+                                value={crNoteDraft}
+                                onChange={(e) => setCrNoteDraft(e.target.value)}
+                                placeholder="What was covered, homework, progress notes…"
+                              />
+                              <button className="lc-btn lc-btn-primary" onClick={crSaveNote}>Save</button>
+                            </>
+                          ) : (
+                            <>
+                              {HIFZ_SECTIONS.map(({ key, label }) => (
+                                <div key={key} style={{ marginBottom: "14px", background: C.g, border: "1px solid #D3E9F7", borderRadius: "10px", padding: "10px" }}>
+                                  <div style={{ fontSize: "12px", color: C.a, marginBottom: "8px", fontWeight: 600 }}>{label}</div>
+
+                                  <div style={{ fontSize: "11px", color: C.a, marginBottom: "3px" }}>Starting point</div>
+                                  <div className="lc-form-grid" style={{ marginBottom: "8px" }}>
+                                    <div>
+                                      <label style={{ fontSize: "11px", color: C.a }}>Surah</label>
+                                      <SearchableSelect
+                                        value={crHifzDraft[key].startSurah}
+                                        onChange={(val) => crSetHifzField(key, "startSurah", val)}
+                                        placeholder="Select surah"
+                                        options={SURAH_OPTIONS}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: "11px", color: C.a }}>Ayah</label>
+                                      <input
+                                        className="lc-input"
+                                        type="number"
+                                        min="1"
+                                        value={crHifzDraft[key].startAyah}
+                                        onChange={(e) => crSetHifzField(key, "startAyah", e.target.value)}
+                                        placeholder="Ayah #"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div style={{ fontSize: "11px", color: C.a, marginBottom: "3px" }}>Ending point</div>
+                                  <div className="lc-form-grid" style={{ marginBottom: "8px" }}>
+                                    <div>
+                                      <label style={{ fontSize: "11px", color: C.a }}>Surah</label>
+                                      <SearchableSelect
+                                        value={crHifzDraft[key].endSurah}
+                                        onChange={(val) => crSetHifzField(key, "endSurah", val)}
+                                        placeholder="Select surah"
+                                        options={SURAH_OPTIONS}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label style={{ fontSize: "11px", color: C.a }}>Ayah</label>
+                                      <input
+                                        className="lc-input"
+                                        type="number"
+                                        min="1"
+                                        value={crHifzDraft[key].endAyah}
+                                        onChange={(e) => crSetHifzField(key, "endAyah", e.target.value)}
+                                        placeholder="Ayah #"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <label style={{ fontSize: "11px", color: C.a }}>Mistakes</label>
+                                  <input
+                                    className="lc-input"
+                                    type="number"
+                                    min="0"
+                                    style={{ maxWidth: "120px" }}
+                                    value={crHifzDraft[key].mistakes}
+                                    onChange={(e) => crSetHifzField(key, "mistakes", e.target.value)}
+                                  />
+                                </div>
+                              ))}
+                              <button className="lc-btn lc-btn-primary" onClick={crSaveHifz}>Save</button>
+                            </>
+                          )}
+                        </>
+                      )}
                     </div>
 
                     {hifzStudents.length > 0 && (
@@ -4094,7 +4182,7 @@ export default function App() {
                                                       <button
                                                         type="button"
                                                         className="lc-btn no-print"
-                                                        onClick={() => editHistoricalRecord(g.date, rec.studentId)}
+                                                        onClick={() => editHistoricalRecord(rec)}
                                                       >
                                                         Edit
                                                       </button>
@@ -4121,26 +4209,141 @@ export default function App() {
             })()}
           </div>
         </TeacherPortalLayout>
+      ) : role === "student" ? (
+        <StudentPortalLayout
+          activeSection={section}
+          navItems={[
+            { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: () => setSection("dashboard") },
+            { key: "learningRecords", label: "Learning records", icon: BookOpen, onClick: () => setSection("learningRecords") },
+            { key: "timetable", label: "My timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
+            { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => setSection("attendance") },
+            { key: "assignments", label: "Assignments", icon: ListChecks, onClick: () => setSection("assignments") },
+          ]}
+          studentDisplayName={studentName(loggedInStudentId)}
+          onLogout={() => { setSection("dashboard"); signOutUser(); }}
+        >
+          <div className="lc-main" key={`student-${section}`}>
+            <style>{`
+              .tp-student-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
+              @media (max-width: 820px) {
+                .tp-student-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
+              }
+              @media (max-width: 640px) {
+                .tp-student-page { padding: 20px; }
+              }
+            `}</style>
+
+            {/* ---------------- DASHBOARD ---------------- */}
+            {/* Section shell only — content to be built once student data/auth is wired up. */}
+            {section === "dashboard" && (
+              <div className="tp-student-page">
+                <div className="tp-header">
+                  <div className="tp-title-group">
+                    <span className="tp-title-icon" aria-hidden="true"><LayoutDashboard size={22} /></span>
+                    <h1 className="tp-title">Dashboard</h1>
+                  </div>
+                </div>
+                <div className="tp-card">
+                  <div className="lc-empty-state">
+                    <LayoutDashboard size={32} aria-hidden="true" />
+                    <div>Your dashboard is coming soon.</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ---------------- LEARNING RECORDS ---------------- */}
+            {section === "learningRecords" && (
+              <div className="tp-student-page">
+                <div className="tp-header">
+                  <div className="tp-title-group">
+                    <span className="tp-title-icon" aria-hidden="true"><BookOpen size={22} /></span>
+                    <h1 className="tp-title">Learning records</h1>
+                  </div>
+                </div>
+                <div className="tp-card">
+                  <div className="lc-empty-state">
+                    <BookOpen size={32} aria-hidden="true" />
+                    <div>Your learning records are coming soon.</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ---------------- MY TIMETABLE ---------------- */}
+            {section === "timetable" && (
+              <div className="tp-student-page">
+                <div className="tp-header">
+                  <div className="tp-title-group">
+                    <span className="tp-title-icon" aria-hidden="true"><CalendarDays size={22} /></span>
+                    <h1 className="tp-title">My timetable</h1>
+                  </div>
+                </div>
+                <div className="tp-card">
+                  <div className="lc-empty-state">
+                    <CalendarDays size={32} aria-hidden="true" />
+                    <div>Your timetable is coming soon.</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ---------------- ATTENDANCE ---------------- */}
+            {section === "attendance" && (
+              <div className="tp-student-page">
+                <div className="tp-header">
+                  <div className="tp-title-group">
+                    <span className="tp-title-icon" aria-hidden="true"><ClipboardCheck size={22} /></span>
+                    <h1 className="tp-title">Attendance</h1>
+                  </div>
+                </div>
+                <div className="tp-card">
+                  <div className="lc-empty-state">
+                    <ClipboardCheck size={32} aria-hidden="true" />
+                    <div>Your attendance record is coming soon.</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ---------------- ASSIGNMENTS ---------------- */}
+            {section === "assignments" && (
+              <div className="tp-student-page">
+                <div className="tp-header">
+                  <div className="tp-title-group">
+                    <span className="tp-title-icon" aria-hidden="true"><ListChecks size={22} /></span>
+                    <h1 className="tp-title">Assignments</h1>
+                  </div>
+                </div>
+                <div className="tp-card">
+                  <div className="lc-empty-state">
+                    <ListChecks size={32} aria-hidden="true" />
+                    <div>Your assignments are coming soon.</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </StudentPortalLayout>
       ) : (
       <AdminPortalLayout
         activeSection={section}
         navItems={[
-          role === "admin" && { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: () => setSection("dashboard") },
-          (role === "admin" || staffPerms?.canManageClassesStudents) && { key: "classes", label: "Classes", icon: Layers, onClick: () => { setSection("classes"); setClassesView("classes"); } },
-          role === "admin" && { key: "teachers", label: "Teachers", icon: GraduationCap, onClick: () => setSection("teachers") },
-          role === "admin" && { key: "timetable", label: "Timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
-          (role === "admin" || staffPerms?.canManagePayments) && { key: "finance", label: role === "staff" ? "Payments" : "Finance", icon: Wallet, onClick: () => { setSection("finance"); if (role === "staff") setFinanceView("payments"); } },
-          role === "admin" && { key: "data", label: "Data", icon: Trash2, onClick: () => setSection("data") },
-          role === "admin" && { key: "adminStaff", label: "Admin staff", icon: Users, onClick: () => { setSection("adminStaff"); setAdminStaffView("staff"); } },
-          role === "staff" && { key: "tasks", label: "Tasks", icon: ClipboardCheck, onClick: () => setSection("tasks") },
-        ].filter(Boolean)}
-        portalLabel={role === "staff" ? "Staff Portal" : "Admin Portal"}
-        displayName={role === "staff" ? staffName(loggedInStaffId) : "Admin"}
-        roleLabel={role === "staff" ? "Staff" : "Administrator"}
-        onTeacherLogin={role === "admin" ? () => { setLoginEmail(""); setLoginPassword(""); setLoginError(""); setAccountType("teacher"); setAuthView("login"); } : undefined}
+          { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: () => setSection("dashboard") },
+          { key: "classes", label: "Classes", icon: Layers, onClick: () => { setSection("classes"); setClassesView("classes"); } },
+          { key: "teachers", label: "Teachers", icon: GraduationCap, onClick: () => setSection("teachers") },
+          { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAdminAttendanceView("records"); } },
+          { key: "timetable", label: "Timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
+          { key: "finance", label: "Finance", icon: Wallet, onClick: () => setSection("finance") },
+          { key: "data", label: "Data", icon: Trash2, onClick: () => setSection("data") },
+        ]}
+        portalLabel="Admin Portal"
+        displayName="Admin"
+        roleLabel="Administrator"
+        onTeacherLogin={() => { setLoginEmail(""); setLoginPassword(""); setLoginError(""); setAccountType("teacher"); setAuthView("login"); }}
         onLogout={() => {
           setIsAdminAuthenticated(false); setAuthView("login"); setAdminEmailInput(""); setAdminPasswordInput("");
-          setRole("admin"); setLoggedInStaffId(null); setStaffPerms(null); setAccountType("admin");
+          setRole("admin"); setAccountType("admin");
         }}
       >
         <div className="lc-main" key={`admin-${section}`}>
@@ -4196,8 +4399,8 @@ export default function App() {
                         <Wallet size={22} color="#854F0B" aria-hidden="true" />
                       </div>
                       <div>
-                        <div className="lc-stat-value">{revenueLoading ? "…" : <CountUp value={totalRevenue} formatter={fmtMoney} />}</div>
-                        <div className="lc-stat-label">Total revenue received (all time)</div>
+                        <div className="lc-stat-value"><CountUp value={totals.received} formatter={fmtMoney} /></div>
+                        <div className="lc-stat-label">Revenue received — {monthLabel(month)}</div>
                       </div>
                     </div>
                   </div>
@@ -4229,6 +4432,26 @@ export default function App() {
                         <div style={{ fontSize: "20px", fontWeight: 600, color: C.b }}>{fmtMoney(totals.pending)}</div>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="tp-card" style={{ marginBottom: "18px" }}>
+                    <div style={{ fontSize: "15px", fontWeight: 600, color: TP.navy, marginBottom: "12px" }}>
+                      Monthly performance — last {DASHBOARD_MONTHLY_SPAN} months
+                    </div>
+                    <div className="tp-table-wrap"><table className="tp-list-table">
+                      <thead><tr><th>Month</th><th>Expected</th><th>Received</th><th>Pending</th><th>Collected</th></tr></thead>
+                      <tbody>
+                        {monthlyPerformance.map((m) => (
+                          <tr key={m.key}>
+                            <td>{monthLabel(m.key)}</td>
+                            <td>{fmtMoney(m.expected)}</td>
+                            <td style={{ color: C.d }}>{fmtMoney(m.received)}</td>
+                            <td style={{ color: C.b }}>{fmtMoney(m.pending)}</td>
+                            <td>{m.expected > 0 ? Math.round((m.received / m.expected) * 100) : 0}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table></div>
                   </div>
 
                   <div className="tp-card" style={{ marginBottom: "18px", ...(pendingStudents.length > 0 ? { borderColor: C.o, background: "#FEF8F6" } : {}) }}>
@@ -4376,11 +4599,17 @@ export default function App() {
                               <label style={{ fontSize: "12px", color: C.a }}>Fee starts from</label>
                               <input className="lc-input" type="month" value={sJoinedMonth} onChange={(e) => setSJoinedMonth(e.target.value)} />
                             </div>
+                            <div>
+                              <label style={{ fontSize: "12px", color: C.a }}>Login email (optional)</label>
+                              <input className="lc-input" type="email" value={sEmail} onChange={(e) => setSEmail(e.target.value)} placeholder="student@aflaah.com" />
+                            </div>
                           </div>
                           <div style={{ fontSize: "12px", color: C.a, marginBottom: "12px" }}>
                             The rest of the fee goes to the center. Use 0% for classes that are fully retained by the center.
                             {" "}Fee starts from {monthLabel(sJoinedMonth || month)} — no fee is shown as due before that month.
+                            {" "}Passwords are handled by Supabase Auth, not this app — create the student's login in Supabase → Authentication → Users (or have them sign up), then use "Link login" below with the same email.
                           </div>
+                          {linkStudentLoginError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "12px" }}>{linkStudentLoginError}</div>}
 
                           {classes.length === 0 ? (
                             <div className="lc-card" style={{ background: C.g, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
@@ -4411,6 +4640,15 @@ export default function App() {
                           <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
                             <button className="lc-btn lc-btn-primary" onClick={handleSaveStudent}>{editingStudentId ? "Save changes" : "Add student"}</button>
                             <button className="lc-btn" onClick={resetStudentForm}>Cancel</button>
+                            {editingStudentId && (
+                              <button
+                                className="lc-btn"
+                                disabled={linkStudentLoginLoadingId === editingStudentId}
+                                onClick={() => linkStudentLogin(editingStudentId, sEmail)}
+                              >
+                                {linkStudentLoginLoadingId === editingStudentId ? "Linking…" : "Link login"}
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -4459,7 +4697,7 @@ export default function App() {
                           }
                           return (
                           <div className="tp-table-wrap"><table className="tp-list-table">
-                            <thead><tr><th>Name</th><th>Class</th><th>Teacher</th><th>Fee</th><th>Teacher %</th><th>Schedule</th><th>{monthLabel(month)}</th><th></th></tr></thead>
+                            <thead><tr><th>Name</th><th>Class</th><th>Teacher</th><th>Fee</th><th>Teacher %</th><th>Schedule</th><th>Portal</th><th>{monthLabel(month)}</th><th></th></tr></thead>
                             <tbody>
                               {filteredStudents.map((s) => {
                                 const inMonth = isEnrolledInMonth(s, month);
@@ -4473,6 +4711,13 @@ export default function App() {
                                     <td>{fmtMoney(s.fee)}</td>
                                     <td>{s.teacherId ? `${s.sharePercent || 0}%` : "—"}</td>
                                     <td style={{ whiteSpace: "nowrap" }}>{formatSchedule(s.schedule)}</td>
+                                    <td>
+                                      {s.userId ? (
+                                        <span className="lc-badge lc-badge-paid" style={{ cursor: "default" }}>Login linked</span>
+                                      ) : (
+                                        <span className="lc-badge lc-badge-pending" style={{ cursor: "default" }}>Not linked</span>
+                                      )}
+                                    </td>
                                     <td>
                                       {inMonth ? (
                                         <button
@@ -5119,7 +5364,7 @@ export default function App() {
                   <div className="tp-header">
                     <div className="tp-title-group">
                       <span className="tp-title-icon" aria-hidden="true"><Wallet size={22} /></span>
-                      <h1 className="tp-title">{role === "staff" ? "Payments" : "Finance"}</h1>
+                      <h1 className="tp-title">Finance</h1>
                     </div>
                     <div className="tp-actions">
                       <button type="button" className="tp-btn-outline" style={{ width: "44px", padding: 0, justifyContent: "center" }} onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="Previous month">‹</button>
@@ -5640,322 +5885,593 @@ export default function App() {
                 );
               })()}
 
-              {/* ---------------- ADMIN STAFF ---------------- */}
-              {section === "adminStaff" && role === "admin" && (
-                <div className="tp-adminstaff-page">
-                  <style>{`
-                    .tp-adminstaff-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
-                    @media (max-width: 820px) {
-                      .tp-adminstaff-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
-                    }
-                    @media (max-width: 640px) {
-                      .tp-adminstaff-page { padding: 20px; }
-                    }
-                  `}</style>
-                  <div className="tp-header">
-                    <div className="tp-title-group">
-                      <span className="tp-title-icon" aria-hidden="true"><Users size={22} /></span>
-                      <h1 className="tp-title">Admin staff</h1>
-                    </div>
-                    <div className="tp-actions">
-                      {adminStaffView === "staff" ? (
-                        <button type="button" className="tp-btn-gradient" onClick={() => { resetStaffForm(); setShowStaffForm(true); }}>+ Add staff</button>
-                      ) : (
-                        <button type="button" className="tp-btn-gradient" onClick={() => { resetTaskForm(); setShowTaskForm(true); }}>+ Assign task</button>
+              {/* ---------------- ATTENDANCE (admin) ---------------- */}
+              {section === "attendance" && role === "admin" && (() => {
+                const studentInitials = (name) => (name || "").trim().split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase() || "?";
+                const todayStr = fmtDateStr(new Date());
+
+                const inRange = (dateStr) => (!adminAttRangeStart || dateStr >= adminAttRangeStart) && (!adminAttRangeEnd || dateStr <= adminAttRangeEnd);
+
+                const attendanceByStudent = new Map();
+                adminAllAttendance.forEach((r) => {
+                  if (!attendanceByStudent.has(r.studentId)) attendanceByStudent.set(r.studentId, []);
+                  attendanceByStudent.get(r.studentId).push(r);
+                });
+
+                const percentFor = (studentId) => {
+                  const rows = (attendanceByStudent.get(studentId) || []).filter((r) => (r.status === "present" || r.status === "absent") && inRange(r.date));
+                  if (rows.length === 0) return null;
+                  const present = rows.filter((r) => r.status === "present").length;
+                  return Math.round((present / rows.length) * 100);
+                };
+                const percentTheme = (pct) => {
+                  if (pct === null) return { bg: "#EDEFF2", color: "#4B5563" };
+                  if (pct >= 90) return { bg: C.i, color: C.d };
+                  if (pct >= 75) return { bg: C.t, color: C.u };
+                  return { bg: C.h, color: C.b };
+                };
+
+                const q = adminAttSearch.trim().toLowerCase();
+                const filteredStudents = students
+                  .filter((s) => !q || s.name.toLowerCase().includes(q))
+                  .filter((s) => !adminAttClassId || s.classId === adminAttClassId)
+                  .slice()
+                  .sort((a, b) => a.name.localeCompare(b.name));
+
+                const totalFiltered = filteredStudents.length;
+                const totalPages = Math.max(1, Math.ceil(totalFiltered / adminAttPageSize));
+                const currentPage = Math.min(adminAttPage, totalPages);
+                const pageStart = (currentPage - 1) * adminAttPageSize;
+                const pageRows = filteredStudents.slice(pageStart, pageStart + adminAttPageSize);
+
+                const exportReport = () => {
+                  const rows = filteredStudents.map((s) => {
+                    const pct = percentFor(s.id);
+                    return [s.name, s.className || "—", pct === null ? "No data" : `${pct}%`];
+                  });
+                  const rangeLabel = adminAttRangeStart && adminAttRangeEnd ? `${adminAttRangeStart} to ${adminAttRangeEnd}` : "All time";
+                  downloadRowsAsPDF("Student Attendance Report", rangeLabel, ["Student", "Class", "Attendance"], rows, "student_attendance_report.pdf");
+                };
+
+                // ---- Follow-up alerts: students on a 2+ recorded-session absence streak ----
+                const flagged = [];
+                attendanceByStudent.forEach((rows, studentId) => {
+                  const sorted = rows.filter((r) => r.status === "present" || r.status === "absent").slice().sort((a, b) => b.date.localeCompare(a.date));
+                  let streak = 0;
+                  const streakDates = [];
+                  for (const r of sorted) {
+                    if (r.status === "absent") { streak++; streakDates.push(r.date); }
+                    else break;
+                  }
+                  if (streak >= 2) {
+                    const datesAsc = streakDates.slice().reverse();
+                    flagged.push({ studentId, streak, fromDate: datesAsc[0], toDate: datesAsc[datesAsc.length - 1], dates: datesAsc });
+                  }
+                });
+
+                // "2026-09-02","2026-09-03" → "Sep 2, 3" — a month label only when it changes.
+                const formatAbsenceDates = (dates) => {
+                  let lastMonth = null;
+                  return dates.map((d) => {
+                    const [, m, day] = d.split("-").map(Number);
+                    const monthLabel = MONTH_NAMES[m - 1].slice(0, 3);
+                    const isNewMonth = monthLabel !== lastMonth;
+                    lastMonth = monthLabel;
+                    return isNewMonth ? `${monthLabel} ${day}` : String(day);
+                  }).join(", ");
+                };
+
+                const followUpFor = (studentId) => followUps.find((f) => f.studentId === studentId) || null;
+
+                // A follow-up resolves ITS CURRENT absence streak once the parent is marked
+                // Contacted with a remark (or explicitly Resolved) — but only if that happened
+                // on or after the streak's most recent absence. A fresh absence after that
+                // reopens the alert (the student attending a class breaks the streak entirely,
+                // handled above by `flagged` simply no longer including them).
+                const isResolvedForStreak = (f) => {
+                  const fu = followUpFor(f.studentId);
+                  if (!fu) return false;
+                  const resolved = fu.contactStatus === "resolved" || (fu.contactStatus === "contacted" && (fu.remarks || "").trim() !== "");
+                  if (!resolved) return false;
+                  return (fu.updatedAt || "").slice(0, 10) >= f.toDate;
+                };
+                const activeFlagged = flagged.filter((f) => !isResolvedForStreak(f));
+
+                const needsContact = activeFlagged.filter((f) => {
+                  const fu = followUpFor(f.studentId);
+                  return !fu || fu.contactStatus === "not_contacted";
+                }).length;
+                const contactedToday = followUps.filter((f) => f.contactStatus === "contacted" && (f.updatedAt || "").slice(0, 10) === todayStr).length;
+                const awaitingResponse = activeFlagged.filter((f) => (followUpFor(f.studentId) || {}).contactStatus === "awaiting_response").length;
+                const resolvedCount = followUps.filter((f) => f.contactStatus === "resolved" || (f.contactStatus === "contacted" && (f.remarks || "").trim() !== "")).length;
+
+                const filteredFlagged = activeFlagged
+                  .map((f) => ({ ...f, student: students.find((s) => s.id === f.studentId) }))
+                  .filter((f) => f.student)
+                  .filter((f) => !q || f.student.name.toLowerCase().includes(q))
+                  .filter((f) => !adminAttClassId || f.student.classId === adminAttClassId)
+                  .filter((f) => {
+                    if (!adminAttContactFilter) return true;
+                    const fu = followUpFor(f.studentId);
+                    const status = fu ? fu.contactStatus : "not_contacted";
+                    return status === adminAttContactFilter;
+                  })
+                  .sort((a, b) => b.streak - a.streak);
+
+                const contactStatusLabel = { not_contacted: "Not contacted", contacted: "Contacted", awaiting_response: "Awaiting response", resolved: "Resolved" };
+                const contactStatusTheme = {
+                  not_contacted: { bg: C.h, color: C.b },
+                  contacted: { bg: C.i, color: C.d },
+                  awaiting_response: { bg: C.t, color: C.u },
+                  resolved: { bg: C.i, color: C.d },
+                };
+
+                const getDraft = (studentId) => {
+                  if (followUpDrafts[studentId] !== undefined) return followUpDrafts[studentId];
+                  const fu = followUpFor(studentId);
+                  return { contactStatus: fu ? fu.contactStatus : "not_contacted", remarks: fu ? fu.remarks : "" };
+                };
+                const setDraftField = (studentId, field, value) => {
+                  setFollowUpDrafts((prev) => ({ ...prev, [studentId]: { ...getDraft(studentId), [field]: value } }));
+                };
+
+                const viewStudent = adminAttViewStudentId ? students.find((s) => s.id === adminAttViewStudentId) : null;
+                const viewRows = viewStudent
+                  ? (attendanceByStudent.get(viewStudent.id) || [])
+                      .filter((r) => r.status)
+                      .slice()
+                      .sort((a, b) => b.date.localeCompare(a.date))
+                  : [];
+
+                // ---- Unrecorded Attendance: scheduled classes, already ended, with no
+                // attendance mark saved for one or more of their students ----
+                const unrecordedGroups = (() => {
+                  const now = new Date();
+                  const nowTimeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+                  const LOOKBACK_DAYS = 14;
+                  const recordedSet = new Set(
+                    adminAllAttendance.filter((r) => r.status).map((r) => `${r.studentId}:${r.date}`)
+                  );
+                  const groups = new Map();
+                  for (let i = 0; i < LOOKBACK_DAYS; i++) {
+                    const d = new Date(now);
+                    d.setDate(d.getDate() - i);
+                    const dateStr = fmtDateStr(d);
+                    if (isHoliday(dateStr)) continue;
+                    const isToday = dateStr === todayStr;
+                    const weekday = weekdayAbbrev(dateStr);
+                    scheduleRows.filter((r) => r.day === weekday).forEach((r) => {
+                      if (isToday && r.endTime > nowTimeStr) return; // class hasn't ended yet today
+                      if (recordedSet.has(`${r.studentId}:${dateStr}`)) return;
+                      const key = `${dateStr}|${r.className}|${r.teacherId}`;
+                      if (!groups.has(key)) {
+                        groups.set(key, { date: dateStr, className: r.className, teacherId: r.teacherId, startTime: r.startTime, endTime: r.endTime, studentCount: 0 });
+                      }
+                      groups.get(key).studentCount++;
+                    });
+                  }
+                  return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date) || a.className.localeCompare(b.className));
+                })();
+
+                const dismissalFor = (teacherId) => unrecordedDismissals.find((d) => d.teacherId === teacherId) || null;
+                const activeUnrecordedGroups = unrecordedGroups.filter((g) => {
+                  const d = dismissalFor(g.teacherId);
+                  if (!d) return true;
+                  return g.date > (d.dismissedAt || "").slice(0, 10);
+                });
+
+                const unrecordedByTeacher = (() => {
+                  const map = new Map();
+                  activeUnrecordedGroups.forEach((g) => {
+                    if (!map.has(g.teacherId)) map.set(g.teacherId, []);
+                    map.get(g.teacherId).push(g);
+                  });
+                  return Array.from(map.entries())
+                    .map(([teacherId, groups]) => ({ teacherId, teacherLabel: teacherName(teacherId), groups, count: groups.length }))
+                    .sort((a, b) => b.count - a.count || a.teacherLabel.localeCompare(b.teacherLabel));
+                })();
+
+                const openUnrecordedTeacher = adminAttUnrecordedTeacherId
+                  ? unrecordedByTeacher.find((t) => t.teacherId === adminAttUnrecordedTeacherId)
+                  : null;
+
+                return (
+                  <div className="tp-adminattendance-page">
+                    <style>{`
+                      .tp-adminattendance-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
+                      @media (max-width: 820px) {
+                        .tp-adminattendance-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
+                      }
+                      @media (max-width: 640px) {
+                        .tp-adminattendance-page { padding: 20px; }
+                      }
+                      .tp-alert-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: #D9573A; color: #FFFFFF; font-size: 11px; font-weight: 700; margin-left: 8px; }
+                    `}</style>
+                    <div className="tp-header">
+                      <div className="tp-title-group">
+                        <span className="tp-title-icon" aria-hidden="true"><ClipboardCheck size={22} /></span>
+                        <div>
+                          <h1 className="tp-title">Student Attendance</h1>
+                          <div className="tp-subtext" style={{ margin: 0 }}>Monitor student attendance</div>
+                        </div>
+                      </div>
+                      {adminAttRecordsLoading && (
+                        <span style={{ fontSize: "13px", color: TP.secondaryText, display: "inline-flex", alignItems: "center" }}>
+                          <span className="lc-spinner"></span>Loading…
+                        </span>
                       )}
                     </div>
-                  </div>
 
-                  <div className="tp-segment" role="group" aria-label="Admin staff view">
-                    <button type="button" aria-pressed={adminStaffView === "staff"} className={`tp-segment-btn ${adminStaffView === "staff" ? "tp-segment-btn-active" : ""}`} onClick={() => setAdminStaffView("staff")}>Staff</button>
-                    <button type="button" aria-pressed={adminStaffView === "tasks"} className={`tp-segment-btn ${adminStaffView === "tasks" ? "tp-segment-btn-active" : ""}`} onClick={() => setAdminStaffView("tasks")}>Tasks</button>
-                  </div>
-
-                  {adminStaffView === "staff" && (
-                  <>
-                  {showStaffForm && (
-                    <div className="tp-card" style={{ marginBottom: "18px" }}>
-                      <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: TP.navy }}>
-                        {editingStaffId ? "Edit staff member" : "New staff member"}
-                      </div>
-                      <div className="lc-form-grid">
-                        <div>
-                          <label style={{ fontSize: "12px", color: C.a }}>Name</label>
-                          <input className="lc-input" value={stName} onChange={(e) => setStName(e.target.value)} placeholder="Staff name" />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", color: C.a }}>Phone (optional)</label>
-                          <input className="lc-input" value={stPhone} onChange={(e) => setStPhone(e.target.value)} placeholder="Contact number" />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", color: C.a }}>Login email</label>
-                          <input className="lc-input" type="email" value={stEmail} onChange={(e) => setStEmail(e.target.value)} placeholder="staff@aflaah.com" />
-                        </div>
-                      </div>
-                      <div style={{ margin: "6px 0 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                        <div style={{ fontSize: "12px", color: C.a }}>Permissions</div>
-                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-                          <input type="checkbox" checked={stCanClasses} onChange={(e) => setStCanClasses(e.target.checked)} />
-                          Manage classes &amp; students (add/edit classes, add/edit students)
-                        </label>
-                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px" }}>
-                          <input type="checkbox" checked={stCanPayments} onChange={(e) => setStCanPayments(e.target.checked)} />
-                          Payments status (see unpaid students, mark paid/unpaid — no revenue totals)
-                        </label>
-                      </div>
-                      <div style={{ fontSize: "12px", color: C.a, marginBottom: "12px" }}>
-                        Passwords are handled by Supabase Auth, not this app. To give a staff member access: create their login in Supabase → Authentication → Users (or have them sign up), then use "Link login" below with the same email to connect it to this record.
-                      </div>
-                      {linkStaffLoginError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "12px" }}>{linkStaffLoginError}</div>}
-                      <div style={{ display: "flex", gap: "10px" }}>
-                        <button className="lc-btn lc-btn-primary" onClick={handleSaveStaff}>{editingStaffId ? "Save changes" : "Add staff"}</button>
-                        <button className="lc-btn" onClick={resetStaffForm}>Cancel</button>
-                        {editingStaffId && (
-                          <button
-                            className="lc-btn"
-                            disabled={linkStaffLoginLoadingId === editingStaffId}
-                            onClick={() => linkStaffLogin(editingStaffId, stEmail)}
-                          >
-                            {linkStaffLoginLoadingId === editingStaffId ? "Linking…" : "Link login"}
-                          </button>
-                        )}
-                      </div>
+                    <div className="tp-segment" role="group" aria-label="Attendance view">
+                      <button
+                        type="button"
+                        aria-pressed={adminAttendanceView === "records"}
+                        className={`tp-segment-btn ${adminAttendanceView === "records" ? "tp-segment-btn-active" : ""}`}
+                        onClick={() => { setAdminAttendanceView("records"); setAdminAttUnrecordedTeacherId(null); }}
+                      >
+                        Student Records
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={adminAttendanceView === "alerts"}
+                        className={`tp-segment-btn ${adminAttendanceView === "alerts" ? "tp-segment-btn-active" : ""}`}
+                        onClick={() => { setAdminAttendanceView("alerts"); setAdminAttUnrecordedTeacherId(null); }}
+                      >
+                        Follow-up Alerts
+                        {activeFlagged.length > 0 && <span className="tp-alert-badge">{activeFlagged.length}</span>}
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={adminAttendanceView === "unrecorded"}
+                        className={`tp-segment-btn ${adminAttendanceView === "unrecorded" ? "tp-segment-btn-active" : ""}`}
+                        onClick={() => setAdminAttendanceView("unrecorded")}
+                      >
+                        Unrecorded Attendance
+                        {activeUnrecordedGroups.length > 0 && <span className="tp-alert-badge">{activeUnrecordedGroups.length}</span>}
+                      </button>
                     </div>
-                  )}
 
-                  <div className="tp-card">
-                    {adminStaff.length > 0 && (
-                      <div className="lc-search-wrap" style={{ marginBottom: "14px", maxWidth: "320px" }}>
-                        <Search size={15} color={C.a} aria-hidden="true" />
-                        <input
-                          className="lc-input"
-                          placeholder="Search staff…"
-                          value={staffSearch}
-                          onChange={(e) => setStaffSearch(e.target.value)}
-                        />
-                        {staffSearch && (
-                          <button className="lc-search-clear" onClick={() => setStaffSearch("")} aria-label="Clear search"><X size={14} /></button>
-                        )}
-                      </div>
-                    )}
-                    {(() => {
-                      const q = staffSearch.trim().toLowerCase();
-                      const filteredStaff = q ? adminStaff.filter((s) => s.name.toLowerCase().includes(q)) : adminStaff;
-                      if (adminStaff.length === 0) {
-                        return (
-                          <div className="lc-empty-state">
-                            <Users size={32} aria-hidden="true" />
-                            <div>No admin staff yet. Add your first one above.</div>
+                    <div className="tp-card">
+                      {adminAttendanceView !== "unrecorded" && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "20px" }}>
+                          <div className="lc-search-wrap" style={{ maxWidth: "280px" }}>
+                            <Search size={16} aria-hidden="true" color={C.a} />
+                            <input
+                              className="lc-input"
+                              value={adminAttSearch}
+                              onChange={(e) => { setAdminAttSearch(e.target.value); setAdminAttPage(1); }}
+                              placeholder="Search student…"
+                            />
+                            {adminAttSearch && (
+                              <button className="lc-search-clear" onClick={() => setAdminAttSearch("")} aria-label="Clear search"><X size={14} /></button>
+                            )}
                           </div>
-                        );
-                      }
-                      if (filteredStaff.length === 0) {
-                        return (
-                          <div className="lc-empty-state">
-                            <Search size={32} aria-hidden="true" />
-                            <div>No staff match "{staffSearch}".</div>
-                          </div>
-                        );
-                      }
-                      return (
-                      <div className="tp-table-wrap"><table className="tp-list-table">
-                        <thead><tr><th>Name</th><th>Phone</th><th>Permissions</th><th>Portal</th><th></th></tr></thead>
-                        <tbody>
-                          {filteredStaff.map((s) => (
-                            <tr key={s.id}>
-                              <td>{s.name}</td>
-                              <td>{s.phone || "—"}</td>
-                              <td style={{ fontSize: "12px" }}>
-                                {[s.canManageClassesStudents && "Classes & students", s.canManagePayments && "Payments"].filter(Boolean).join(", ") || "—"}
-                              </td>
-                              <td>
-                                {s.userId ? (
-                                  <span className="lc-badge lc-badge-paid" style={{ cursor: "default" }}>Login linked</span>
-                                ) : (
-                                  <span className="lc-badge lc-badge-pending" style={{ cursor: "default" }}>Not linked</span>
-                                )}
-                              </td>
-                              <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                                <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => startEditStaff(s)}>Edit</button>
-                                <button className="lc-btn lc-btn-danger" onClick={() => removeStaff(s.id)}>Remove</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table></div>
-                      );
-                    })()}
-                  </div>
-                  </>
-                  )}
-
-                  {adminStaffView === "tasks" && (
-                    <>
-                      {showTaskForm && (
-                        <div className="tp-card" style={{ marginBottom: "18px" }}>
-                          <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: TP.navy }}>
-                            {editingTaskId ? "Edit task" : "New task"}
-                          </div>
-                          <div className="lc-form-grid">
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Title</label>
-                              <input className="lc-input" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="e.g. Call pending students" />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Assign to</label>
-                              <SearchableSelect
-                                options={adminStaff.map((s) => ({ value: s.id, label: s.name }))}
-                                value={taskAssignedTo}
-                                onChange={setTaskAssignedTo}
-                                placeholder="Select staff member"
-                              />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Due date (optional)</label>
-                              <input className="lc-input" type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
-                            </div>
-                          </div>
-                          <div style={{ marginBottom: "12px" }}>
-                            <label style={{ fontSize: "12px", color: C.a }}>Notes (optional)</label>
-                            <input className="lc-input" value={taskNotes} onChange={(e) => setTaskNotes(e.target.value)} placeholder="Any details" />
-                          </div>
-                          <div style={{ display: "flex", gap: "10px" }}>
-                            <button className="lc-btn lc-btn-primary" disabled={!taskTitle.trim() || !taskAssignedTo} onClick={handleSaveTask}>
-                              {editingTaskId ? "Save changes" : "Assign task"}
-                            </button>
-                            <button className="lc-btn" onClick={resetTaskForm}>Cancel</button>
-                          </div>
+                          <SearchableSelect
+                            style={{ maxWidth: "220px" }}
+                            value={adminAttClassId}
+                            onChange={(val) => { setAdminAttClassId(val); setAdminAttPage(1); }}
+                            placeholder="All Classes"
+                            options={classes.slice().sort((a, b) => a.name.localeCompare(b.name)).map((c) => ({ value: c.id, label: c.name }))}
+                          />
+                          {adminAttendanceView === "records" ? (
+                            <>
+                              <label className="tp-date-picker">
+                                <CalendarDays size={16} aria-hidden="true" />
+                                <input type="date" aria-label="From date" value={adminAttRangeStart} onChange={(e) => setAdminAttRangeStart(e.target.value)} />
+                                <span style={{ color: TP.secondaryText }}>–</span>
+                                <input type="date" aria-label="To date" value={adminAttRangeEnd} onChange={(e) => setAdminAttRangeEnd(e.target.value)} />
+                              </label>
+                              <button type="button" className="tp-btn-gradient" onClick={exportReport} style={{ marginLeft: "auto" }}>
+                                <FileText size={16} aria-hidden="true" />
+                                Export Report
+                              </button>
+                            </>
+                          ) : (
+                            <select
+                              className="lc-select"
+                              style={{ maxWidth: "200px" }}
+                              value={adminAttContactFilter}
+                              onChange={(e) => setAdminAttContactFilter(e.target.value)}
+                            >
+                              <option value="">Contact Status</option>
+                              {Object.entries(contactStatusLabel).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                            </select>
+                          )}
                         </div>
                       )}
 
-                      <div className="tp-card">
-                        {(() => {
-                          const todayStr = new Date().toISOString().slice(0, 10);
-                          const sorted = [...tasks].sort((a, b) => {
-                            if (a.done !== b.done) return a.done ? 1 : -1;
-                            return (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99");
-                          });
-                          if (sorted.length === 0) {
-                            return (
-                              <div className="lc-empty-state">
-                                <ClipboardCheck size={32} aria-hidden="true" />
-                                <div>No tasks yet. Assign your first one above.</div>
-                              </div>
-                            );
-                          }
-                          return (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                              {sorted.map((t) => {
-                                const overdue = t.dueDate && !t.done && t.dueDate < todayStr;
-                                return (
-                                  <div
-                                    key={t.id}
-                                    className="lc-card"
-                                    style={{ margin: 0, opacity: t.done ? 0.6 : 1, ...(overdue ? { borderColor: C.o, background: "#FEF8F6" } : {}) }}
-                                  >
-                                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                                      <input
-                                        type="checkbox"
-                                        checked={t.done}
-                                        style={{ marginTop: "3px" }}
-                                        onChange={(e) => saveTasks(tasks.map((x) => (x.id === t.id ? { ...x, done: e.target.checked } : x)))}
-                                      />
-                                      <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, textDecoration: t.done ? "line-through" : "none" }}>{t.title}</div>
-                                        {t.notes && <div style={{ fontSize: "13px", color: C.a, marginTop: "3px" }}>{t.notes}</div>}
-                                        <div style={{ fontSize: "12px", color: overdue ? C.b : C.a, marginTop: "5px", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                                          <span>{staffName(t.assignedTo)}</span>
-                                          {t.dueDate && <span>{overdue ? "Overdue — " : "Due "}{t.dueDate}</span>}
-                                        </div>
-                                      </div>
-                                      <div style={{ whiteSpace: "nowrap" }}>
-                                        <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => startEditTask(t)}>Edit</button>
-                                        <button className="lc-btn lc-btn-danger" onClick={() => removeTask(t.id)}>Remove</button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
+                      {adminAttendanceView === "records" ? (
+                        <>
+                          {pageRows.length === 0 ? (
+                            <div className="lc-empty-state">
+                              <Users size={32} aria-hidden="true" />
+                              <div>No students match your filters.</div>
                             </div>
-                          );
-                        })()}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+                          ) : (
+                            <div className="lc-table-wrap">
+                              <table className="lc-table">
+                                <thead>
+                                  <tr>
+                                    <th>Student</th>
+                                    <th>Class</th>
+                                    <th>Attendance</th>
+                                    <th>Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {pageRows.map((s) => {
+                                    const pct = percentFor(s.id);
+                                    const theme = percentTheme(pct);
+                                    const avatar = classBadgeStyle(studentInitials(s.name));
+                                    return (
+                                      <tr key={s.id}>
+                                        <td>
+                                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                            <span style={{ width: "34px", height: "34px", borderRadius: "50%", background: avatar.bg, color: avatar.color, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: "12px", flexShrink: 0 }}>
+                                              {studentInitials(s.name)}
+                                            </span>
+                                            <span style={{ fontWeight: 600 }}>{s.name}</span>
+                                          </div>
+                                        </td>
+                                        <td>{s.className || "—"}</td>
+                                        <td>
+                                          <span style={{ display: "inline-block", fontSize: "13px", fontWeight: 700, padding: "4px 12px", borderRadius: "999px", background: theme.bg, color: theme.color }}>
+                                            {pct === null ? "No data" : `${pct}%`}
+                                          </span>
+                                        </td>
+                                        <td>
+                                          <button type="button" className="lc-btn" onClick={() => setAdminAttViewStudentId(s.id)}>View Attendance</button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
 
-              {/* ---------------- MY TASKS (staff) ---------------- */}
-              {section === "tasks" && role === "staff" && (
-                <div className="tp-mytasks-page">
-                  <style>{`
-                    .tp-mytasks-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
-                    @media (max-width: 820px) {
-                      .tp-mytasks-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
-                    }
-                    @media (max-width: 640px) {
-                      .tp-mytasks-page { padding: 20px; }
-                    }
-                  `}</style>
-                  <div className="tp-header">
-                    <div className="tp-title-group">
-                      <span className="tp-title-icon" aria-hidden="true"><ClipboardCheck size={22} /></span>
-                      <h1 className="tp-title">My tasks</h1>
-                    </div>
-                  </div>
-
-                  <div className="tp-card">
-                    {(() => {
-                      const todayStr = new Date().toISOString().slice(0, 10);
-                      const visibleTasks = tasks.filter((t) => t.assignedTo === loggedInStaffId);
-                      const sorted = [...visibleTasks].sort((a, b) => {
-                        if (a.done !== b.done) return a.done ? 1 : -1;
-                        return (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99");
-                      });
-                      if (sorted.length === 0) {
-                        return (
-                          <div className="lc-empty-state">
-                            <ClipboardCheck size={32} aria-hidden="true" />
-                            <div>No tasks assigned to you yet.</div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                          {sorted.map((t) => {
-                            const overdue = t.dueDate && !t.done && t.dueDate < todayStr;
-                            return (
-                              <div
-                                key={t.id}
-                                className="lc-card"
-                                style={{ margin: 0, opacity: t.done ? 0.6 : 1, ...(overdue ? { borderColor: C.o, background: "#FEF8F6" } : {}) }}
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginTop: "18px" }}>
+                            <div style={{ fontSize: "13px", color: C.a }}>
+                              Showing {totalFiltered === 0 ? 0 : pageStart + 1}–{Math.min(pageStart + adminAttPageSize, totalFiltered)} of {totalFiltered}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <button className="lc-btn" disabled={currentPage <= 1} onClick={() => setAdminAttPage(currentPage - 1)}>Previous</button>
+                              {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                                <button
+                                  key={p}
+                                  className="lc-btn"
+                                  style={p === currentPage ? { background: TP.blue, color: "#FFFFFF", borderColor: TP.blue } : {}}
+                                  onClick={() => setAdminAttPage(p)}
+                                >
+                                  {p}
+                                </button>
+                              ))}
+                              <button className="lc-btn" disabled={currentPage >= totalPages} onClick={() => setAdminAttPage(currentPage + 1)}>Next</button>
+                              <select
+                                className="lc-select"
+                                style={{ width: "auto" }}
+                                value={adminAttPageSize}
+                                onChange={(e) => { setAdminAttPageSize(Number(e.target.value)); setAdminAttPage(1); }}
                               >
-                                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                                  <input
-                                    type="checkbox"
-                                    checked={t.done}
-                                    style={{ marginTop: "3px" }}
-                                    onChange={(e) => toggleTaskDone(t.id, e.target.checked)}
-                                  />
-                                  <div style={{ flex: 1 }}>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, textDecoration: t.done ? "line-through" : "none" }}>{t.title}</div>
-                                    {t.notes && <div style={{ fontSize: "13px", color: C.a, marginTop: "3px" }}>{t.notes}</div>}
-                                    {t.dueDate && (
-                                      <div style={{ fontSize: "12px", color: overdue ? C.b : C.a, marginTop: "5px" }}>
-                                        {overdue ? "Overdue — " : "Due "}{t.dueDate}
-                                      </div>
-                                    )}
-                                  </div>
+                                {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n} per page</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        </>
+                      ) : adminAttendanceView === "alerts" ? (
+                        <>
+                          <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "22px" }}>
+                            {[
+                              { label: "Needs Contact", value: needsContact, icon: AlertTriangle, bg: C.h, color: C.b },
+                              { label: "Contacted Today", value: contactedToday, icon: Phone, bg: C.v, color: TP.blue },
+                              { label: "Awaiting Response", value: awaitingResponse, icon: Clock, bg: C.t, color: C.u },
+                              { label: "Resolved", value: resolvedCount, icon: CheckCircle2, bg: C.i, color: C.d },
+                            ].map((chip) => (
+                              <div key={chip.label} className="lc-stat-card" style={{ flex: "1 1 200px", padding: "14px 18px" }}>
+                                <div className="lc-stat-icon" style={{ background: chip.bg, width: "40px", height: "40px", borderRadius: "10px" }}>
+                                  <chip.icon size={18} color={chip.color} aria-hidden="true" />
+                                </div>
+                                <div>
+                                  <div className="lc-stat-value" style={{ fontSize: "22px" }}><CountUp value={chip.value} /></div>
+                                  <div className="lc-stat-label">{chip.label}</div>
                                 </div>
                               </div>
-                            );
-                          })}
+                            ))}
+                          </div>
+
+                          {filteredFlagged.length === 0 ? (
+                            <div className="lc-empty-state">
+                              <CheckCircle2 size={32} aria-hidden="true" />
+                              <div>No follow-up alerts right now.</div>
+                            </div>
+                          ) : (
+                            <div className="lc-table-wrap">
+                              <table className="lc-table">
+                                <thead>
+                                  <tr>
+                                    <th>Student</th>
+                                    <th>Class</th>
+                                    <th>Absence</th>
+                                    <th>Phone</th>
+                                    <th>Contact Status</th>
+                                    <th>Remarks</th>
+                                    <th>Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredFlagged.map((f) => {
+                                    const draft = getDraft(f.studentId);
+                                    const theme = contactStatusTheme[draft.contactStatus] || contactStatusTheme.not_contacted;
+                                    return (
+                                      <tr key={f.studentId}>
+                                        <td style={{ fontWeight: 600 }}>{f.student.name}</td>
+                                        <td>{f.student.className || "—"}</td>
+                                        <td>
+                                          <span style={{ display: "inline-block", fontSize: "12px", fontWeight: 700, padding: "3px 10px", borderRadius: "999px", background: C.h, color: C.b, whiteSpace: "nowrap" }}>
+                                            Absent {f.streak} day{f.streak === 1 ? "" : "s"}
+                                          </span>
+                                          <div style={{ fontSize: "12px", color: C.a, marginTop: "4px" }}>
+                                            {formatAbsenceDates(f.dates)}
+                                          </div>
+                                        </td>
+                                        <td style={{ whiteSpace: "nowrap" }}>{f.student.phone || "—"}</td>
+                                        <td>
+                                          <select
+                                            className="lc-select"
+                                            style={{ fontWeight: 700, color: theme.color, background: theme.bg, border: "none", minWidth: "150px" }}
+                                            value={draft.contactStatus}
+                                            onChange={(e) => setDraftField(f.studentId, "contactStatus", e.target.value)}
+                                          >
+                                            {Object.entries(contactStatusLabel).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                                          </select>
+                                        </td>
+                                        <td style={{ minWidth: "180px" }}>
+                                          <textarea
+                                            className="lc-input"
+                                            rows={2}
+                                            style={{ resize: "vertical" }}
+                                            value={draft.remarks}
+                                            onChange={(e) => setDraftField(f.studentId, "remarks", e.target.value)}
+                                            placeholder="Write a remark…"
+                                          />
+                                        </td>
+                                        <td>
+                                          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                            <button type="button" className="lc-btn" onClick={() => setAdminAttViewStudentId(f.studentId)}>View Attendance</button>
+                                            <button
+                                              type="button"
+                                              className="lc-btn lc-btn-primary"
+                                              disabled={followUpSavingId === f.studentId}
+                                              onClick={() => saveFollowUp(f.studentId, draft.contactStatus, draft.remarks)}
+                                            >
+                                              {followUpSavingId === f.studentId ? "Saving…" : "Save Follow-up"}
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </>
+                      ) : !openUnrecordedTeacher ? (
+                        <>
+                          {unrecordedByTeacher.length === 0 ? (
+                            <div className="lc-empty-state">
+                              <CheckCircle2 size={32} aria-hidden="true" />
+                              <div>All attendance is up to date.</div>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                              {unrecordedByTeacher.map((t) => (
+                                <div key={t.teacherId} className="tp-accordion-row" style={{ cursor: "default" }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAdminAttUnrecordedTeacherId(t.teacherId)}
+                                    style={{ flex: 1, display: "flex", alignItems: "center", gap: "14px", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", textAlign: "left" }}
+                                  >
+                                    <ChevronRight size={18} aria-hidden="true" />
+                                    <span className="tp-accordion-title" style={{ flex: "none" }}>{t.teacherLabel}</span>
+                                    <span className="tp-count-badge">{t.count} unrecorded class{t.count === 1 ? "" : "es"}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="lc-btn lc-btn-danger"
+                                    style={{ padding: "6px 12px", fontSize: "12px", flexShrink: 0 }}
+                                    disabled={unrecordedDismissingId === t.teacherId}
+                                    onClick={() => dismissUnrecordedForTeacher(t.teacherId)}
+                                  >
+                                    {unrecordedDismissingId === t.teacherId ? "…" : "Delete"}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+                            <button type="button" className="lc-btn" onClick={() => setAdminAttUnrecordedTeacherId(null)}>
+                              <ChevronLeft size={14} aria-hidden="true" style={{ marginRight: "4px", verticalAlign: "-2px" }} />
+                              All teachers
+                            </button>
+                            <button
+                              type="button"
+                              className="lc-btn lc-btn-danger"
+                              disabled={unrecordedDismissingId === openUnrecordedTeacher.teacherId}
+                              onClick={() => dismissUnrecordedForTeacher(openUnrecordedTeacher.teacherId)}
+                            >
+                              {unrecordedDismissingId === openUnrecordedTeacher.teacherId ? "Deleting…" : "Delete all for this teacher"}
+                            </button>
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "14px" }}>{openUnrecordedTeacher.teacherLabel}</div>
+                          <div className="lc-table-wrap">
+                            <table className="lc-table">
+                              <thead>
+                                <tr>
+                                  <th>Class</th>
+                                  <th>Date</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {openUnrecordedTeacher.groups.map((g) => {
+                                  const code = classCode(g.className);
+                                  const badge = classBadgeStyle(code);
+                                  return (
+                                    <tr key={`${g.date}|${g.className}`}>
+                                      <td>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                          <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{code}</span>
+                                          <div>
+                                            <div style={{ fontWeight: 600 }}>{g.className}</div>
+                                            <div style={{ fontSize: "12px", color: C.a }}>
+                                              {fmtTime12(g.startTime)} – {fmtTime12(g.endTime)} · {g.studentCount} student{g.studentCount === 1 ? "" : "s"}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td>{weekdayAbbrev(g.date)}, {g.date}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {viewStudent && (
+                      <div className="lc-modal-backdrop" onClick={() => setAdminAttViewStudentId(null)}>
+                        <div className="lc-modal-sheet" onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                            <div style={{ fontWeight: 700, fontSize: "16px" }}>{viewStudent.name}</div>
+                            <button className="lc-btn" style={{ padding: "6px 10px" }} onClick={() => setAdminAttViewStudentId(null)} aria-label="Close"><X size={16} /></button>
+                          </div>
+                          <div style={{ fontSize: "12px", color: C.a, marginBottom: "14px" }}>{viewStudent.className || "—"}</div>
+                          {viewRows.length === 0 ? (
+                            <div style={{ color: C.a, fontSize: "14px" }}>No attendance recorded yet.</div>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "50vh", overflowY: "auto" }}>
+                              {viewRows.map((r) => (
+                                <div key={r.date} className="lc-card" style={{ padding: "10px 14px", margin: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                  <span style={{ fontSize: "13px" }}>{weekdayAbbrev(r.date)}, {r.date}</span>
+                                  {r.status === "present" && <span className="lc-badge lc-badge-paid">Present</span>}
+                                  {r.status === "absent" && <span className="lc-badge lc-badge-pending">Absent</span>}
+                                  {r.status === "cancelled" && <span className="lc-badge lc-badge-neutral">Cancelled</span>}
+                                  {r.status === "rescheduled" && <span className="lc-badge lc-badge-move">Rescheduled</span>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      );
-                    })()}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </>
           )}
         </div>
