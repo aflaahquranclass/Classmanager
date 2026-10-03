@@ -77,8 +77,7 @@ const TP_SHARED_STYLES = `
         .tp-mobile-bar { display: none; }
         .tp-sidebar-wrap { display: contents; }
         .tp-sidebar {
-          position: sticky; top: 0; align-self: flex-start; height: 100vh; height: 100dvh; overflow-x: hidden; overflow-y: auto;
-          width: clamp(260px, 20vw, 300px); flex-shrink: 0;
+          position: relative; overflow: hidden; width: clamp(260px, 20vw, 300px); flex-shrink: 0;
           background: linear-gradient(180deg, ${TP.gradStart} 0%, ${TP.gradMid} 58%, ${TP.gradEnd} 100%);
           color: #FFFFFF; padding: 28px 18px 20px; display: flex; flex-direction: column; box-sizing: border-box;
         }
@@ -228,7 +227,7 @@ const TP_SHARED_STYLES = `
           .tp-shell { flex-direction: column; }
           .tp-sidebar-wrap { display: block; }
           .tp-sidebar {
-            position: fixed; top: 0; left: 0; bottom: 0; height: auto; width: 82vw; max-width: 310px; z-index: 60;
+            position: fixed; top: 0; left: 0; bottom: 0; width: 82vw; max-width: 310px; z-index: 60;
             transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 6px 0 28px rgba(0,0,0,0.25);
           }
           .tp-sidebar-wrap-open .tp-sidebar { transform: translateX(0); }
@@ -269,6 +268,10 @@ w:"#1B2733",
 x:"#EDEFF2",
 y:"#D9573A",
 };
+
+// Finance starts fresh from this month: earlier months were cleared and can't be
+// browsed. Payments are marked from this month onwards.
+const FINANCE_START_MONTH = "2026-10";
 
 function currentMonthKey() {
   const d = new Date();
@@ -918,8 +921,6 @@ export default function App() {
   const [financeView, setFinanceView] = useState("dashboard"); // dashboard | payments | salaries | ledger | student
   const [finStudentSearch, setFinStudentSearch] = useState("");
   const [finStudentId, setFinStudentId] = useState("");
-  const [finStudentPayments, setFinStudentPayments] = useState([]); // { month, paid, amountPaid, paidDate }
-  const [finStudentLoading, setFinStudentLoading] = useState(false);
   const [expenseDescInput, setExpenseDescInput] = useState("");
   const [expenseAmountInput, setExpenseAmountInput] = useState("");
   const [expenseDateInput, setExpenseDateInput] = useState("");
@@ -2201,27 +2202,6 @@ export default function App() {
     setAdminExamDeletingId(null);
   };
 
-  // ---- Finance: one student's payment history (all months) ----
-  const loadStudentPayments = useCallback(async (studentId) => {
-    setFinStudentLoading(true);
-    try {
-      const { data, error } = await supabase.from("payments").select("month, paid, amount_paid, paid_date").eq("student_id", studentId);
-      if (error) throw error;
-      setFinStudentPayments((data || []).map((r) => ({ month: r.month, paid: r.paid, amountPaid: Number(r.amount_paid) || 0, paidDate: r.paid_date })));
-    } catch {
-      setFinStudentPayments([]);
-      showToast("Couldn't load this student's payments. Please try again.");
-    }
-    setFinStudentLoading(false);
-  }, []);
-
-  // Reload whenever the selection changes or a payment is marked/undone elsewhere.
-  useEffect(() => {
-    if (role === "admin" && section === "finance" && financeView === "student" && finStudentId) {
-      loadStudentPayments(finStudentId);
-    }
-  }, [role, section, financeView, finStudentId, paymentsByMonth, loadStudentPayments]);
-
   const getDraft = (studentId, fee) => {
     if (payDrafts[studentId] !== undefined) return payDrafts[studentId];
     const rec = monthData[studentId];
@@ -2326,7 +2306,10 @@ export default function App() {
   const DASHBOARD_MONTHLY_SPAN = 6;
   const dashboardMonthKeys = useMemo(() => {
     const keys = [];
-    for (let i = 0; i < DASHBOARD_MONTHLY_SPAN; i++) keys.push(shiftMonth(month, -i));
+    for (let i = 0; i < DASHBOARD_MONTHLY_SPAN; i++) {
+      const k = shiftMonth(month, -i);
+      if (k >= FINANCE_START_MONTH) keys.push(k);
+    }
     return keys;
   }, [month]);
 
@@ -4415,7 +4398,7 @@ export default function App() {
 
                   <div className="tp-card" style={{ marginBottom: "18px" }}>
                     <div style={{ fontSize: "15px", fontWeight: 600, color: TP.navy, marginBottom: "12px" }}>
-                      Monthly performance — last {DASHBOARD_MONTHLY_SPAN} months
+                      Monthly performance — from {monthLabel(FINANCE_START_MONTH)}
                     </div>
                     <div className="tp-table-wrap"><table className="tp-list-table">
                       <thead><tr><th>Month</th><th>Expected</th><th>Received</th><th>Pending</th><th>Collected</th></tr></thead>
@@ -4632,7 +4615,7 @@ export default function App() {
                             )}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                            <button className="lc-btn" onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="Previous month">‹</button>
+                            <button className="lc-btn" disabled={month <= FINANCE_START_MONTH} onClick={() => setMonth((m) => (m > FINANCE_START_MONTH ? shiftMonth(m, -1) : m))} aria-label="Previous month">‹</button>
                             <div style={{ fontSize: "14px", fontWeight: 600, minWidth: "130px", textAlign: "center", color: TP.navy }}>{monthLabel(month)}</div>
                             <button className="lc-btn" onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="Next month">›</button>
                           </div>
@@ -5331,7 +5314,7 @@ export default function App() {
                       <h1 className="tp-title">Finance</h1>
                     </div>
                     <div className="tp-actions">
-                      <button type="button" className="tp-btn-outline" style={{ width: "44px", padding: 0, justifyContent: "center" }} onClick={() => setMonth((m) => shiftMonth(m, -1))} aria-label="Previous month">‹</button>
+                      <button type="button" className="tp-btn-outline" style={{ width: "44px", padding: 0, justifyContent: "center", opacity: month <= FINANCE_START_MONTH ? 0.4 : 1 }} disabled={month <= FINANCE_START_MONTH} onClick={() => setMonth((m) => (m > FINANCE_START_MONTH ? shiftMonth(m, -1) : m))} aria-label="Previous month">‹</button>
                       <span className="tp-chip" style={{ minWidth: "140px", justifyContent: "center" }}>{monthLabel(month)}</span>
                       <button type="button" className="tp-btn-outline" style={{ width: "44px", padding: 0, justifyContent: "center" }} onClick={() => setMonth((m) => shiftMonth(m, 1))} aria-label="Next month">›</button>
                     </div>
@@ -5625,19 +5608,13 @@ export default function App() {
                       ? students.filter((s) => s.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
                       : [];
                     const selected = finStudentId ? students.find((s) => s.id === finStudentId) : null;
-
-                    // One row per month from when the student joined (or first paid) up to now.
-                    const byMonth = new Map(finStudentPayments.map((p) => [p.month, p]));
-                    const firstMonth = [selected && selected.joinedMonth, ...finStudentPayments.map((p) => p.month)]
-                      .filter(Boolean).sort()[0] || currentMonthKey();
-                    const months = [];
-                    for (let k = currentMonthKey(); k >= firstMonth; k = shiftMonth(k, -1)) months.push(k);
-                    const paidRows = finStudentPayments.filter((p) => p.paid);
-                    const totalPaid = paidRows.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
-                    const lastPaid = paidRows.filter((p) => p.paidDate).sort((a, b) => b.paidDate.localeCompare(a.paidDate))[0];
+                    const rec = selected ? monthData[selected.id] : null;
+                    const paid = !!(rec && rec.paid);
+                    const enrolled = selected ? isEnrolledInMonth(selected, month) : false;
 
                     return (
                       <div className="tp-card">
+                        <div className="tp-subtext">Find a student and mark their payment for {monthLabel(month)}.</div>
                         <div className="lc-search-wrap" style={{ maxWidth: "420px", marginBottom: "14px" }}>
                           <Search size={16} aria-hidden="true" color={C.a} />
                           <input
@@ -5656,18 +5633,24 @@ export default function App() {
                             <div style={{ color: TP.secondaryText, fontSize: "14px", marginBottom: "14px" }}>No students match "{finStudentSearch}".</div>
                           ) : (
                             <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "18px" }}>
-                              {matches.map((s) => (
-                                <button
-                                  key={s.id}
-                                  type="button"
-                                  className="tp-accordion-row"
-                                  style={{ marginBottom: 0, ...(s.id === finStudentId ? { borderColor: TP.blue } : {}) }}
-                                  onClick={() => { setFinStudentId(s.id); setFinStudentSearch(""); }}
-                                >
-                                  <span className="tp-accordion-title">{s.name}</span>
-                                  <span className="tp-count-badge">{s.className || "No class"}</span>
-                                </button>
-                              ))}
+                              {matches.map((s) => {
+                                const sPaid = !!(monthData[s.id] && monthData[s.id].paid);
+                                return (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    className="tp-accordion-row"
+                                    style={{ marginBottom: 0, ...(s.id === finStudentId ? { borderColor: TP.blue } : {}) }}
+                                    onClick={() => { setFinStudentId(s.id); setFinStudentSearch(""); }}
+                                  >
+                                    <span className="tp-accordion-title">{s.name}</span>
+                                    <span className="tp-count-badge">{s.className || "No class"}</span>
+                                    {isEnrolledInMonth(s, month) && (
+                                      <span className={`lc-badge ${sPaid ? "lc-badge-paid" : "lc-badge-pending"}`} style={{ cursor: "inherit" }}>{sPaid ? "Paid" : "Pending"}</span>
+                                    )}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )
                         )}
@@ -5676,11 +5659,11 @@ export default function App() {
                           !q && (
                             <div className="lc-empty-state">
                               <Search size={32} aria-hidden="true" />
-                              <div>Search for a student to see when they paid.</div>
+                              <div>Search for a student to mark their payment.</div>
                             </div>
                           )
                         ) : (
-                          <>
+                          <div className="lc-card">
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
                               <div>
                                 <div style={{ fontSize: "18px", fontWeight: 700, color: TP.navy }}>{selected.name}</div>
@@ -5688,36 +5671,43 @@ export default function App() {
                                   {selected.className || "No class"} · Monthly fee {fmtMoney(selected.fee)}
                                 </div>
                               </div>
-                              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                                <span className="tp-chip" style={{ height: "auto", padding: "8px 14px" }}>Total paid: {fmtMoney(totalPaid)}</span>
-                                <span className="tp-chip" style={{ height: "auto", padding: "8px 14px" }}>
-                                  Last paid: {lastPaid ? lastPaid.paidDate : "—"}
-                                </span>
-                              </div>
+                              {enrolled && (
+                                <span className={`lc-badge ${paid ? "lc-badge-paid" : "lc-badge-pending"}`} style={{ cursor: "inherit" }}>{paid ? "Paid" : "Pending"}</span>
+                              )}
                             </div>
 
-                            {finStudentLoading ? (
-                              <div className="lc-loading-row"><span className="lc-spinner"></span>Loading payments…</div>
+                            {!enrolled ? (
+                              <div style={{ fontSize: "14px", color: TP.secondaryText }}>
+                                Fee starts from {monthLabel(selected.joinedMonth)} — nothing is due for {monthLabel(month)}.
+                              </div>
                             ) : (
-                              <div className="tp-table-wrap"><table className="tp-list-table">
-                                <thead><tr><th>Month</th><th>Status</th><th>Amount paid</th><th>Paid on</th></tr></thead>
-                                <tbody>
-                                  {months.map((k) => {
-                                    const p = byMonth.get(k);
-                                    const paid = !!(p && p.paid);
-                                    return (
-                                      <tr key={k}>
-                                        <td>{monthLabel(k)}</td>
-                                        <td><span className={`lc-badge ${paid ? "lc-badge-paid" : "lc-badge-pending"}`}>{paid ? "Paid" : "Pending"}</span></td>
-                                        <td>{paid ? fmtMoney(p.amountPaid) : "—"}</td>
-                                        <td>{paid && p.paidDate ? p.paidDate : "—"}</td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table></div>
+                              <>
+                                {paid && rec.paidDate && (
+                                  <div style={{ fontSize: "13px", color: TP.secondaryText, marginBottom: "12px" }}>
+                                    Paid {fmtMoney(rec.amountPaid)} on {rec.paidDate}
+                                  </div>
+                                )}
+                                <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Amount</label>
+                                <input
+                                  className="lc-input"
+                                  style={{ maxWidth: "200px", marginBottom: "14px" }}
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={getDraft(selected.id, selected.fee)}
+                                  onChange={(e) => setPayDrafts((prev) => ({ ...prev, [selected.id]: e.target.value }))}
+                                  disabled={paid}
+                                />
+                                <div>
+                                  {paid ? (
+                                    <button className="lc-btn" onClick={() => markUnpaid(selected.id)}>Undo</button>
+                                  ) : (
+                                    <button className="lc-btn lc-btn-primary" onClick={() => markPaid(selected.id, selected.fee)}>Mark paid</button>
+                                  )}
+                                </div>
+                              </>
                             )}
-                          </>
+                          </div>
                         )}
                       </div>
                     );
