@@ -77,7 +77,8 @@ const TP_SHARED_STYLES = `
         .tp-mobile-bar { display: none; }
         .tp-sidebar-wrap { display: contents; }
         .tp-sidebar {
-          position: relative; overflow: hidden; width: clamp(260px, 20vw, 300px); flex-shrink: 0;
+          position: sticky; top: 0; align-self: flex-start; height: 100vh; height: 100dvh; overflow-x: hidden; overflow-y: auto;
+          width: clamp(260px, 20vw, 300px); flex-shrink: 0;
           background: linear-gradient(180deg, ${TP.gradStart} 0%, ${TP.gradMid} 58%, ${TP.gradEnd} 100%);
           color: #FFFFFF; padding: 28px 18px 20px; display: flex; flex-direction: column; box-sizing: border-box;
         }
@@ -215,6 +216,7 @@ const TP_SHARED_STYLES = `
           .tp-mobile-bar {
             display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;
             background: linear-gradient(90deg, ${TP.gradStart}, ${TP.gradEnd}); color: #FFFFFF;
+            position: sticky; top: 0; z-index: 50;
           }
           .tp-mobile-bar-brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
           .tp-mobile-bar-brand img { height: 30px; width: auto; }
@@ -226,7 +228,7 @@ const TP_SHARED_STYLES = `
           .tp-shell { flex-direction: column; }
           .tp-sidebar-wrap { display: block; }
           .tp-sidebar {
-            position: fixed; top: 0; left: 0; bottom: 0; width: 82vw; max-width: 310px; z-index: 60;
+            position: fixed; top: 0; left: 0; bottom: 0; height: auto; width: 82vw; max-width: 310px; z-index: 60;
             transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 6px 0 28px rgba(0,0,0,0.25);
           }
           .tp-sidebar-wrap-open .tp-sidebar { transform: translateX(0); }
@@ -556,12 +558,10 @@ function LoginScreen({
       <style>{`
         body { margin: 0; }
         .login-page { position: relative; min-height: 100vh; min-height: 100dvh; background-color: ${LOGIN.bg}; background-image: url("${LOGIN_BACKGROUND_URL}"); background-size: cover; background-position: center; background-repeat: no-repeat; display: flex; align-items: center; justify-content: center; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; color: ${LOGIN.text}; }
-        .login-card { position: relative; width: min(700px, calc(100vw - 32px)); box-sizing: border-box; background: rgba(255,255,255,0.96); border: 1px solid #D8ECF9; border-radius: 24px; padding: 40px 58px; box-shadow: 0 2px 8px rgba(45,135,200,0.10), 0 16px 40px rgba(45,135,200,0.16), 0 32px 70px rgba(45,135,200,0.10); overflow: hidden; }
-        .login-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, ${LOGIN.gradStart}, ${LOGIN.gradEnd}); }
+        .login-card { position: relative; width: min(460px, calc(100vw - 32px)); box-sizing: border-box; background: transparent; border: none; border-radius: 0; padding: 40px 8px; box-shadow: none; }
         .login-card-logo { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 26px; }
         .login-card-logo img { width: clamp(84px, 8vw, 100px); height: auto; display: block; margin-bottom: 14px; }
         .login-card-brand-name { font-size: clamp(24px, 2.4vw, 30px); font-weight: 600; color: ${LOGIN.text}; line-height: 1.25; }
-        .login-card-heading { font-size: clamp(32px, 3vw, 41px); font-weight: 700; color: ${LOGIN.text}; text-align: center; margin-bottom: 8px; }
         .login-card-sub { font-size: clamp(17px, 1.4vw, 20px); color: #5A7C93; text-align: center; margin-bottom: 28px; }
         .login-segment { display: flex; border: 1px solid #DCEEFA; border-radius: 16px; overflow: hidden; margin-bottom: 28px; height: clamp(100px, 10vw, 118px); background: ${LOGIN.white}; }
         .login-segment-btn { flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 6px 4px; border: none; border-right: 1px solid #E3F0FA; background: transparent; color: #5A8CB8; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
@@ -602,7 +602,6 @@ function LoginScreen({
           .login-page { background-position: center top; }
           .login-card { width: calc(100vw - 24px); padding: 24px; border-radius: 18px; }
           .login-card-logo { margin-bottom: 20px; }
-          .login-card-heading { margin-bottom: 6px; }
           .login-card-sub { margin-bottom: 22px; }
           .login-segment { height: clamp(88px, 24vw, 104px); margin-bottom: 22px; }
         }
@@ -616,7 +615,6 @@ function LoginScreen({
           .login-card-logo { margin-bottom: 6px; }
           .login-card-logo img { width: clamp(36px, 8vh, 60px); margin-bottom: 4px; }
           .login-card-brand-name { font-size: clamp(16px, 2.6vh, 22px); }
-          .login-card-heading { font-size: clamp(18px, 3.4vh, 28px); margin-bottom: 2px; }
           .login-card-sub { font-size: clamp(11px, 1.8vh, 15px); margin-bottom: 6px; }
           .login-segment { height: clamp(50px, 9vh, 80px); margin-bottom: 6px; }
           .login-segment-btn svg, .login-segment-icon-shield { width: clamp(16px, 3.4vh, 28px); height: clamp(16px, 3.4vh, 28px); }
@@ -634,7 +632,6 @@ function LoginScreen({
           <div className="login-card-brand-name">Aflaah Quran Class</div>
         </div>
 
-        <div className="login-card-heading">Welcome back</div>
         <div className="login-card-sub">{segments.length === 1 ? `Sign in to the ${segments[0].label}` : "Sign in to continue"}</div>
 
         {segments.length > 1 && (
@@ -894,7 +891,6 @@ export default function App() {
   const [paymentsByMonth, setPaymentsByMonth] = useState({});
   const [expensesByMonth, setExpensesByMonth] = useState({});
   const [otherIncomeByMonth, setOtherIncomeByMonth] = useState({});
-  const [investments, setInvestments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
   const showToast = (message) => {
@@ -919,7 +915,11 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(null); // { month, scope } | null
   const [deletingKey, setDeletingKey] = useState(null); // `${month}:${scope}` while deleting
   const [backupLoadingKey, setBackupLoadingKey] = useState(null); // `${month}:${format}` while preparing
-  const [financeView, setFinanceView] = useState("dashboard"); // dashboard | payments | salaries | ledger | investments
+  const [financeView, setFinanceView] = useState("dashboard"); // dashboard | payments | salaries | ledger | student
+  const [finStudentSearch, setFinStudentSearch] = useState("");
+  const [finStudentId, setFinStudentId] = useState("");
+  const [finStudentPayments, setFinStudentPayments] = useState([]); // { month, paid, amountPaid, paidDate }
+  const [finStudentLoading, setFinStudentLoading] = useState(false);
   const [expenseDescInput, setExpenseDescInput] = useState("");
   const [expenseAmountInput, setExpenseAmountInput] = useState("");
   const [expenseDateInput, setExpenseDateInput] = useState("");
@@ -927,13 +927,6 @@ export default function App() {
   const [incomeAmountInput, setIncomeAmountInput] = useState("");
   const [incomeDateInput, setIncomeDateInput] = useState("");
 
-  // Investments form
-  const [editingInvestmentId, setEditingInvestmentId] = useState(null);
-  const [invDesc, setInvDesc] = useState("");
-  const [invAmount, setInvAmount] = useState("");
-  const [invStartDate, setInvStartDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [invEndDate, setInvEndDate] = useState("");
-  const [invNotes, setInvNotes] = useState("");
   const [month, setMonth] = useState(currentMonthKey());
 
   const [timetableView, setTimetableView] = useState("students"); // students | teachers
@@ -1155,14 +1148,6 @@ export default function App() {
   });
   const HOLIDAY_TO_DB = (h) => ({ label: h.label, start_date: h.startDate, end_date: h.endDate });
   const HOLIDAY_FROM_DB = (r) => ({ id: r.id, label: r.label, startDate: r.start_date, endDate: r.end_date });
-  const INVESTMENT_TO_DB = (i) => ({
-    description: i.description, amount: Number(i.amount) || 0,
-    start_date: i.startDate, end_date: i.endDate || null, notes: i.notes || null,
-  });
-  const INVESTMENT_FROM_DB = (r) => ({
-    id: r.id, description: r.description, amount: r.amount,
-    startDate: r.start_date, endDate: r.end_date, notes: r.notes,
-  });
 
   // Reconciles a full new list against the last-known list for a table:
   // inserts new rows, updates changed rows, deletes removed rows. Returns the
@@ -1351,12 +1336,11 @@ export default function App() {
       setLoading(true);
       setLoadError(null);
       try {
-        const [studentsRes, teachersRes, classesRes, holidaysRes, investmentsRes] = await Promise.all([
+        const [studentsRes, teachersRes, classesRes, holidaysRes] = await Promise.all([
           supabase.from("students").select("*"),
           supabase.from("teachers").select("*"),
           supabase.from("classes").select("*"),
           supabase.from("holidays").select("*"),
-          supabase.from("investments").select("*"),
         ]);
         if (studentsRes.error) throw studentsRes.error;
         if (teachersRes.error) throw teachersRes.error;
@@ -1367,7 +1351,6 @@ export default function App() {
           setTeachers(teachersRes.data.map(TEACHER_FROM_DB));
           setClasses(classesRes.data.map(CLASS_FROM_DB));
           setHolidays(holidaysRes.data.map(HOLIDAY_FROM_DB));
-          if (!investmentsRes.error) setInvestments(investmentsRes.data.map(INVESTMENT_FROM_DB));
         }
       } catch {
         if (!cancelled) setLoadError("Couldn't load your data. Try refreshing.");
@@ -2218,56 +2201,26 @@ export default function App() {
     setAdminExamDeletingId(null);
   };
 
-  // ---- Investments ----
-  const saveInvestments = async (list) => {
-    const previous = investments;
-    setInvestments(list);
+  // ---- Finance: one student's payment history (all months) ----
+  const loadStudentPayments = useCallback(async (studentId) => {
+    setFinStudentLoading(true);
     try {
-      const authoritative = await syncTable("investments", previous, list, INVESTMENT_TO_DB, INVESTMENT_FROM_DB);
-      setInvestments(authoritative);
-      setSaveError(null);
+      const { data, error } = await supabase.from("payments").select("month, paid, amount_paid, paid_date").eq("student_id", studentId);
+      if (error) throw error;
+      setFinStudentPayments((data || []).map((r) => ({ month: r.month, paid: r.paid, amountPaid: Number(r.amount_paid) || 0, paidDate: r.paid_date })));
     } catch {
-      setInvestments(previous);
-      setSaveError("Save failed. Your change may not persist.");
+      setFinStudentPayments([]);
+      showToast("Couldn't load this student's payments. Please try again.");
     }
-  };
+    setFinStudentLoading(false);
+  }, []);
 
-  const resetInvestmentForm = () => {
-    setInvDesc(""); setInvAmount(""); setInvStartDate(new Date().toISOString().slice(0, 10));
-    setInvEndDate(""); setInvNotes("");
-    setEditingInvestmentId(null);
-  };
-
-  // Quick-pick duration buttons fill End date from Start date + N months,
-  // instead of making the admin compute a maturity date by hand.
-  const setInvestmentDurationMonths = (months) => {
-    const [y, m, d] = (invStartDate || new Date().toISOString().slice(0, 10)).split("-").map(Number);
-    const end = new Date(y, m - 1 + months, d);
-    setInvEndDate(`${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`);
-  };
-
-  const handleSaveInvestment = () => {
-    const description = invDesc.trim();
-    const amount = parseFloat(invAmount);
-    if (!description || !Number.isFinite(amount) || amount <= 0 || !invStartDate) return;
-    const payload = { description, amount, startDate: invStartDate, endDate: invEndDate || "", notes: invNotes.trim() };
-    if (editingInvestmentId) {
-      saveInvestments(investments.map((i) => (i.id === editingInvestmentId ? { ...i, ...payload } : i)));
-      showToast(`Saved changes for ${description}`);
-    } else {
-      saveInvestments([...investments, { id: uid(), ...payload }]);
-      showToast(`${description} added`);
+  // Reload whenever the selection changes or a payment is marked/undone elsewhere.
+  useEffect(() => {
+    if (role === "admin" && section === "finance" && financeView === "student" && finStudentId) {
+      loadStudentPayments(finStudentId);
     }
-    resetInvestmentForm();
-  };
-
-  const startEditInvestment = (i) => {
-    setEditingInvestmentId(i.id);
-    setInvDesc(i.description); setInvAmount(String(i.amount));
-    setInvStartDate(i.startDate); setInvEndDate(i.endDate || ""); setInvNotes(i.notes || "");
-  };
-
-  const removeInvestment = (id) => saveInvestments(investments.filter((i) => i.id !== id));
+  }, [role, section, financeView, finStudentId, paymentsByMonth, loadStudentPayments]);
 
   const getDraft = (studentId, fee) => {
     if (payDrafts[studentId] !== undefined) return payDrafts[studentId];
@@ -5390,7 +5343,7 @@ export default function App() {
                       <button type="button" aria-pressed={financeView === "payments"} className={`tp-segment-btn ${financeView === "payments" ? "tp-segment-btn-active" : ""}`} onClick={() => setFinanceView("payments")}>Payments</button>
                       <button type="button" aria-pressed={financeView === "salaries"} className={`tp-segment-btn ${financeView === "salaries" ? "tp-segment-btn-active" : ""}`} onClick={() => setFinanceView("salaries")}>Salaries</button>
                       <button type="button" aria-pressed={financeView === "ledger"} className={`tp-segment-btn ${financeView === "ledger" ? "tp-segment-btn-active" : ""}`} onClick={() => setFinanceView("ledger")}>Expenses & income</button>
-                      <button type="button" aria-pressed={financeView === "investments"} className={`tp-segment-btn ${financeView === "investments" ? "tp-segment-btn-active" : ""}`} onClick={() => setFinanceView("investments")}>Investments</button>
+                      <button type="button" aria-pressed={financeView === "student"} className={`tp-segment-btn ${financeView === "student" ? "tp-segment-btn-active" : ""}`} onClick={() => setFinanceView("student")}>Student search</button>
                     </div>
                   )}
 
@@ -5666,108 +5619,107 @@ export default function App() {
                     </div>
                   )}
 
-                  {role === "admin" && financeView === "investments" && (() => {
-                    const todayStr = new Date().toISOString().slice(0, 10);
-                    const isMatured = (i) => i.endDate && i.endDate < todayStr;
-                    const activeTotal = investments.filter((i) => !isMatured(i)).reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-                    const maturedTotal = investments.filter(isMatured).reduce((sum, i) => sum + (Number(i.amount) || 0), 0);
-                    const sorted = [...investments].sort((a, b) => b.startDate.localeCompare(a.startDate));
+                  {role === "admin" && financeView === "student" && (() => {
+                    const q = finStudentSearch.trim().toLowerCase();
+                    const matches = q
+                      ? students.filter((s) => s.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
+                      : [];
+                    const selected = finStudentId ? students.find((s) => s.id === finStudentId) : null;
+
+                    // One row per month from when the student joined (or first paid) up to now.
+                    const byMonth = new Map(finStudentPayments.map((p) => [p.month, p]));
+                    const firstMonth = [selected && selected.joinedMonth, ...finStudentPayments.map((p) => p.month)]
+                      .filter(Boolean).sort()[0] || currentMonthKey();
+                    const months = [];
+                    for (let k = currentMonthKey(); k >= firstMonth; k = shiftMonth(k, -1)) months.push(k);
+                    const paidRows = finStudentPayments.filter((p) => p.paid);
+                    const totalPaid = paidRows.reduce((sum, p) => sum + (Number(p.amountPaid) || 0), 0);
+                    const lastPaid = paidRows.filter((p) => p.paidDate).sort((a, b) => b.paidDate.localeCompare(a.paidDate))[0];
+
                     return (
-                      <>
-                        <div className="lc-grid-2" style={{ marginBottom: "18px" }}>
-                          <div className="tp-card">
-                            <div style={{ fontSize: "13px", color: TP.secondaryText, marginBottom: "6px" }}>Currently invested</div>
-                            <div style={{ fontSize: "26px", fontWeight: 600, color: C.d }}><CountUp value={activeTotal} formatter={fmtMoney} /></div>
-                          </div>
-                          <div className="tp-card">
-                            <div style={{ fontSize: "13px", color: TP.secondaryText, marginBottom: "6px" }}>Matured</div>
-                            <div style={{ fontSize: "26px", fontWeight: 600, color: TP.navy }}><CountUp value={maturedTotal} formatter={fmtMoney} /></div>
-                          </div>
-                        </div>
-
-                        <div className="tp-card" style={{ marginBottom: "18px" }}>
-                          <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: TP.navy }}>
-                            {editingInvestmentId ? "Edit investment" : "Add investment"}
-                          </div>
-                          <label style={{ fontSize: "12px", color: C.a }}>Description</label>
-                          <input className="lc-input" style={{ marginBottom: "10px" }} value={invDesc} onChange={(e) => setInvDesc(e.target.value)} placeholder="e.g. Fixed deposit — Bank X" />
-                          <div className="lc-form-grid">
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Amount</label>
-                              <input className="lc-input" type="number" min="0" step="0.01" value={invAmount} onChange={(e) => setInvAmount(e.target.value)} placeholder="0.00" />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Start date</label>
-                              <input className="lc-input" type="date" value={invStartDate} onChange={(e) => setInvStartDate(e.target.value)} />
-                            </div>
-                          </div>
-                          <label style={{ fontSize: "12px", color: C.a }}>Duration</label>
-                          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
-                            {[[3, "3 months"], [6, "6 months"], [12, "1 year"], [24, "2 years"]].map(([months, label]) => (
-                              <button key={months} className="lc-btn" style={{ fontSize: "12px", padding: "5px 12px" }} onClick={() => setInvestmentDurationMonths(months)}>
-                                {label}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="lc-form-grid">
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>End date (optional)</label>
-                              <input className="lc-input" type="date" value={invEndDate} onChange={(e) => setInvEndDate(e.target.value)} />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Notes (optional)</label>
-                              <input className="lc-input" value={invNotes} onChange={(e) => setInvNotes(e.target.value)} placeholder="Any details" />
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
-                            <button
-                              className="lc-btn lc-btn-primary"
-                              disabled={!invDesc.trim() || !invAmount || !invStartDate}
-                              onClick={handleSaveInvestment}
-                            >
-                              {editingInvestmentId ? "Save changes" : "Add investment"}
-                            </button>
-                            {editingInvestmentId && <button className="lc-btn" onClick={resetInvestmentForm}>Cancel</button>}
-                          </div>
-                        </div>
-
-                        <div className="tp-card">
-                          {sorted.length === 0 ? (
-                            <div className="lc-empty-state">
-                              <Wallet size={32} aria-hidden="true" />
-                              <div>No investments logged yet. Add your first one above.</div>
-                            </div>
-                          ) : (
-                            <div className="tp-table-wrap"><table className="tp-list-table">
-                              <thead><tr><th>Description</th><th>Amount</th><th>Start</th><th>End</th><th>Status</th><th></th></tr></thead>
-                              <tbody>
-                                {sorted.map((i) => (
-                                  <tr key={i.id}>
-                                    <td>
-                                      {i.description}
-                                      {i.notes && <div style={{ fontSize: "12px", color: TP.secondaryText, marginTop: "2px" }}>{i.notes}</div>}
-                                    </td>
-                                    <td>{fmtMoney(i.amount)}</td>
-                                    <td>{i.startDate}</td>
-                                    <td>{i.endDate || "—"}</td>
-                                    <td>
-                                      {isMatured(i) ? (
-                                        <span className="lc-badge lc-badge-paid" style={{ cursor: "default" }}>Matured</span>
-                                      ) : (
-                                        <span className="lc-badge lc-badge-pending" style={{ cursor: "default" }}>Active</span>
-                                      )}
-                                    </td>
-                                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                                      <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => startEditInvestment(i)}>Edit</button>
-                                      <button className="lc-btn lc-btn-danger" onClick={() => removeInvestment(i.id)}>Remove</button>
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table></div>
+                      <div className="tp-card">
+                        <div className="lc-search-wrap" style={{ maxWidth: "420px", marginBottom: "14px" }}>
+                          <Search size={16} aria-hidden="true" color={C.a} />
+                          <input
+                            className="lc-input"
+                            value={finStudentSearch}
+                            onChange={(e) => setFinStudentSearch(e.target.value)}
+                            placeholder="Search student by name…"
+                          />
+                          {finStudentSearch && (
+                            <button className="lc-search-clear" onClick={() => setFinStudentSearch("")} aria-label="Clear search"><X size={14} /></button>
                           )}
                         </div>
-                      </>
+
+                        {q && (
+                          matches.length === 0 ? (
+                            <div style={{ color: TP.secondaryText, fontSize: "14px", marginBottom: "14px" }}>No students match "{finStudentSearch}".</div>
+                          ) : (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "18px" }}>
+                              {matches.map((s) => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  className="tp-accordion-row"
+                                  style={{ marginBottom: 0, ...(s.id === finStudentId ? { borderColor: TP.blue } : {}) }}
+                                  onClick={() => { setFinStudentId(s.id); setFinStudentSearch(""); }}
+                                >
+                                  <span className="tp-accordion-title">{s.name}</span>
+                                  <span className="tp-count-badge">{s.className || "No class"}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )
+                        )}
+
+                        {!selected ? (
+                          !q && (
+                            <div className="lc-empty-state">
+                              <Search size={32} aria-hidden="true" />
+                              <div>Search for a student to see when they paid.</div>
+                            </div>
+                          )
+                        ) : (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
+                              <div>
+                                <div style={{ fontSize: "18px", fontWeight: 700, color: TP.navy }}>{selected.name}</div>
+                                <div style={{ fontSize: "13px", color: TP.secondaryText }}>
+                                  {selected.className || "No class"} · Monthly fee {fmtMoney(selected.fee)}
+                                </div>
+                              </div>
+                              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                                <span className="tp-chip" style={{ height: "auto", padding: "8px 14px" }}>Total paid: {fmtMoney(totalPaid)}</span>
+                                <span className="tp-chip" style={{ height: "auto", padding: "8px 14px" }}>
+                                  Last paid: {lastPaid ? lastPaid.paidDate : "—"}
+                                </span>
+                              </div>
+                            </div>
+
+                            {finStudentLoading ? (
+                              <div className="lc-loading-row"><span className="lc-spinner"></span>Loading payments…</div>
+                            ) : (
+                              <div className="tp-table-wrap"><table className="tp-list-table">
+                                <thead><tr><th>Month</th><th>Status</th><th>Amount paid</th><th>Paid on</th></tr></thead>
+                                <tbody>
+                                  {months.map((k) => {
+                                    const p = byMonth.get(k);
+                                    const paid = !!(p && p.paid);
+                                    return (
+                                      <tr key={k}>
+                                        <td>{monthLabel(k)}</td>
+                                        <td><span className={`lc-badge ${paid ? "lc-badge-paid" : "lc-badge-pending"}`}>{paid ? "Paid" : "Pending"}</span></td>
+                                        <td>{paid ? fmtMoney(p.amountPaid) : "—"}</td>
+                                        <td>{paid && p.paidDate ? p.paidDate : "—"}</td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table></div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     );
                   })()}
                 </div>
