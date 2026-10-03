@@ -25,7 +25,7 @@
         document.title = name;
         document.querySelector('link[rel="manifest"]').href = "/manifest-" + p + ".webmanifest";
         document.querySelector('meta[name="apple-mobile-web-app-title"]').content = name;
-        document.querySelector('meta[name="theme-color"]').content = p === "admin" ? "#27409A" : "#0D4F85";
+        document.querySelector('meta[name="theme-color"]').content = p === "admin" ? "#000000" : "#0D4F85";
         document.querySelector('link[rel="icon"]').href = p === "admin" ? "/icons/admin-icon-192.png" : "/icons/icon-192.png";
         document.querySelector('link[rel="apple-touch-icon"]').href = p === "admin" ? "/icons/admin-apple-touch-icon.png" : "/icons/apple-touch-icon.png";
       })();

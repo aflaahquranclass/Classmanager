@@ -561,7 +561,6 @@ function LoginScreen({
         .login-card-logo { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 26px; }
         .login-card-logo img { width: clamp(84px, 8vw, 100px); height: auto; display: block; margin-bottom: 14px; }
         .login-card-brand-name { font-size: clamp(24px, 2.4vw, 30px); font-weight: 600; color: ${LOGIN.text}; line-height: 1.25; }
-        .login-card-brand-sub { font-size: clamp(15px, 1.3vw, 18px); color: #5A7C93; margin-top: 4px; }
         .login-card-heading { font-size: clamp(32px, 3vw, 41px); font-weight: 700; color: ${LOGIN.text}; text-align: center; margin-bottom: 8px; }
         .login-card-sub { font-size: clamp(17px, 1.4vw, 20px); color: #5A7C93; text-align: center; margin-bottom: 28px; }
         .login-segment { display: flex; border: 1px solid #DCEEFA; border-radius: 16px; overflow: hidden; margin-bottom: 28px; height: clamp(100px, 10vw, 118px); background: ${LOGIN.white}; }
@@ -617,7 +616,6 @@ function LoginScreen({
           .login-card-logo { margin-bottom: 6px; }
           .login-card-logo img { width: clamp(36px, 8vh, 60px); margin-bottom: 4px; }
           .login-card-brand-name { font-size: clamp(16px, 2.6vh, 22px); }
-          .login-card-brand-sub { font-size: clamp(11px, 1.6vh, 14px); margin-top: 2px; }
           .login-card-heading { font-size: clamp(18px, 3.4vh, 28px); margin-bottom: 2px; }
           .login-card-sub { font-size: clamp(11px, 1.8vh, 15px); margin-bottom: 6px; }
           .login-segment { height: clamp(50px, 9vh, 80px); margin-bottom: 6px; }
@@ -634,7 +632,6 @@ function LoginScreen({
         <div className="login-card-logo">
           <img src={LOGIN_LOGO_ICON_URL} alt="Aflaah Quran Class logo" />
           <div className="login-card-brand-name">Aflaah Quran Class</div>
-          <div className="login-card-brand-sub">Class Management Portal</div>
         </div>
 
         <div className="login-card-heading">Welcome back</div>
