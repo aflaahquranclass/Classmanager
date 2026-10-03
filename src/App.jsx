@@ -228,6 +228,7 @@ const TP_SHARED_STYLES = `
           .tp-sidebar-wrap { display: block; }
           .tp-sidebar {
             position: fixed; top: 0; left: 0; bottom: 0; width: 82vw; max-width: 310px; z-index: 60;
+            overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
             transform: translateX(-100%); transition: transform 0.25s ease; box-shadow: 6px 0 28px rgba(0,0,0,0.25);
           }
           .tp-sidebar-wrap-open .tp-sidebar { transform: translateX(0); }
