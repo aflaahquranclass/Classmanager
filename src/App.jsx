@@ -921,6 +921,7 @@ export default function App() {
   const [backupLoadingKey, setBackupLoadingKey] = useState(null); // `${month}:${format}` while preparing
   const [financeView, setFinanceView] = useState("dashboard"); // dashboard | payments | salaries | ledger | student
   const [finStudentSearch, setFinStudentSearch] = useState("");
+  const [finClassSearch, setFinClassSearch] = useState("");
   const [finStudentId, setFinStudentId] = useState("");
   const [expenseDescInput, setExpenseDescInput] = useState("");
   const [expenseAmountInput, setExpenseAmountInput] = useState("");
@@ -5414,52 +5415,126 @@ export default function App() {
                     </>
                   )}
 
-                  {financeView === "payments" && (
-                    <div className="tp-card">
-                      {activeStudents.length === 0 ? (
-                        <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No students yet. Add one in the Students section.</div>
-                      ) : (
-                        <div className="tp-table-wrap"><table className="tp-list-table">
-                          <thead><tr><th>Name</th><th>Class</th><th>Fee</th><th>Status</th><th>Amount</th><th></th></tr></thead>
-                          <tbody>
-                            {activeStudents.map((s) => {
-                              const rec = monthData[s.id];
-                              const paid = !!(rec && rec.paid);
-                              return (
-                                <tr key={s.id}>
-                                  <td>{s.name}</td>
-                                  <td>{s.className || "—"}</td>
-                                  <td>{fmtMoney(s.fee)}</td>
-                                  <td>
-                                    <span className={`lc-badge ${paid ? "lc-badge-paid" : "lc-badge-pending"}`}>{paid ? "Paid" : "Pending"}</span>
-                                    {paid && rec.paidDate && <div style={{ fontSize: "11px", color: TP.secondaryText, marginTop: "3px" }}>on {rec.paidDate}</div>}
-                                  </td>
-                                  <td style={{ width: "120px" }}>
-                                    <input
-                                      className="lc-input"
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={getDraft(s.id, s.fee)}
-                                      onChange={(e) => setPayDrafts((prev) => ({ ...prev, [s.id]: e.target.value }))}
-                                      disabled={paid}
-                                    />
-                                  </td>
-                                  <td style={{ textAlign: "right" }}>
-                                    {paid ? (
-                                      <button className="lc-btn" onClick={() => markUnpaid(s.id)}>Undo</button>
-                                    ) : (
-                                      <button className="lc-btn lc-btn-primary" onClick={() => markPaid(s.id, s.fee)}>Mark paid</button>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table></div>
-                      )}
-                    </div>
-                  )}
+                  {financeView === "payments" && (() => {
+                    // Group the month's students by class (class list order, "No class" last).
+                    const groups = [];
+                    const byKey = new Map();
+                    const classOrder = [...classes].sort((a, b) => a.name.localeCompare(b.name));
+                    classOrder.forEach((c) => {
+                      const g = { key: `fin-class:${c.id}`, name: c.name, code: c.code || classCode(c.name), students: [] };
+                      byKey.set(c.id, g);
+                      groups.push(g);
+                    });
+                    const noClass = { key: "fin-class:none", name: "No class", code: "", students: [] };
+                    activeStudents.forEach((s) => {
+                      const g = (s.classId && byKey.get(s.classId)) || noClass;
+                      g.students.push(s);
+                    });
+                    if (noClass.students.length > 0) groups.push(noClass);
+                    const cq = finClassSearch.trim().toLowerCase();
+                    const visibleGroups = groups.filter((g) =>
+                      g.students.length > 0 && (!cq || g.name.toLowerCase().includes(cq) || (g.code || "").toLowerCase().includes(cq))
+                    );
+
+                    if (activeStudents.length === 0) {
+                      return (
+                        <div className="tp-card">
+                          <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No students yet. Add one in the Students section.</div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div className="lc-search-wrap" style={{ maxWidth: "360px", marginBottom: "4px" }}>
+                          <Search size={16} aria-hidden="true" color={C.a} />
+                          <input
+                            className="lc-input"
+                            value={finClassSearch}
+                            onChange={(e) => setFinClassSearch(e.target.value)}
+                            placeholder="Search class…"
+                            aria-label="Search class"
+                          />
+                          {finClassSearch && (
+                            <button className="lc-search-clear" onClick={() => setFinClassSearch("")} aria-label="Clear search"><X size={14} /></button>
+                          )}
+                        </div>
+                        {visibleGroups.length === 0 && (
+                          <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No class matches "{finClassSearch}".</div>
+                        )}
+                        {visibleGroups.map((g) => {
+                          const sorted = [...g.students].sort((a, b) => a.name.localeCompare(b.name));
+                          const paidCount = sorted.filter((s) => monthData[s.id] && monthData[s.id].paid).length;
+                          const collected = sorted.reduce((sum, s) => {
+                            const rec = monthData[s.id];
+                            return sum + (rec && rec.paid ? Number(rec.amountPaid) || 0 : 0);
+                          }, 0);
+                          const allPaid = paidCount === sorted.length;
+                          const isOpen = expandedClasses.has(g.key);
+                          const badge = g.code ? classBadgeStyle(g.code) : null;
+                          return (
+                            <div key={g.key}>
+                              <button
+                                type="button"
+                                className="tp-accordion-row"
+                                style={{ marginBottom: 0, flexWrap: "wrap", rowGap: "8px" }}
+                                aria-expanded={isOpen}
+                                onClick={() => toggleClassExpand(g.key)}
+                              >
+                                <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
+                                {badge && <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{g.code}</span>}
+                                <span className="tp-accordion-title">{g.name}</span>
+                                <span className="tp-count-badge">{sorted.length} student{sorted.length === 1 ? "" : "s"}</span>
+                                <span className={`lc-badge ${allPaid ? "lc-badge-paid" : "lc-badge-pending"}`} style={{ cursor: "inherit" }}>{paidCount}/{sorted.length} paid</span>
+                                <span style={{ fontSize: "13px", fontWeight: 600, color: C.d, minWidth: "72px", textAlign: "right" }}>{fmtMoney(collected)}</span>
+                              </button>
+                              {isOpen && (
+                                <div className="tp-card lc-expand-panel" style={{ marginTop: "8px" }}>
+                                  <div className="tp-table-wrap"><table className="tp-list-table">
+                                    <thead><tr><th>Name</th><th>Fee</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+                                    <tbody>
+                                      {sorted.map((s) => {
+                                        const rec = monthData[s.id];
+                                        const paid = !!(rec && rec.paid);
+                                        return (
+                                          <tr key={s.id}>
+                                            <td>{s.name}</td>
+                                            <td>{fmtMoney(s.fee)}</td>
+                                            <td>
+                                              <span className={`lc-badge ${paid ? "lc-badge-paid" : "lc-badge-pending"}`}>{paid ? "Paid" : "Pending"}</span>
+                                              {paid && rec.paidDate && <div style={{ fontSize: "11px", color: TP.secondaryText, marginTop: "3px" }}>on {rec.paidDate}</div>}
+                                            </td>
+                                            <td style={{ width: "120px" }}>
+                                              <input
+                                                className="lc-input"
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={getDraft(s.id, s.fee)}
+                                                onChange={(e) => setPayDrafts((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                                                disabled={paid}
+                                              />
+                                            </td>
+                                            <td style={{ textAlign: "right" }}>
+                                              {paid ? (
+                                                <button className="lc-btn" onClick={() => markUnpaid(s.id)}>Undo</button>
+                                              ) : (
+                                                <button className="lc-btn lc-btn-primary" onClick={() => markPaid(s.id, s.fee)}>Mark paid</button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table></div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
 
                   {role === "admin" && financeView === "salaries" && (
                     <>
