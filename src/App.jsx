@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Users, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, ListChecks, Phone } from "lucide-react";
+import { Users, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, ListChecks, Phone, Plus } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 
 const LOGO_DATA_URI = "data:image/png;base64,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";
@@ -400,6 +400,11 @@ function SearchableSelect({ options, value, onChange, placeholder = "Select…",
 
 const DAY_ORDER = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// The "unmarked attendance" reminder only applies going forward from the day
+// this policy started — older gaps from before it existed are grandfathered
+// in and never flagged.
+const UNMARKED_ATTENDANCE_START_DATE = "2026-09-18";
+
 // Shared visual theme for attendance-day status — used to color and iconify
 // calendar cells consistently (background, border, icon, text all match).
 const ATT_STATUS_THEME = {
@@ -412,42 +417,33 @@ const ATT_STATUS_THEME = {
   holiday: { bg: C.l, border: "#A7D8E3", ring: "#5FB6CB", color: C.j, label: "Holiday" },
 };
 
-function toArabicNumeral(num) {
-  const digits = ["٠", "١", "٢", "٣", "٤", "٥", "٦", "٧", "٨", "٩"];
-  return String(num).split("").map((d) => digits[Number(d)]).join("");
-}
-
-const SURAH_NAMES = [
-  "الفاتحة", "البقرة", "آل عمران", "النساء", "المائدة", "الأنعام", "الأعراف", "الأنفال",
-  "التوبة", "يونس", "هود", "يوسف", "الرعد", "إبراهيم", "الحجر", "النحل", "الإسراء", "الكهف",
-  "مريم", "طه", "الأنبياء", "الحج", "المؤمنون", "النور", "الفرقان", "الشعراء", "النمل",
-  "القصص", "العنكبوت", "الروم", "لقمان", "السجدة", "الأحزاب", "سبأ", "فاطر", "يس",
-  "الصافات", "ص", "الزمر", "غافر", "فصلت", "الشورى", "الزخرف", "الدخان", "الجاثية",
-  "الأحقاف", "محمد", "الفتح", "الحجرات", "ق", "الذاريات", "الطور", "النجم", "القمر",
-  "الرحمن", "الواقعة", "الحديد", "المجادلة", "الحشر", "الممتحنة", "الصف", "الجمعة",
-  "المنافقون", "التغابن", "الطلاق", "التحريم", "الملك", "القلم", "الحاقة", "المعارج",
-  "نوح", "الجن", "المزمل", "المدثر", "القيامة", "الإنسان", "المرسلات", "النبأ",
-  "النازعات", "عبس", "التكوير", "الانفطار", "المطففين", "الانشقاق", "البروج", "الطارق",
-  "الأعلى", "الغاشية", "الفجر", "البلد", "الشمس", "الليل", "الضحى", "الشرح", "التين",
-  "العلق", "القدر", "البينة", "الزلزلة", "العاديات", "القارعة", "التكاثر", "العصر",
-  "الهمزة", "الفيل", "قريش", "الماعون", "الكوثر", "الكافرون", "النصر", "المسد",
-  "الإخلاص", "الفلق", "الناس",
-].map((name, i) => `${toArabicNumeral(i + 1)}. ${name}`);
-
-const SURAH_OPTIONS = SURAH_NAMES.map((name, i) => ({ value: name, label: name, keywords: String(i + 1) }));
-
-const HIFZ_SECTIONS = [
-  { key: "hifz", label: "Hifz" },
-  { key: "shortMuraja", label: "Short Muraja'ah" },
-  { key: "longMuraja", label: "Long Muraja'ah" },
+// English transliterated surah names, in Quran order — used by the Hifz Exam
+// question builder's Surah dropdowns.
+const SURAH_NAMES_EN = [
+  "Al-Fatihah", "Al-Baqarah", "Al-Imran", "An-Nisa", "Al-Ma'idah", "Al-An'am", "Al-A'raf", "Al-Anfal",
+  "At-Tawbah", "Yunus", "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr", "An-Nahl", "Al-Isra", "Al-Kahf",
+  "Maryam", "Ta-Ha", "Al-Anbiya", "Al-Hajj", "Al-Mu'minun", "An-Nur", "Al-Furqan", "Ash-Shu'ara", "An-Naml",
+  "Al-Qasas", "Al-Ankabut", "Ar-Rum", "Luqman", "As-Sajdah", "Al-Ahzab", "Saba", "Fatir", "Ya-Sin",
+  "As-Saffat", "Sad", "Az-Zumar", "Ghafir", "Fussilat", "Ash-Shura", "Az-Zukhruf", "Ad-Dukhan", "Al-Jathiyah",
+  "Al-Ahqaf", "Muhammad", "Al-Fath", "Al-Hujurat", "Qaf", "Adh-Dhariyat", "At-Tur", "An-Najm", "Al-Qamar",
+  "Ar-Rahman", "Al-Waqi'ah", "Al-Hadid", "Al-Mujadila", "Al-Hashr", "Al-Mumtahanah", "As-Saff", "Al-Jumu'ah",
+  "Al-Munafiqun", "At-Taghabun", "At-Talaq", "At-Tahrim", "Al-Mulk", "Al-Qalam", "Al-Haqqah", "Al-Ma'arij",
+  "Nuh", "Al-Jinn", "Al-Muzzammil", "Al-Muddaththir", "Al-Qiyamah", "Al-Insan", "Al-Mursalat", "An-Naba",
+  "An-Nazi'at", "Abasa", "At-Takwir", "Al-Infitar", "Al-Mutaffifin", "Al-Inshiqaq", "Al-Buruj", "At-Tariq",
+  "Al-A'la", "Al-Ghashiyah", "Al-Fajr", "Al-Balad", "Ash-Shams", "Al-Layl", "Ad-Duha", "Ash-Sharh", "At-Tin",
+  "Al-Alaq", "Al-Qadr", "Al-Bayyinah", "Az-Zalzalah", "Al-Adiyat", "Al-Qari'ah", "At-Takathur", "Al-Asr",
+  "Al-Humazah", "Al-Fil", "Quraysh", "Al-Ma'un", "Al-Kawthar", "Al-Kafirun", "An-Nasr", "Al-Masad",
+  "Al-Ikhlas", "Al-Falaq", "An-Nas",
 ];
+const SURAH_OPTIONS_EN = SURAH_NAMES_EN.map((name, i) => ({ value: name, label: `${i + 1}. ${name}`, keywords: String(i + 1) }));
 
-const emptyHifzSection = () => ({ startSurah: "", startAyah: "", endSurah: "", endAyah: "", mistakes: "0" });
-const emptyHifzDraft = () => ({
-  hifz: emptyHifzSection(),
-  shortMuraja: emptyHifzSection(),
-  longMuraja: emptyHifzSection(),
-});
+const EXAM_QUESTION_TYPES = [
+  "Continue recitation",
+  "Recite from memory",
+  "Identify next ayah",
+  "Tajweed check",
+  "Revision (Muraja'ah)",
+];
 
 function fmtTime12(t) {
   if (!t) return "";
@@ -461,33 +457,6 @@ function fmtTime12(t) {
 function formatSchedule(schedule) {
   if (!schedule || !schedule.days || schedule.days.length === 0) return "—";
   return `${schedule.days.join(", ")} · ${fmtTime12(schedule.startTime)}–${fmtTime12(schedule.endTime)}`;
-}
-
-function renderRecordBody(rec) {
-  if (!rec) return null;
-  if (rec.recordType === "hifz" && (rec.hifz || rec.shortMuraja || rec.longMuraja)) {
-    const sections = [
-      { label: "Hifz", data: rec.hifz },
-      { label: "Short Muraja'ah", data: rec.shortMuraja },
-      { label: "Long Muraja'ah", data: rec.longMuraja },
-    ].filter((s) => s.data && (s.data.startSurah || s.data.endSurah));
-    if (sections.length === 0) return null;
-    return (
-      <div style={{ fontSize: "13px", marginTop: "6px" }}>
-        {sections.map((s) => {
-          const d = s.data;
-          const from = d.startSurah ? `${d.startSurah}${d.startAyah ? `:${d.startAyah}` : ""}` : "—";
-          const to = d.endSurah ? `${d.endSurah}${d.endAyah ? `:${d.endAyah}` : ""}` : "—";
-          return (
-            <div key={s.label}>
-              {s.label}: {from} → {to} — {d.mistakes || 0} mistake{String(d.mistakes) === "1" ? "" : "s"}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-  return rec.note ? <div style={{ fontSize: "13px", marginTop: "6px" }}>{rec.note}</div> : null;
 }
 
 function formatRecordSummaryText(rec) {
@@ -1342,18 +1311,28 @@ export default function App() {
   const [attDetailOpen, setAttDetailOpen] = useState(false);
   const [attendanceBulkLoaded, setAttendanceBulkLoaded] = useState(false);
   const [attendanceBulkLoading, setAttendanceBulkLoading] = useState(false);
+  const [teacherUnmarkedDismissals, setTeacherUnmarkedDismissals] = useState([]); // { date, className }
+  const [unmarkedDismissingKey, setUnmarkedDismissingKey] = useState(null);
 
-  // ---- Class records history (teacher portal) ----
-  const [allRecords, setAllRecords] = useState([]);
-  const [recordsLoading, setRecordsLoading] = useState(false);
-  const [hifzReportStudentId, setHifzReportStudentId] = useState("");
   const [expandedClasses, setExpandedClasses] = useState(new Set());
 
-  // ---- Add a class record (teacher portal, "Class records" page) ----
-  const [crStudentId, setCrStudentId] = useState("");
-  const [crMode, setCrMode] = useState("text"); // text | hifz
-  const [crNoteDraft, setCrNoteDraft] = useState("");
-  const [crHifzDraft, setCrHifzDraft] = useState(emptyHifzDraft());
+  // ---- Hifz Exams (teacher portal "Exams" page) ----
+  const [examView, setExamView] = useState("details"); // details | history
+  const [examStudentName, setExamStudentName] = useState("");
+  const [examDate, setExamDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const [examQuestions, setExamQuestions] = useState([{ id: 1, surah: "", ayah: "", questionType: EXAM_QUESTION_TYPES[0], result: "correct", remark: "" }]);
+  const [examComments, setExamComments] = useState("");
+  const [examFinalResult, setExamFinalResult] = useState(null); // null | "pass" | "not_passed"
+  const [examSubmitting, setExamSubmitting] = useState(false);
+  const [examReports, setExamReports] = useState([]);
+  const [examReportsLoaded, setExamReportsLoaded] = useState(false);
+  const [examReportsLoading, setExamReportsLoading] = useState(false);
+  const [viewExamId, setViewExamId] = useState(null);
+  const [editingExamId, setEditingExamId] = useState(null);
+  const [examDeletingId, setExamDeletingId] = useState(null);
 
   const toggleClassExpand = (key) => {
     setExpandedClasses((prev) => {
@@ -1444,6 +1423,16 @@ export default function App() {
   const [unrecordedDismissals, setUnrecordedDismissals] = useState([]); // { teacherId, dismissedAt }
   const [adminAttUnrecordedTeacherId, setAdminAttUnrecordedTeacherId] = useState(null);
   const [unrecordedDismissingId, setUnrecordedDismissingId] = useState(null);
+
+  // ---- Admin Exams (all teachers' Hifz exam reports) ----
+  const [adminExamSearch, setAdminExamSearch] = useState("");
+  const [adminExamTeacherId, setAdminExamTeacherId] = useState("");
+  const [adminExamResultFilter, setAdminExamResultFilter] = useState("");
+  const [adminExamReports, setAdminExamReports] = useState([]);
+  const [adminExamReportsLoaded, setAdminExamReportsLoaded] = useState(false);
+  const [adminExamReportsLoading, setAdminExamReportsLoading] = useState(false);
+  const [adminViewExamId, setAdminViewExamId] = useState(null);
+  const [adminExamDeletingId, setAdminExamDeletingId] = useState(null);
 
   useEffect(() => {
     if (authView !== "app") return;
@@ -1682,18 +1671,60 @@ export default function App() {
   const loadAttendanceBulk = useCallback(async () => {
     setAttendanceBulkLoading(true);
     try {
-      const { data, error } = await supabase.from("attendance_records").select("*");
-      if (error) throw error;
+      const [attRes, dismissRes] = await Promise.all([
+        supabase.from("attendance_records").select("*"),
+        supabase.from("teacher_unmarked_dismissals").select("record_date, class_name"),
+      ]);
+      if (attRes.error) throw attRes.error;
       const merged = {};
-      (data || []).forEach((r) => {
+      (attRes.data || []).forEach((r) => {
         if (!merged[r.record_date]) merged[r.record_date] = {};
         merged[r.record_date][r.student_id] = ATT_FROM_DB(r);
       });
       setAttendanceByDate((prev) => ({ ...merged, ...prev }));
+      if (!dismissRes.error) {
+        setTeacherUnmarkedDismissals((dismissRes.data || []).map((r) => ({ date: r.record_date, className: r.class_name })));
+      }
     } catch { /* leave whatever is cached */ }
     setAttendanceBulkLoading(false);
     setAttendanceBulkLoaded(true);
   }, []);
+
+  // Lets a teacher manually clear one unmarked-attendance reminder they don't
+  // want to deal with (e.g. the class didn't actually happen). Persisted per
+  // teacher so it stays cleared across sessions/reloads.
+  const dismissUnmarked = async (dateStr, className) => {
+    const key = `${dateStr}|${className}`;
+    setUnmarkedDismissingKey(key);
+    try {
+      const { error } = await supabase
+        .from("teacher_unmarked_dismissals")
+        .upsert({ teacher_id: loggedInTeacherId, record_date: dateStr, class_name: className }, { onConflict: "teacher_id,record_date,class_name" });
+      if (error) throw error;
+      setTeacherUnmarkedDismissals((prev) => [...prev, { date: dateStr, className }]);
+    } catch {
+      showToast("Couldn't clear that reminder. Please try again.");
+    }
+    setUnmarkedDismissingKey(null);
+  };
+
+  const dismissAllUnmarked = async (items) => {
+    if (items.length === 0) return;
+    setUnmarkedDismissingKey("__all__");
+    try {
+      const { error } = await supabase
+        .from("teacher_unmarked_dismissals")
+        .upsert(
+          items.map((g) => ({ teacher_id: loggedInTeacherId, record_date: g.date, class_name: g.className })),
+          { onConflict: "teacher_id,record_date,class_name" }
+        );
+      if (error) throw error;
+      setTeacherUnmarkedDismissals((prev) => [...prev, ...items.map((g) => ({ date: g.date, className: g.className }))]);
+    } catch {
+      showToast("Couldn't clear the reminders. Please try again.");
+    }
+    setUnmarkedDismissingKey(null);
+  };
 
   useEffect(() => {
     if (role === "teacher" && section === "attendance" && !attendanceBulkLoaded && !attendanceBulkLoading) {
@@ -1837,49 +1868,114 @@ export default function App() {
     showToast(`Backup ready — ${rows.length} record${rows.length === 1 ? "" : "s"}`);
   };
 
-  const loadAllTeacherRecords = useCallback(async (teacherId) => {
-    setRecordsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("attendance_records").select("*").eq("teacher_id", teacherId).eq("recorded", true);
-      if (error) throw error;
-      const results = (data || []).map((row) => {
-        const student = students.find((s) => s.id === row.student_id);
-        return {
-          date: row.record_date,
-          studentId: row.student_id,
-          studentName: student ? student.name : "(removed student)",
-          className: (student && student.className) || "—",
-          status: row.status || null,
-          note: row.note || "",
-          recordType: row.record_type || "text",
-          hifz: row.hifz || null,
-          shortMuraja: row.short_muraja || null,
-          longMuraja: row.long_muraja || null,
-        };
-      });
-      results.sort((a, b) => b.date.localeCompare(a.date) || a.studentName.localeCompare(b.studentName));
-      setAllRecords(results);
-    } catch {
-      setAllRecords([]);
-      showToast("Couldn't refresh class records. Please try again.");
-    } finally {
-      setRecordsLoading(false);
-    }
-  }, [students]);
+  // ---- Hifz Exams ----
+  const EXAM_FROM_DB = (r) => ({
+    id: r.id, teacherId: r.teacher_id, studentName: r.student_name, examDate: r.exam_date,
+    questions: r.questions || [], comments: r.recitation_comments || "", finalResult: r.final_result,
+    createdAt: r.created_at,
+  });
 
-  // Lets a teacher fix a mistake in a class record from the "Class records" history
-  // list: loads it straight into the "Add a class record" form above, ready to edit and re-save.
-  const editHistoricalRecord = (rec) => {
-    setRecordDate(rec.date);
-    setCrStudentId(rec.studentId);
-    setCrMode(rec.recordType || "text");
-    setCrNoteDraft(rec.note || "");
-    setCrHifzDraft(rec.recordType === "hifz" && (rec.hifz || rec.shortMuraja || rec.longMuraja)
-      ? { hifz: rec.hifz || emptyHifzSection(), shortMuraja: rec.shortMuraja || emptyHifzSection(), longMuraja: rec.longMuraja || emptyHifzSection() }
-      : emptyHifzDraft());
-    showToast("Loaded into the form above — edit and save to update");
+  const loadExamReports = useCallback(async (teacherId) => {
+    setExamReportsLoading(true);
+    try {
+      const { data, error } = await supabase.from("hifz_exams").select("*").eq("teacher_id", teacherId).order("exam_date", { ascending: false });
+      if (error) throw error;
+      setExamReports((data || []).map(EXAM_FROM_DB));
+    } catch {
+      showToast("Couldn't load exam reports. Please try again.");
+    }
+    setExamReportsLoading(false);
+    setExamReportsLoaded(true);
+  }, []);
+
+  const addExamQuestion = () => {
+    setExamQuestions((prev) => [
+      ...prev,
+      { id: (prev[prev.length - 1]?.id || 0) + 1, surah: "", ayah: "", questionType: EXAM_QUESTION_TYPES[0], result: "correct", remark: "" },
+    ]);
   };
+  const removeExamQuestion = (id) => setExamQuestions((prev) => prev.filter((q) => q.id !== id));
+  const updateExamQuestion = (id, field, value) => {
+    setExamQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, [field]: value } : q)));
+  };
+
+  const resetExamForm = () => {
+    setExamStudentName("");
+    setExamDate(() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    });
+    setExamQuestions([{ id: 1, surah: "", ayah: "", questionType: EXAM_QUESTION_TYPES[0], result: "correct", remark: "" }]);
+    setExamComments("");
+    setExamFinalResult(null);
+    setEditingExamId(null);
+  };
+
+  // Loads a previously-submitted report back into the form so the teacher can
+  // correct it — Submit then updates the same row instead of creating a new one.
+  const startEditExam = (exam) => {
+    setExamStudentName(exam.studentName);
+    setExamDate(exam.examDate);
+    setExamQuestions(
+      exam.questions.length > 0
+        ? exam.questions.map((q, i) => ({ id: i + 1, surah: q.surah ?? q.startSurah ?? "", ayah: q.ayah ?? q.startAyah ?? "", questionType: q.questionType || EXAM_QUESTION_TYPES[0], result: q.result || "correct", remark: q.remark || "" }))
+        : [{ id: 1, surah: "", ayah: "", questionType: EXAM_QUESTION_TYPES[0], result: "correct", remark: "" }]
+    );
+    setExamComments(exam.comments || "");
+    setExamFinalResult(exam.finalResult);
+    setEditingExamId(exam.id);
+    setExamView("details");
+  };
+
+  const submitExam = async () => {
+    if (!examStudentName.trim()) { showToast("Enter the student's name."); return; }
+    if (!examDate) { showToast("Pick an exam date."); return; }
+    const missingRemark = examQuestions.find((q) => q.result === "incorrect" && !q.remark.trim());
+    if (missingRemark) { showToast("Add a mistake/remark for every question marked Incorrect."); return; }
+    if (!examFinalResult) { showToast("Choose a final decision — Pass or Not Passed."); return; }
+    setExamSubmitting(true);
+    try {
+      const payload = {
+        teacher_id: loggedInTeacherId,
+        student_name: examStudentName.trim(),
+        exam_date: examDate,
+        questions: examQuestions.map(({ id, ...q }) => q),
+        recitation_comments: examComments.trim() || null,
+        final_result: examFinalResult,
+      };
+      const { error } = editingExamId
+        ? await supabase.from("hifz_exams").update(payload).eq("id", editingExamId)
+        : await supabase.from("hifz_exams").insert(payload);
+      if (error) throw error;
+      showToast(editingExamId ? "Exam result updated" : "Exam result submitted");
+      resetExamForm();
+      setExamView("history");
+      setExamReportsLoaded(false);
+    } catch {
+      showToast("Couldn't save the exam. Please try again.");
+    }
+    setExamSubmitting(false);
+  };
+
+  const deleteExam = async (examId) => {
+    setExamDeletingId(examId);
+    try {
+      const { error } = await supabase.from("hifz_exams").delete().eq("id", examId);
+      if (error) throw error;
+      setExamReports((prev) => prev.filter((e) => e.id !== examId));
+      if (viewExamId === examId) setViewExamId(null);
+      showToast("Exam report deleted");
+    } catch {
+      showToast("Couldn't delete the exam. Please try again.");
+    }
+    setExamDeletingId(null);
+  };
+
+  useEffect(() => {
+    if (role === "teacher" && section === "exams" && !examReportsLoaded && !examReportsLoading) {
+      loadExamReports(loggedInTeacherId);
+    }
+  }, [role, section, examReportsLoaded, examReportsLoading, loadExamReports, loggedInTeacherId]);
 
   const weekdayAbbrev = (dateStr) => {
     const [y, m, d] = dateStr.split("-").map(Number);
@@ -2174,6 +2270,44 @@ export default function App() {
       showToast("Couldn't dismiss. Please try again.");
     }
     setUnrecordedDismissingId(null);
+  };
+
+  // ---- Admin Exams: all teachers' Hifz exam reports ----
+  const loadAdminExamReports = useCallback(async () => {
+    setAdminExamReportsLoading(true);
+    try {
+      const { data, error } = await supabase.from("hifz_exams").select("*").order("exam_date", { ascending: false });
+      if (error) throw error;
+      setAdminExamReports((data || []).map((r) => ({
+        id: r.id, teacherId: r.teacher_id, studentName: r.student_name, examDate: r.exam_date,
+        questions: r.questions || [], comments: r.recitation_comments || "", finalResult: r.final_result,
+        createdAt: r.created_at,
+      })));
+    } catch {
+      showToast("Couldn't load exam reports. Please try again.");
+    }
+    setAdminExamReportsLoading(false);
+    setAdminExamReportsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (role === "admin" && section === "exams" && !adminExamReportsLoaded && !adminExamReportsLoading) {
+      loadAdminExamReports();
+    }
+  }, [role, section, adminExamReportsLoaded, adminExamReportsLoading, loadAdminExamReports]);
+
+  const deleteAdminExam = async (examId) => {
+    setAdminExamDeletingId(examId);
+    try {
+      const { error } = await supabase.from("hifz_exams").delete().eq("id", examId);
+      if (error) throw error;
+      setAdminExamReports((prev) => prev.filter((e) => e.id !== examId));
+      if (adminViewExamId === examId) setAdminViewExamId(null);
+      showToast("Exam report deleted");
+    } catch {
+      showToast("Couldn't delete the exam. Please try again.");
+    }
+    setAdminExamDeletingId(null);
   };
 
   // ---- Investments ----
@@ -2640,16 +2774,14 @@ export default function App() {
     document.body.removeChild(link);
   };
 
-  const downloadRowsAsImage = (title, subtitle, columns, rows, filename) => {
-    const { canvas } = buildTableCanvas(title, subtitle, columns, rows);
+  const downloadCanvasAsImage = (canvas, filename) => {
     triggerDownload(canvas.toDataURL("image/png"), filename);
   };
 
-  // Builds a real, valid PDF by hand (single page, one embedded JPEG of the table).
+  // Builds a real, valid PDF by hand (single page, one embedded JPEG of the canvas).
   // This avoids relying on the browser's print dialog, which can behave
   // inconsistently inside a sandboxed preview — this download always works the same way.
-  const downloadRowsAsPDF = (title, subtitle, columns, rows, filename) => {
-    const { canvas, width, height } = buildTableCanvas(title, subtitle, columns, rows);
+  const downloadCanvasAsPDF = (canvas, width, height, filename) => {
     const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
     const base64 = dataUrl.split(",")[1];
     const binary = atob(base64);
@@ -2718,6 +2850,183 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     triggerDownload(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  const downloadRowsAsImage = (title, subtitle, columns, rows, filename) => {
+    const { canvas } = buildTableCanvas(title, subtitle, columns, rows);
+    downloadCanvasAsImage(canvas, filename);
+  };
+
+  const downloadRowsAsPDF = (title, subtitle, columns, rows, filename) => {
+    const { canvas, width, height } = buildTableCanvas(title, subtitle, columns, rows);
+    downloadCanvasAsPDF(canvas, width, height, filename);
+  };
+
+  // Builds a printable Hifz exam report: header (student/date/teacher/result),
+  // a questions table, and a wrapped Recitation Comments block underneath.
+  const buildExamReportCanvas = (exam, teacherLabel) => {
+    const padding = 24;
+    const cellPaddingX = 10;
+    const rowHeight = 34;
+    const colHeaderHeight = 34;
+    const hasLogo = !!logoImg;
+    const logoH = 40;
+    const logoW = hasLogo ? logoH * (logoImg.width / logoImg.height) : 0;
+    const fontFamily = "system-ui, -apple-system, sans-serif";
+    const measure = document.createElement("canvas").getContext("2d");
+
+    const columns = ["#", "Surah", "Ayah", "Type", "Result", "Remark"];
+    const rows = exam.questions.map((q, i) => [
+      String(i + 1), (q.surah ?? q.startSurah) || "—", (q.ayah ?? q.startAyah) || "—",
+      q.questionType || "—", q.result === "correct" ? "Correct" : "Incorrect", q.remark || "—",
+    ]);
+    measure.font = "13px " + fontFamily;
+    const colWidths = columns.map((col, i) => {
+      let max = measure.measureText(col).width;
+      rows.forEach((r) => {
+        const w = measure.measureText(String(r[i] ?? "")).width;
+        if (w > max) max = w;
+      });
+      return Math.max(70, Math.ceil(max) + cellPaddingX * 2);
+    });
+    const tableWidth = colWidths.reduce((a, b) => a + b, 0);
+
+    const resultLabel = exam.finalResult === "pass" ? "PASS" : "NOT PASSED";
+    const resultColor = exam.finalResult === "pass" ? C.d : C.b;
+    const resultBg = exam.finalResult === "pass" ? C.i : C.h;
+
+    // Clearly-labelled header block: title, then one line each for student,
+    // exam date, and teacher, plus a colored result banner — nothing crammed
+    // onto a single subtitle line.
+    const headerLinesY = hasLogo ? 10 : 0;
+    const titleAreaHeight = (hasLogo ? 60 : 56) + 3 * 18 + 14;
+
+    // Word-wrap the comments to the table's width
+    measure.font = "13px " + fontFamily;
+    const commentsLabel = "Recitation Comments";
+    const commentLines = [];
+    const commentText = exam.comments || "—";
+    commentText.split("\n").forEach((paragraph) => {
+      const words = paragraph.split(" ");
+      let line = "";
+      words.forEach((word) => {
+        const test = line ? `${line} ${word}` : word;
+        if (measure.measureText(test).width > tableWidth && line) {
+          commentLines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      });
+      commentLines.push(line);
+    });
+    const commentsBlockHeight = 24 + commentLines.length * 18 + 16;
+
+    const tableHeaderY = titleAreaHeight;
+    const bodyHeight = rows.length === 0 ? 40 : rows.length * rowHeight;
+    const tableHeight = colHeaderHeight + bodyHeight;
+    const width = Math.max(tableWidth + padding * 2, hasLogo ? padding * 2 + logoW + 260 : 320);
+    const height = tableHeaderY + tableHeight + commentsBlockHeight + padding;
+
+    const canvas = document.createElement("canvas");
+    const scale = 2;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.scale(scale, scale);
+
+    ctx.fillStyle = C.c;
+    ctx.fillRect(0, 0, width, height);
+
+    const textX = hasLogo ? padding + logoW + 14 : padding;
+    if (hasLogo) ctx.drawImage(logoImg, padding, headerLinesY, logoW, logoH);
+    else {
+      ctx.fillStyle = C.m;
+      ctx.font = "600 19px Georgia, 'Times New Roman', serif";
+      ctx.fillText("Aflaah Quran Class", padding, 20);
+    }
+    ctx.fillStyle = C.f;
+    ctx.font = "700 16px " + fontFamily;
+    ctx.fillText("Hifz Exam Report", textX, headerLinesY + 18);
+
+    ctx.font = "13px " + fontFamily;
+    const infoLines = [
+      ["Student: ", exam.studentName],
+      ["Exam Date: ", exam.examDate],
+      ["Teacher: ", teacherLabel],
+    ];
+    infoLines.forEach(([label, value], i) => {
+      const lineY = headerLinesY + 40 + i * 18;
+      ctx.fillStyle = C.a;
+      ctx.fillText(label, textX, lineY);
+      const labelW = measure.measureText(label).width;
+      ctx.fillStyle = C.w;
+      ctx.font = "700 13px " + fontFamily;
+      ctx.fillText(value, textX + labelW, lineY);
+      ctx.font = "13px " + fontFamily;
+    });
+
+    const badgeW = 130, badgeH = 30;
+    const badgeX = width - padding - badgeW;
+    const badgeY = headerLinesY + 4;
+    ctx.fillStyle = resultBg;
+    ctx.fillRect(badgeX, badgeY, badgeW, badgeH);
+    ctx.fillStyle = resultColor;
+    ctx.font = "700 13px " + fontFamily;
+    ctx.textAlign = "center";
+    ctx.fillText(resultLabel, badgeX + badgeW / 2, badgeY + badgeH / 2 + 4);
+    ctx.textAlign = "left";
+
+    ctx.fillStyle = C.e;
+    ctx.fillRect(0, titleAreaHeight - 6, width, 2);
+
+    const tableLeft = padding;
+    const colX = [tableLeft];
+    colWidths.forEach((w) => colX.push(colX[colX.length - 1] + w));
+
+    ctx.fillStyle = C.m;
+    ctx.font = "700 12px " + fontFamily;
+    columns.forEach((col, i) => ctx.fillText(col.toUpperCase(), colX[i] + cellPaddingX, tableHeaderY + 22));
+
+    ctx.font = "13px " + fontFamily;
+    if (rows.length === 0) {
+      ctx.fillText("No questions recorded.", tableLeft + cellPaddingX, tableHeaderY + colHeaderHeight + 24);
+    } else {
+      rows.forEach((r, ri) => {
+        const rowY = tableHeaderY + colHeaderHeight + ri * rowHeight;
+        columns.forEach((col, i) => ctx.fillText(String(r[i] ?? ""), colX[i] + cellPaddingX, rowY + rowHeight / 2 + 4));
+      });
+    }
+
+    ctx.strokeStyle = C.m;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    colX.forEach((x) => { ctx.moveTo(x, tableHeaderY); ctx.lineTo(x, tableHeaderY + tableHeight); });
+    for (let i = 0; i <= (rows.length || 1); i++) {
+      const y = tableHeaderY + colHeaderHeight + i * (rows.length === 0 ? bodyHeight : rowHeight);
+      ctx.moveTo(tableLeft, y); ctx.lineTo(tableLeft + tableWidth, y);
+    }
+    ctx.moveTo(tableLeft, tableHeaderY); ctx.lineTo(tableLeft + tableWidth, tableHeaderY);
+    ctx.stroke();
+
+    const commentsTop = tableHeaderY + tableHeight + 20;
+    ctx.fillStyle = C.m;
+    ctx.font = "700 12px " + fontFamily;
+    ctx.fillText(commentsLabel.toUpperCase(), tableLeft, commentsTop);
+    ctx.fillStyle = C.w;
+    ctx.font = "13px " + fontFamily;
+    commentLines.forEach((line, i) => ctx.fillText(line, tableLeft, commentsTop + 22 + i * 18));
+
+    return { canvas, width, height };
+  };
+
+  const downloadExamReportAsImage = (exam, teacherLabel, filename) => {
+    const { canvas } = buildExamReportCanvas(exam, teacherLabel);
+    downloadCanvasAsImage(canvas, filename);
+  };
+  const downloadExamReportAsPDF = (exam, teacherLabel, filename) => {
+    const { canvas, width, height } = buildExamReportCanvas(exam, teacherLabel);
+    downloadCanvasAsPDF(canvas, width, height, filename);
   };
 
   return (
@@ -2924,7 +3233,7 @@ export default function App() {
           navItems={[
             { key: "timetable", label: "My timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
             { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAttendanceView("day"); } },
-            { key: "classRecords", label: "Class records", icon: BookOpen, onClick: () => { setSection("classRecords"); loadAllTeacherRecords(loggedInTeacherId); } },
+            { key: "exams", label: "Exams", icon: FileText, onClick: () => { setSection("exams"); setExamView("details"); } },
           ]}
           teacherDisplayName={teacherName(loggedInTeacherId)}
           onLogout={() => { setSection("dashboard"); signOutUser(); }}
@@ -3065,15 +3374,16 @@ export default function App() {
               const openGroup = openClassName ? dayGroups.find((g) => g.className === openClassName) : null;
 
               // ---- Unmarked attendance: this teacher's own past classes (last 14 days,
-              // already ended) with no present/absent mark saved yet ----
+              // already ended) with no present/absent mark saved yet. Only counts from
+              // UNMARKED_ATTENDANCE_START_DATE onward — older gaps don't count, and
+              // nothing here expires with time; it only clears once marked or the
+              // teacher dismisses it via dismissUnmarked. ----
               const teacherUnmarked = (() => {
                 const now = new Date();
                 const nowTimeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-                const LOOKBACK_DAYS = 14;
+                const dismissedSet = new Set(teacherUnmarkedDismissals.map((d) => `${d.date}|${d.className}`));
                 const groups = new Map();
-                for (let i = 0; i < LOOKBACK_DAYS; i++) {
-                  const d = new Date(now);
-                  d.setDate(d.getDate() - i);
+                for (let d = new Date(`${UNMARKED_ATTENDANCE_START_DATE}T00:00:00`); fmtDateStr(d) <= todayStr; d.setDate(d.getDate() + 1)) {
                   const dateStr = fmtDateStr(d);
                   if (isHoliday(dateStr)) continue;
                   const isToday = dateStr === todayStr;
@@ -3084,6 +3394,7 @@ export default function App() {
                     const st = (dateRecords[r.studentId] || {}).status;
                     if (st) return; // already marked
                     const key = `${dateStr}|${r.className}`;
+                    if (dismissedSet.has(key)) return; // teacher cleared this one
                     if (!groups.has(key)) groups.set(key, { date: dateStr, className: r.className, entries: [] });
                     groups.get(key).entries.push(r);
                   });
@@ -3092,6 +3403,7 @@ export default function App() {
               })();
 
               const jumpToUnmarked = (dateStr, className, entries) => {
+                setAttendanceView("day");
                 setRecordDate(dateStr);
                 const freshRecords = attendanceByDate[dateStr] || {};
                 const draft = {};
@@ -3170,6 +3482,7 @@ export default function App() {
                 });
                 saveAttendanceForDate(selectedDate, updated);
                 showToast("Attendance saved");
+                closeClass();
               };
 
               // Build the month calendar grid
@@ -3248,11 +3561,6 @@ export default function App() {
               })();
 
               const attSubtitle = teacherName(loggedInTeacherId);
-
-              const viewAllRecords = () => {
-                setSection("classRecords");
-                loadAllTeacherRecords(loggedInTeacherId);
-              };
 
               const rescheduleBox = attReschedule && (
                 <div className="lc-card" style={{ marginBottom: "18px", background: C.g }}>
@@ -3334,7 +3642,6 @@ export default function App() {
                           onClick={() => { setAttendanceView("day"); closeClass(); }}
                         >
                           Day view
-                          {attendanceBulkLoaded && teacherUnmarked.length > 0 && <span className="tp-alert-badge">{teacherUnmarked.length}</span>}
                         </button>
                         <button
                           type="button"
@@ -3343,6 +3650,15 @@ export default function App() {
                           onClick={() => setAttendanceView("calendar")}
                         >
                           Calendar view
+                        </button>
+                        <button
+                          type="button"
+                          aria-pressed={attendanceView === "unmarked"}
+                          className={`tp-segment-btn ${attendanceView === "unmarked" ? "tp-segment-btn-active" : ""}`}
+                          onClick={() => { setAttendanceView("unmarked"); closeClass(); }}
+                        >
+                          Unmarked Attendance
+                          {attendanceBulkLoaded && teacherUnmarked.length > 0 && <span className="tp-alert-badge">{teacherUnmarked.length}</span>}
                         </button>
                       </div>
                       {attendanceView === "day" && !openClassName && daySessions.length > 0 && (
@@ -3360,29 +3676,6 @@ export default function App() {
                           <div className="tp-subtext">
                             Showing classes scheduled for {selectedWeekday}, {recordDate}
                           </div>
-
-                          {attendanceBulkLoaded && teacherUnmarked.length > 0 && (
-                            <div className="lc-card" style={{ marginBottom: "18px", borderColor: "#EAB5A2", background: "#FBEAE6" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", fontWeight: 700, color: C.b }}>
-                                <AlertTriangle size={16} aria-hidden="true" />
-                                {teacherUnmarked.length} unmarked class{teacherUnmarked.length === 1 ? "" : "es"} from previous days
-                              </div>
-                              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                {teacherUnmarked.map((g) => (
-                                  <button
-                                    key={`${g.date}|${g.className}`}
-                                    type="button"
-                                    className="lc-btn"
-                                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between", textAlign: "left", background: "#FFFFFF" }}
-                                    onClick={() => jumpToUnmarked(g.date, g.className, g.entries)}
-                                  >
-                                    <span>{weekdayAbbrev(g.date)}, {g.date} — {g.className}</span>
-                                    <span style={{ fontSize: "12px", color: C.a }}>{g.entries.length} student{g.entries.length === 1 ? "" : "s"}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
 
                           {attReschedule && attReschedule.type === "day" && rescheduleBox}
 
@@ -3507,19 +3800,67 @@ export default function App() {
                                 <button type="button" className="lc-btn" onClick={closeClass}>Cancel</button>
                               </div>
                             </div>
-
-                            <div className="lc-quick-link" onClick={viewAllRecords}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                <Clock size={16} color={C.a} aria-hidden="true" />
-                                <span style={{ fontSize: "13px", color: C.w }}>Recent Attendance Records</span>
-                              </div>
-                              <span style={{ fontSize: "13px", color: TP.blue, display: "flex", alignItems: "center", gap: "4px" }}>
-                                View all records <ChevronRight size={14} aria-hidden="true" />
-                              </span>
-                            </div>
                           </>
                         );
                       })()}
+                    </>
+                  )}
+
+                  {attendanceView === "unmarked" && (
+                    <>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", marginBottom: "16px" }}>
+                        <div className="tp-subtext" style={{ marginBottom: 0 }}>
+                          Classes with no attendance recorded yet. This is a standing reminder — an entry only leaves once you actually mark that class.
+                        </div>
+                        {attendanceBulkLoaded && teacherUnmarked.length > 0 && (
+                          <button
+                            type="button"
+                            className="lc-btn no-print"
+                            style={{ padding: "6px 8px", flexShrink: 0 }}
+                            title="Clear all"
+                            aria-label="Clear all unmarked reminders"
+                            disabled={unmarkedDismissingKey === "__all__"}
+                            onClick={() => dismissAllUnmarked(teacherUnmarked)}
+                          >
+                            <X size={16} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
+                      {!attendanceBulkLoaded ? (
+                        <div style={{ color: TP.secondaryText, fontSize: "14px" }}>Loading…</div>
+                      ) : teacherUnmarked.length === 0 ? (
+                        <div className="lc-card">
+                          <div className="lc-celebrate" style={{ color: C.d, fontSize: "14px" }}><PartyPopper size={16} aria-hidden="true" />Nothing unmarked — you're all caught up.</div>
+                        </div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {teacherUnmarked.map((g) => {
+                            const key = `${g.date}|${g.className}`;
+                            return (
+                              <div key={key} className="tp-accordion-row" style={{ cursor: "default" }}>
+                                <button
+                                  type="button"
+                                  onClick={() => jumpToUnmarked(g.date, g.className, g.entries)}
+                                  style={{ flex: 1, display: "flex", alignItems: "center", gap: "14px", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", textAlign: "left" }}
+                                >
+                                  <AlertTriangle size={18} color={C.b} aria-hidden="true" />
+                                  <span className="tp-accordion-title">{weekdayAbbrev(g.date)}, {g.date} — {g.className}</span>
+                                  <span className="tp-count-badge">{g.entries.length} student{g.entries.length === 1 ? "" : "s"}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="lc-btn"
+                                  style={{ fontSize: "12px", padding: "6px 12px", flexShrink: 0 }}
+                                  disabled={unmarkedDismissingKey === key}
+                                  onClick={() => dismissUnmarked(g.date, g.className)}
+                                >
+                                  {unmarkedDismissingKey === key ? "…" : "Clear"}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </>
                   )}
 
@@ -3804,406 +4145,324 @@ export default function App() {
               );
             })()}
 
-            {section === "classRecords" && (() => {
-              const groups = [];
-              let currentDate = null;
-              let currentGroup = null;
-              allRecords.forEach((rec) => {
-                if (rec.date !== currentDate) {
-                  currentDate = rec.date;
-                  currentGroup = { date: rec.date, items: [] };
-                  groups.push(currentGroup);
-                }
-                currentGroup.items.push(rec);
-              });
+            {section === "exams" && (() => {
+              const teacherLabel = teacherName(loggedInTeacherId);
+              const viewingExam = viewExamId ? examReports.find((e) => e.id === viewExamId) : null;
 
-              const monthLabelText = (monthKey) => {
-                const [y, m] = monthKey.split("-").map(Number);
-                return `${MONTH_NAMES[m - 1]} ${y}`;
-              };
+              const resultBadge = (result) => (
+                <span
+                  style={{
+                    display: "inline-block", fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "999px",
+                    background: result === "pass" ? C.i : C.h, color: result === "pass" ? C.d : C.b,
+                  }}
+                >
+                  {result === "pass" ? "Pass" : "Not Passed"}
+                </span>
+              );
 
-              const monthGroups = [];
-              let currentMonthKeyLoop = null;
-              let currentMonthGroup = null;
-              groups.forEach((g) => {
-                const mk = g.date.slice(0, 7);
-                if (mk !== currentMonthKeyLoop) {
-                  currentMonthKeyLoop = mk;
-                  currentMonthGroup = { monthKey: mk, dateGroups: [] };
-                  monthGroups.push(currentMonthGroup);
-                }
-                currentMonthGroup.dateGroups.push(g);
-              });
-
-              const hifzStudents = Array.from(
-                new Map(allRecords.filter((r) => r.recordType === "hifz").map((r) => [r.studentId, r.studentName])).entries()
-              ).map(([id, name]) => ({ id, name }));
-
-              const buildHifzRows = (recordsList, includeStudentCol) => {
-                const rows = [];
-                let lastGroupKey = null;
-                recordsList.forEach((r) => {
-                  const groupKey = `${r.date}:${r.studentId}`;
-                  [
-                    { label: "Hifz", data: r.hifz },
-                    { label: "Short Muraja'ah", data: r.shortMuraja },
-                    { label: "Long Muraja'ah", data: r.longMuraja },
-                  ].forEach(({ label, data }) => {
-                    if (!data || (!data.startSurah && !data.endSurah)) return;
-                    const start = data.startSurah ? `${data.startSurah}${data.startAyah ? `:${data.startAyah}` : ""}` : "—";
-                    const end = data.endSurah ? `${data.endSurah}${data.endAyah ? `:${data.endAyah}` : ""}` : "—";
-                    const dateCell = groupKey === lastGroupKey ? "" : r.date;
-                    lastGroupKey = groupKey;
-                    rows.push(includeStudentCol
-                      ? [dateCell, r.studentName, label, start, end, String(data.mistakes || 0)]
-                      : [dateCell, label, start, end, String(data.mistakes || 0)]);
-                  });
-                });
-                return rows;
-              };
-
-              const includeStudentCol = !hifzReportStudentId;
-              const hifzColumns = includeStudentCol
-                ? ["Date", "Student", "Section", "Start", "End", "Mistakes"]
-                : ["Date", "Section", "Start", "End", "Mistakes"];
-              const selectedHifzStudent = hifzStudents.find((s) => s.id === hifzReportStudentId);
-              const hifzFilteredAll = allRecords.filter((r) => r.recordType === "hifz" && (!hifzReportStudentId || r.studentId === hifzReportStudentId));
-              const hifzRows = buildHifzRows(hifzFilteredAll, includeStudentCol);
-              const hifzReportSubtitle = selectedHifzStudent ? `All time — ${selectedHifzStudent.name}` : "All time — All students";
-
-              const recordsSubtitle = teacherName(loggedInTeacherId);
-
-              // ---- Add a class record (text note or Hifz progress) ----
-              const crStudents = students
-                .filter((s) => s.teacherId === loggedInTeacherId)
-                .slice()
-                .sort((a, b) => a.name.localeCompare(b.name));
-              const crSelectStudent = (studentId) => {
-                setCrStudentId(studentId);
-                const rec = (attendanceByDate[recordDate] || {})[studentId];
-                setCrMode((rec && rec.recordType) || "text");
-                setCrNoteDraft((rec && rec.note) || "");
-                setCrHifzDraft(rec && (rec.hifz || rec.shortMuraja || rec.longMuraja)
-                  ? { hifz: rec.hifz || emptyHifzSection(), shortMuraja: rec.shortMuraja || emptyHifzSection(), longMuraja: rec.longMuraja || emptyHifzSection() }
-                  : emptyHifzDraft());
-              };
-              const crSetHifzField = (hifzSection, field, value) => {
-                setCrHifzDraft((prev) => ({ ...prev, [hifzSection]: { ...prev[hifzSection], [field]: value } }));
-              };
-              const crSaveNote = async () => {
-                if (!crStudentId) return;
-                const dayRecordsNow = attendanceByDate[recordDate] || {};
-                const current = dayRecordsNow[crStudentId] || {};
-                const updated = { ...dayRecordsNow, [crStudentId]: { ...current, note: crNoteDraft, recordType: "text", recorded: true } };
-                await saveAttendanceForDate(recordDate, updated);
-                showToast("Class record saved");
-                loadAllTeacherRecords(loggedInTeacherId);
-              };
-              const crSaveHifz = async () => {
-                if (!crStudentId) return;
-                const dayRecordsNow = attendanceByDate[recordDate] || {};
-                const current = dayRecordsNow[crStudentId] || {};
-                const updated = { ...dayRecordsNow, [crStudentId]: { ...current, ...crHifzDraft, recordType: "hifz", recorded: true } };
-                await saveAttendanceForDate(recordDate, updated);
-                showToast("Hifz record saved");
-                loadAllTeacherRecords(loggedInTeacherId);
-              };
+              const filenameFor = (exam) => `${exam.studentName.replace(/\s+/g, "_")}_${exam.examDate}_hifz_exam`;
 
               return (
-                <div className="tp-classrecords-page">
+                <div className="tp-exams-page">
                   <style>{`
-                    .tp-classrecords-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
+                    .tp-exams-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
                     @media (max-width: 820px) {
-                      .tp-classrecords-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
+                      .tp-exams-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
                     }
                     @media (max-width: 640px) {
-                      .tp-classrecords-page { padding: 20px; }
+                      .tp-exams-page { padding: 20px; }
                     }
+                    .tp-exam-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+                    .tp-exam-table th { text-align: left; color: #5B6B79; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px; border-bottom: 1px solid #D3E9F7; white-space: nowrap; }
+                    .tp-exam-table td { padding: 6px 8px; border-bottom: 1px solid #E7F2FA; vertical-align: middle; min-width: 110px; }
+                    .tp-decision-btn { border: 2px solid #D3E9F7; border-radius: 14px; padding: 18px; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; font-weight: 700; cursor: pointer; background: #FFFFFF; color: #1B2733; transition: all 0.15s ease; }
+                    .tp-decision-btn:hover { border-color: #8FC4E8; }
+                    .tp-decision-btn-pass-active { border-color: #5FA579; background: ${C.i}; color: ${C.d}; }
+                    .tp-decision-btn-fail-active { border-color: #D9825F; background: ${C.h}; color: ${C.b}; }
                   `}</style>
+
                   <div className="tp-header">
                     <div className="tp-title-group">
-                      <span className="tp-title-icon" aria-hidden="true"><BookOpen size={22} /></span>
-                      <h1 className="tp-title">Class records</h1>
+                      <span className="tp-title-icon" aria-hidden="true"><FileText size={22} /></span>
+                      <h1 className="tp-title">Exams</h1>
                     </div>
                     <div className="tp-actions no-print">
                       <span className="tp-chip">
                         <Users size={16} aria-hidden="true" />
-                        {recordsSubtitle}
+                        {teacherLabel}
                       </span>
-                      <button
-                        type="button"
-                        className="tp-btn-gradient"
-                        disabled={recordsLoading}
-                        aria-label="Refresh class records"
-                        onClick={() => loadAllTeacherRecords(loggedInTeacherId)}
-                      >
-                        {recordsLoading ? <span className="lc-spinner"></span> : <RotateCw size={16} aria-hidden="true" />}
-                        {recordsLoading ? "Refreshing…" : "Refresh"}
-                      </button>
                     </div>
                   </div>
 
                   <div className="tp-card">
-                    <div className="tp-subtext">
-                      Every class you've saved a record for, grouped by month, most recent first.
+                    <div className="tp-segment" role="group" aria-label="Exams view">
+                      <button
+                        type="button"
+                        aria-pressed={examView === "details"}
+                        className={`tp-segment-btn ${examView === "details" ? "tp-segment-btn-active" : ""}`}
+                        onClick={() => setExamView("details")}
+                      >
+                        Exam Details
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={examView === "history"}
+                        className={`tp-segment-btn ${examView === "history" ? "tp-segment-btn-active" : ""}`}
+                        onClick={() => setExamView("history")}
+                      >
+                        Exam Report History
+                      </button>
                     </div>
 
-                    <div className="lc-card no-print" style={{ marginBottom: "22px" }}>
-                      <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "12px" }}>Add a class record</div>
-                      <div className="lc-form-grid" style={{ marginBottom: "12px" }}>
-                        <div>
-                          <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Date</label>
-                          <input className="lc-input" type="date" value={recordDate} onChange={(e) => setRecordDate(e.target.value)} />
-                        </div>
-                        <div>
-                          <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Student</label>
-                          <SearchableSelect
-                            value={crStudentId}
-                            onChange={crSelectStudent}
-                            placeholder="Select a student…"
-                            options={crStudents.map((s) => ({ value: s.id, label: s.name }))}
-                          />
-                        </div>
-                      </div>
-
-                      {crStudentId && (
-                        <>
-                          <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
-                            <div className={`lc-subtab ${crMode === "text" ? "lc-subtab-active" : ""}`} onClick={() => setCrMode("text")}>Text note</div>
-                            <div className={`lc-subtab ${crMode === "hifz" ? "lc-subtab-active" : ""}`} onClick={() => setCrMode("hifz")}>Hifz record</div>
-                          </div>
-
-                          {crMode === "text" ? (
-                            <>
-                              <label style={{ fontSize: "12px", color: C.a }}>Class notes / progress</label>
-                              <textarea
-                                className="lc-input"
-                                rows={2}
-                                style={{ resize: "vertical", marginBottom: "8px" }}
-                                value={crNoteDraft}
-                                onChange={(e) => setCrNoteDraft(e.target.value)}
-                                placeholder="What was covered, homework, progress notes…"
-                              />
-                              <button className="lc-btn lc-btn-primary" onClick={crSaveNote}>Save</button>
-                            </>
-                          ) : (
-                            <>
-                              {HIFZ_SECTIONS.map(({ key, label }) => (
-                                <div key={key} style={{ marginBottom: "14px", background: C.g, border: "1px solid #D3E9F7", borderRadius: "10px", padding: "10px" }}>
-                                  <div style={{ fontSize: "12px", color: C.a, marginBottom: "8px", fontWeight: 600 }}>{label}</div>
-
-                                  <div style={{ fontSize: "11px", color: C.a, marginBottom: "3px" }}>Starting point</div>
-                                  <div className="lc-form-grid" style={{ marginBottom: "8px" }}>
-                                    <div>
-                                      <label style={{ fontSize: "11px", color: C.a }}>Surah</label>
-                                      <SearchableSelect
-                                        value={crHifzDraft[key].startSurah}
-                                        onChange={(val) => crSetHifzField(key, "startSurah", val)}
-                                        placeholder="Select surah"
-                                        options={SURAH_OPTIONS}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label style={{ fontSize: "11px", color: C.a }}>Ayah</label>
-                                      <input
-                                        className="lc-input"
-                                        type="number"
-                                        min="1"
-                                        value={crHifzDraft[key].startAyah}
-                                        onChange={(e) => crSetHifzField(key, "startAyah", e.target.value)}
-                                        placeholder="Ayah #"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div style={{ fontSize: "11px", color: C.a, marginBottom: "3px" }}>Ending point</div>
-                                  <div className="lc-form-grid" style={{ marginBottom: "8px" }}>
-                                    <div>
-                                      <label style={{ fontSize: "11px", color: C.a }}>Surah</label>
-                                      <SearchableSelect
-                                        value={crHifzDraft[key].endSurah}
-                                        onChange={(val) => crSetHifzField(key, "endSurah", val)}
-                                        placeholder="Select surah"
-                                        options={SURAH_OPTIONS}
-                                      />
-                                    </div>
-                                    <div>
-                                      <label style={{ fontSize: "11px", color: C.a }}>Ayah</label>
-                                      <input
-                                        className="lc-input"
-                                        type="number"
-                                        min="1"
-                                        value={crHifzDraft[key].endAyah}
-                                        onChange={(e) => crSetHifzField(key, "endAyah", e.target.value)}
-                                        placeholder="Ayah #"
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <label style={{ fontSize: "11px", color: C.a }}>Mistakes</label>
-                                  <input
-                                    className="lc-input"
-                                    type="number"
-                                    min="0"
-                                    style={{ maxWidth: "120px" }}
-                                    value={crHifzDraft[key].mistakes}
-                                    onChange={(e) => crSetHifzField(key, "mistakes", e.target.value)}
-                                  />
-                                </div>
-                              ))}
-                              <button className="lc-btn lc-btn-primary" onClick={crSaveHifz}>Save</button>
-                            </>
+                    {examView === "details" ? (
+                      <div className="lc-card">
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
+                          <div style={{ fontSize: "18px", fontWeight: 700 }}>{editingExamId ? "Edit Hifz Exam" : "Create Hifz Exam"}</div>
+                          {editingExamId && (
+                            <button type="button" className="lc-btn" onClick={resetExamForm}>Cancel edit</button>
                           )}
-                        </>
-                      )}
-                    </div>
+                        </div>
 
-                    {hifzStudents.length > 0 && (
-                      <div className="lc-card" style={{ marginBottom: "22px" }}>
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }} className="no-print">
-                          <SearchableSelect
-                            style={{ maxWidth: "240px" }}
-                            value={hifzReportStudentId}
-                            onChange={setHifzReportStudentId}
-                            placeholder="All students"
-                            options={hifzStudents.map((s) => ({ value: s.id, label: s.name }))}
+                        <div className="lc-form-grid" style={{ marginBottom: "20px" }}>
+                          <div>
+                            <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Student name</label>
+                            <input className="lc-input" value={examStudentName} onChange={(e) => setExamStudentName(e.target.value)} placeholder="Enter student name" />
+                          </div>
+                          <div>
+                            <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Exam date</label>
+                            <input className="lc-input" type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} />
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "12px" }}>Hifz Questions</div>
+                        <div className="lc-table-wrap">
+                          <table className="tp-exam-table">
+                            <thead>
+                              <tr>
+                                <th>Question</th>
+                                <th>Surah</th>
+                                <th>Ayah</th>
+                                <th>Question Type</th>
+                                <th>Result</th>
+                                <th>Mistake / Remark</th>
+                                <th></th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {examQuestions.map((q, i) => {
+                                const remarkRequired = q.result === "incorrect";
+                                const remarkMissing = remarkRequired && !q.remark.trim();
+                                return (
+                                  <tr key={q.id}>
+                                    <td>{i + 1}</td>
+                                    <td style={{ minWidth: "170px" }}>
+                                      <SearchableSelect
+                                        value={q.surah}
+                                        onChange={(val) => updateExamQuestion(q.id, "surah", val)}
+                                        placeholder="Select surah"
+                                        options={SURAH_OPTIONS_EN}
+                                      />
+                                    </td>
+                                    <td style={{ minWidth: "90px" }}>
+                                      <input className="lc-input" type="number" min="1" value={q.ayah} onChange={(e) => updateExamQuestion(q.id, "ayah", e.target.value)} placeholder="Ayah" />
+                                    </td>
+                                    <td style={{ minWidth: "170px" }}>
+                                      <select className="lc-select" value={q.questionType} onChange={(e) => updateExamQuestion(q.id, "questionType", e.target.value)}>
+                                        {EXAM_QUESTION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                                      </select>
+                                    </td>
+                                    <td style={{ minWidth: "130px" }}>
+                                      <select
+                                        className="lc-select"
+                                        style={{ fontWeight: 700, color: q.result === "correct" ? C.d : C.b, background: q.result === "correct" ? C.i : C.h, border: "none" }}
+                                        value={q.result}
+                                        onChange={(e) => updateExamQuestion(q.id, "result", e.target.value)}
+                                      >
+                                        <option value="correct">Correct</option>
+                                        <option value="incorrect">Incorrect</option>
+                                      </select>
+                                    </td>
+                                    <td style={{ minWidth: "200px" }}>
+                                      <input
+                                        className="lc-input"
+                                        value={q.remark}
+                                        onChange={(e) => updateExamQuestion(q.id, "remark", e.target.value)}
+                                        placeholder={remarkRequired ? "Required — describe the mistake" : "Optional remark"}
+                                        style={remarkMissing ? { borderColor: C.b, background: C.h } : {}}
+                                      />
+                                    </td>
+                                    <td>
+                                      {examQuestions.length > 1 && (
+                                        <button type="button" className="lc-btn" style={{ padding: "6px 8px" }} onClick={() => removeExamQuestion(q.id)} aria-label="Remove question">
+                                          <X size={14} aria-hidden="true" />
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <button type="button" className="lc-btn" style={{ marginTop: "14px", color: TP.blue, fontWeight: 600 }} onClick={addExamQuestion}>
+                          <Plus size={14} aria-hidden="true" style={{ marginRight: "6px", verticalAlign: "-2px" }} />
+                          Add question
+                        </button>
+
+                        <div style={{ marginTop: "24px" }}>
+                          <label style={{ fontSize: "14px", fontWeight: 700, display: "block", marginBottom: "8px" }}>Recitation comments</label>
+                          <textarea
+                            className="lc-input"
+                            rows={4}
+                            style={{ resize: "vertical" }}
+                            value={examComments}
+                            onChange={(e) => setExamComments(e.target.value)}
+                            placeholder="Recitation quality, fluency, pronunciation, memorization accuracy, strengths, areas requiring improvement…"
                           />
-                          <div style={{ display: "flex", gap: "8px" }}>
+                        </div>
+
+                        <div style={{ marginTop: "24px", background: C.g, border: "1px solid #D3E9F7", borderRadius: "14px", padding: "18px" }}>
+                          <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "4px" }}>Final decision</div>
+                          <div style={{ fontSize: "13px", color: C.a, marginBottom: "14px" }}>Please select the final result for this exam (required).</div>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                             <button
-                              className="lc-btn"
-                              onClick={() => downloadRowsAsImage("Hifz Report", hifzReportSubtitle, hifzColumns, hifzRows, `${(selectedHifzStudent ? selectedHifzStudent.name : "all_students").replace(/\s+/g, "_")}_hifz_report_all_time.png`)}
+                              type="button"
+                              className={`tp-decision-btn ${examFinalResult === "pass" ? "tp-decision-btn-pass-active" : ""}`}
+                              onClick={() => setExamFinalResult("pass")}
                             >
-                              Download as image
+                              <CheckCircle2 size={20} aria-hidden="true" />
+                              Pass
                             </button>
                             <button
-                              className="lc-btn"
-                              onClick={() => downloadRowsAsPDF("Hifz Report", hifzReportSubtitle, hifzColumns, hifzRows, `${(selectedHifzStudent ? selectedHifzStudent.name : "all_students").replace(/\s+/g, "_")}_hifz_report_all_time.pdf`)}
+                              type="button"
+                              className={`tp-decision-btn ${examFinalResult === "not_passed" ? "tp-decision-btn-fail-active" : ""}`}
+                              onClick={() => setExamFinalResult("not_passed")}
                             >
-                              Download as PDF
+                              <XCircle size={20} aria-hidden="true" />
+                              Not Passed
                             </button>
                           </div>
                         </div>
-                        <div style={{ fontSize: "13px", fontWeight: 600, marginBottom: "10px" }}>{hifzReportSubtitle} (all months combined)</div>
-                        {hifzRows.length === 0 ? (
-                          <div style={{ color: C.a, fontSize: "14px" }}>No Hifz records for this selection yet.</div>
+
+                        <button
+                          type="button"
+                          className="tp-btn-gradient"
+                          style={{ marginTop: "22px" }}
+                          disabled={examSubmitting}
+                          onClick={submitExam}
+                        >
+                          {examSubmitting ? <span className="lc-spinner"></span> : <FileText size={16} aria-hidden="true" />}
+                          {examSubmitting ? "Saving…" : editingExamId ? "Update exam result" : "Submit exam result"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        {examReportsLoading ? (
+                          <div className="lc-loading-row"><span className="lc-spinner"></span>Loading exam reports…</div>
+                        ) : examReports.length === 0 ? (
+                          <div className="lc-empty-state">
+                            <FileText size={32} aria-hidden="true" />
+                            <div>No exam reports submitted yet.</div>
+                          </div>
                         ) : (
-                          <div className="lc-table-wrap"><table className="lc-table">
-                            <thead><tr>{hifzColumns.map((c) => <th key={c}>{c}</th>)}</tr></thead>
-                            <tbody>
-                              {hifzRows.map((row, i) => (
-                                <tr key={i}>{row.map((cell, j) => <td key={j}>{cell}</td>)}</tr>
-                              ))}
-                            </tbody>
-                          </table></div>
+                          <div className="lc-table-wrap">
+                            <table className="lc-table">
+                              <thead>
+                                <tr>
+                                  <th>Student</th>
+                                  <th>Exam date</th>
+                                  <th>Teacher</th>
+                                  <th>Final result</th>
+                                  <th>Action</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {examReports.map((exam) => (
+                                  <tr key={exam.id}>
+                                    <td style={{ fontWeight: 600 }}>{exam.studentName}</td>
+                                    <td>{exam.examDate}</td>
+                                    <td>{teacherLabel}</td>
+                                    <td>{resultBadge(exam.finalResult)}</td>
+                                    <td>
+                                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                        <button type="button" className="lc-btn" onClick={() => setViewExamId(exam.id)}>
+                                          <FileText size={14} aria-hidden="true" style={{ marginRight: "4px", verticalAlign: "-2px" }} />
+                                          View Report
+                                        </button>
+                                        <button type="button" className="lc-btn" onClick={() => downloadExamReportAsPDF(exam, teacherLabel, `${filenameFor(exam)}.pdf`)}>
+                                          Download PDF
+                                        </button>
+                                        <button type="button" className="lc-btn" onClick={() => startEditExam(exam)}>
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="lc-btn lc-btn-danger"
+                                          disabled={examDeletingId === exam.id}
+                                          onClick={() => deleteExam(exam.id)}
+                                        >
+                                          {examDeletingId === exam.id ? "Deleting…" : "Delete"}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
                         )}
                       </div>
                     )}
-
-                    {recordsLoading ? (
-                      <div className="lc-loading-row"><span className="lc-spinner"></span>Loading your records…</div>
-                    ) : monthGroups.length === 0 ? (
-                      <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No saved class records yet. Once you save a note under Records, it will show up here.</div>
-                    ) : (
-                      <div className="no-print" style={{ maxHeight: "620px", overflowY: "auto", paddingRight: "4px" }}>
-                        {monthGroups.map((mg) => {
-                          const monthRecordsHifz = allRecords.filter(
-                            (r) => r.recordType === "hifz" && r.date.slice(0, 7) === mg.monthKey && (!hifzReportStudentId || r.studentId === hifzReportStudentId)
-                          );
-                          const monthHifzRows = buildHifzRows(monthRecordsHifz, includeStudentCol);
-                          const monthLabelStr = monthLabelText(mg.monthKey);
-                          const monthSubtitle = selectedHifzStudent ? `${monthLabelStr} — ${selectedHifzStudent.name}` : `${monthLabelStr} — All students`;
-                          return (
-                            <div key={mg.monthKey} style={{ marginBottom: "26px" }}>
-                              <div className="tp-month-heading-row">
-                                <span className="tp-month-icon" aria-hidden="true"><CalendarDays size={18} /></span>
-                                <span className="tp-month-heading">{monthLabelStr}</span>
-                                <span className="tp-month-underline" />
-                                <span className="tp-month-line" />
-                                {monthHifzRows.length > 0 && (
-                                  <div className="no-print" style={{ display: "flex", gap: "8px" }}>
-                                    <button
-                                      className="lc-btn"
-                                      onClick={() => downloadRowsAsImage("Hifz Report", monthSubtitle, hifzColumns, monthHifzRows, `${(selectedHifzStudent ? selectedHifzStudent.name : "all_students").replace(/\s+/g, "_")}_${mg.monthKey}_hifz_report.png`)}
-                                    >
-                                      Download month (image)
-                                    </button>
-                                    <button
-                                      className="lc-btn"
-                                      onClick={() => downloadRowsAsPDF("Hifz Report", monthSubtitle, hifzColumns, monthHifzRows, `${(selectedHifzStudent ? selectedHifzStudent.name : "all_students").replace(/\s+/g, "_")}_${mg.monthKey}_hifz_report.pdf`)}
-                                    >
-                                      Download month (PDF)
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-
-                              {mg.dateGroups.map((g) => {
-                                const classGroups = groupByClass(g.items);
-                                return (
-                                  <div key={g.date} style={{ marginBottom: "18px" }}>
-                                    <div className="tp-date-badge">
-                                      {weekdayAbbrev(g.date)}, {g.date}
-                                    </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                      {classGroups.map(({ className, entries }) => {
-                                        const key = `history:${g.date}:${className}`;
-                                        const isOpen = expandedClasses.has(key);
-                                        const code = classCode(className);
-                                        const badge = classBadgeStyle(code);
-                                        return (
-                                          <div key={key}>
-                                            <button
-                                              type="button"
-                                              className="tp-accordion-row"
-                                              aria-expanded={isOpen}
-                                              onClick={() => toggleClassExpand(key)}
-                                            >
-                                              <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
-                                              <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{code}</span>
-                                              <span className="tp-accordion-title">{className}</span>
-                                              <span className="tp-count-badge">{entries.length} student{entries.length === 1 ? "" : "s"}</span>
-                                            </button>
-                                            {isOpen && (
-                                              <div className="lc-expand-panel" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px", paddingLeft: "8px" }}>
-                                                {entries.map((rec) => (
-                                                  <div className="lc-card" key={g.date + rec.studentId}>
-                                                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
-                                                      <div>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                                                          <div style={{ fontWeight: 600 }}>{rec.studentName}</div>
-                                                          {rec.status && (
-                                                            <span className={`lc-badge ${rec.status === "present" ? "lc-badge-paid" : "lc-badge-pending"}`}>
-                                                              {rec.status === "present" ? "Present" : "Absent"}
-                                                            </span>
-                                                          )}
-                                                        </div>
-                                                        {renderRecordBody(rec)}
-                                                      </div>
-                                                      <button
-                                                        type="button"
-                                                        className="lc-btn no-print"
-                                                        onClick={() => editHistoricalRecord(rec)}
-                                                      >
-                                                        Edit
-                                                      </button>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
                   </div>
+
+                  {viewingExam && (
+                    <div className="lc-modal-backdrop" onClick={() => setViewExamId(null)}>
+                      <div className="lc-modal-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "640px" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                          <div style={{ fontWeight: 700, fontSize: "16px" }}>{viewingExam.studentName}</div>
+                          <button className="lc-btn" style={{ padding: "6px 10px" }} onClick={() => setViewExamId(null)} aria-label="Close"><X size={16} /></button>
+                        </div>
+                        <div style={{ fontSize: "13px", color: C.a, marginBottom: "10px" }}>
+                          {viewingExam.examDate} · {teacherLabel}
+                        </div>
+                        <div style={{ marginBottom: "16px" }}>{resultBadge(viewingExam.finalResult)}</div>
+
+                        <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "8px" }}>Questions</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                          {viewingExam.questions.length === 0 ? (
+                            <div style={{ fontSize: "13px", color: C.a }}>No questions recorded.</div>
+                          ) : viewingExam.questions.map((q, i) => (
+                            <div key={i} className="lc-card" style={{ padding: "10px 14px", margin: 0 }}>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "4px" }}>
+                                <span style={{ fontWeight: 600, fontSize: "13px" }}>Q{i + 1} · {q.questionType || "—"}</span>
+                                <span style={{ fontSize: "12px", fontWeight: 700, color: q.result === "correct" ? C.d : C.b }}>
+                                  {q.result === "correct" ? "Correct" : "Incorrect"}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: "12px", color: C.a }}>
+                                {(q.surah ?? q.startSurah) || "—"}{(q.ayah ?? q.startAyah) ? `:${q.ayah ?? q.startAyah}` : ""}
+                              </div>
+                              {q.remark && <div style={{ fontSize: "13px", marginTop: "4px" }}>{q.remark}</div>}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "6px" }}>Recitation comments</div>
+                        <div style={{ fontSize: "13px", color: viewingExam.comments ? C.w : C.a, marginBottom: "18px", whiteSpace: "pre-wrap" }}>
+                          {viewingExam.comments || "No comments recorded."}
+                        </div>
+
+                        <button
+                          type="button"
+                          className="lc-btn lc-btn-primary"
+                          style={{ width: "100%" }}
+                          onClick={() => downloadExamReportAsPDF(viewingExam, teacherLabel, `${filenameFor(viewingExam)}.pdf`)}
+                        >
+                          Download PDF
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -4333,6 +4592,7 @@ export default function App() {
           { key: "classes", label: "Classes", icon: Layers, onClick: () => { setSection("classes"); setClassesView("classes"); } },
           { key: "teachers", label: "Teachers", icon: GraduationCap, onClick: () => setSection("teachers") },
           { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAdminAttendanceView("records"); } },
+          { key: "exams", label: "Exams", icon: FileText, onClick: () => setSection("exams") },
           { key: "timetable", label: "Timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
           { key: "finance", label: "Finance", icon: Wallet, onClick: () => setSection("finance") },
           { key: "data", label: "Data", icon: Trash2, onClick: () => setSection("data") },
@@ -6466,6 +6726,189 @@ export default function App() {
                               ))}
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+              {/* ---------------- EXAMS (admin) ---------------- */}
+              {section === "exams" && role === "admin" && (() => {
+                const q = adminExamSearch.trim().toLowerCase();
+                const filteredExams = adminExamReports
+                  .filter((e) => !q || e.studentName.toLowerCase().includes(q))
+                  .filter((e) => !adminExamTeacherId || e.teacherId === adminExamTeacherId)
+                  .filter((e) => !adminExamResultFilter || e.finalResult === adminExamResultFilter);
+
+                const resultBadge = (result) => (
+                  <span
+                    style={{
+                      display: "inline-block", fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "999px",
+                      background: result === "pass" ? C.i : C.h, color: result === "pass" ? C.d : C.b,
+                    }}
+                  >
+                    {result === "pass" ? "Pass" : "Not Passed"}
+                  </span>
+                );
+
+                const filenameFor = (exam) => `${exam.studentName.replace(/\s+/g, "_")}_${exam.examDate}_hifz_exam`;
+                const viewingExam = adminViewExamId ? adminExamReports.find((e) => e.id === adminViewExamId) : null;
+
+                return (
+                  <div className="tp-adminexams-page">
+                    <style>{`
+                      .tp-adminexams-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
+                      @media (max-width: 820px) {
+                        .tp-adminexams-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
+                      }
+                      @media (max-width: 640px) {
+                        .tp-adminexams-page { padding: 20px; }
+                      }
+                    `}</style>
+                    <div className="tp-header">
+                      <div className="tp-title-group">
+                        <span className="tp-title-icon" aria-hidden="true"><FileText size={22} /></span>
+                        <div>
+                          <h1 className="tp-title">Exam Reports</h1>
+                          <div className="tp-subtext" style={{ margin: 0 }}>Hifz exams submitted by every teacher</div>
+                        </div>
+                      </div>
+                      {adminExamReportsLoading && (
+                        <span style={{ fontSize: "13px", color: TP.secondaryText, display: "inline-flex", alignItems: "center" }}>
+                          <span className="lc-spinner"></span>Loading…
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="tp-card">
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginBottom: "20px" }}>
+                        <div className="lc-search-wrap" style={{ maxWidth: "280px" }}>
+                          <Search size={16} aria-hidden="true" color={C.a} />
+                          <input
+                            className="lc-input"
+                            value={adminExamSearch}
+                            onChange={(e) => setAdminExamSearch(e.target.value)}
+                            placeholder="Search student…"
+                          />
+                          {adminExamSearch && (
+                            <button className="lc-search-clear" onClick={() => setAdminExamSearch("")} aria-label="Clear search"><X size={14} /></button>
+                          )}
+                        </div>
+                        <SearchableSelect
+                          style={{ maxWidth: "220px" }}
+                          value={adminExamTeacherId}
+                          onChange={setAdminExamTeacherId}
+                          placeholder="All Teachers"
+                          options={teachers.slice().sort((a, b) => a.name.localeCompare(b.name)).map((t) => ({ value: t.id, label: t.name }))}
+                        />
+                        <select
+                          className="lc-select"
+                          style={{ maxWidth: "180px" }}
+                          value={adminExamResultFilter}
+                          onChange={(e) => setAdminExamResultFilter(e.target.value)}
+                        >
+                          <option value="">All Results</option>
+                          <option value="pass">Pass</option>
+                          <option value="not_passed">Not Passed</option>
+                        </select>
+                      </div>
+
+                      {filteredExams.length === 0 ? (
+                        <div className="lc-empty-state">
+                          <FileText size={32} aria-hidden="true" />
+                          <div>No exam reports match your filters.</div>
+                        </div>
+                      ) : (
+                        <div className="lc-table-wrap">
+                          <table className="lc-table">
+                            <thead>
+                              <tr>
+                                <th>Student</th>
+                                <th>Exam date</th>
+                                <th>Teacher</th>
+                                <th>Final result</th>
+                                <th>Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredExams.map((exam) => (
+                                <tr key={exam.id}>
+                                  <td style={{ fontWeight: 600 }}>{exam.studentName}</td>
+                                  <td>{exam.examDate}</td>
+                                  <td>{teacherName(exam.teacherId)}</td>
+                                  <td>{resultBadge(exam.finalResult)}</td>
+                                  <td>
+                                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                      <button type="button" className="lc-btn" onClick={() => setAdminViewExamId(exam.id)}>
+                                        <FileText size={14} aria-hidden="true" style={{ marginRight: "4px", verticalAlign: "-2px" }} />
+                                        View Report
+                                      </button>
+                                      <button type="button" className="lc-btn" onClick={() => downloadExamReportAsPDF(exam, teacherName(exam.teacherId), `${filenameFor(exam)}.pdf`)}>
+                                        Download PDF
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="lc-btn lc-btn-danger"
+                                        disabled={adminExamDeletingId === exam.id}
+                                        onClick={() => deleteAdminExam(exam.id)}
+                                      >
+                                        {adminExamDeletingId === exam.id ? "Deleting…" : "Delete"}
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+
+                    {viewingExam && (
+                      <div className="lc-modal-backdrop" onClick={() => setAdminViewExamId(null)}>
+                        <div className="lc-modal-sheet" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "640px" }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                            <div style={{ fontWeight: 700, fontSize: "16px" }}>{viewingExam.studentName}</div>
+                            <button className="lc-btn" style={{ padding: "6px 10px" }} onClick={() => setAdminViewExamId(null)} aria-label="Close"><X size={16} /></button>
+                          </div>
+                          <div style={{ fontSize: "13px", color: C.a, marginBottom: "10px" }}>
+                            {viewingExam.examDate} · {teacherName(viewingExam.teacherId)}
+                          </div>
+                          <div style={{ marginBottom: "16px" }}>{resultBadge(viewingExam.finalResult)}</div>
+
+                          <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "8px" }}>Questions</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "16px" }}>
+                            {viewingExam.questions.length === 0 ? (
+                              <div style={{ fontSize: "13px", color: C.a }}>No questions recorded.</div>
+                            ) : viewingExam.questions.map((q, i) => (
+                              <div key={i} className="lc-card" style={{ padding: "10px 14px", margin: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "4px" }}>
+                                  <span style={{ fontWeight: 600, fontSize: "13px" }}>Q{i + 1} · {q.questionType || "—"}</span>
+                                  <span style={{ fontSize: "12px", fontWeight: 700, color: q.result === "correct" ? C.d : C.b }}>
+                                    {q.result === "correct" ? "Correct" : "Incorrect"}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: "12px", color: C.a }}>
+                                  {(q.surah ?? q.startSurah) || "—"}{(q.ayah ?? q.startAyah) ? `:${q.ayah ?? q.startAyah}` : ""}
+                                </div>
+                                {q.remark && <div style={{ fontSize: "13px", marginTop: "4px" }}>{q.remark}</div>}
+                              </div>
+                            ))}
+                          </div>
+
+                          <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "6px" }}>Recitation comments</div>
+                          <div style={{ fontSize: "13px", color: viewingExam.comments ? C.w : C.a, marginBottom: "18px", whiteSpace: "pre-wrap" }}>
+                            {viewingExam.comments || "No comments recorded."}
+                          </div>
+
+                          <button
+                            type="button"
+                            className="lc-btn lc-btn-primary"
+                            style={{ width: "100%" }}
+                            onClick={() => downloadExamReportAsPDF(viewingExam, teacherName(viewingExam.teacherId), `${filenameFor(viewingExam)}.pdf`)}
+                          >
+                            Download PDF
+                          </button>
                         </div>
                       </div>
                     )}
