@@ -13,6 +13,23 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Aflaah" />
+    <script>
+      // aqc-teachers.* / aqc-admin.* are dedicated portals: give each its own
+      // app name, install manifest and icon so they install as separate apps.
+      (function () {
+        var h = location.hostname, p = null;
+        if (h.indexOf("aqc-teachers") === 0) p = "teachers";
+        else if (h.indexOf("aqc-admin") === 0) p = "admin";
+        if (!p) return;
+        var name = p === "admin" ? "AQC Admin" : "AQC Teachers";
+        document.title = name;
+        document.querySelector('link[rel="manifest"]').href = "/manifest-" + p + ".webmanifest";
+        document.querySelector('meta[name="apple-mobile-web-app-title"]').content = name;
+        document.querySelector('meta[name="theme-color"]').content = p === "admin" ? "#27409A" : "#0D4F85";
+        document.querySelector('link[rel="icon"]').href = p === "admin" ? "/icons/admin-icon-192.png" : "/icons/icon-192.png";
+        document.querySelector('link[rel="apple-touch-icon"]').href = p === "admin" ? "/icons/admin-apple-touch-icon.png" : "/icons/apple-touch-icon.png";
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
