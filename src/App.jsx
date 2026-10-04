@@ -1133,7 +1133,7 @@ export default function App() {
     id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, className: r.class_name,
     fee: r.fee, phone: r.phone, teacherId: r.teacher_id,
     sharePercent: r.teacher_share_percent, schedule: r.schedule, joinedMonth: r.joined_month,
-    email: r.email,
+    email: r.email, studentCode: r.student_code || "",
   });
   const TEACHER_TO_DB = (t) => ({
     name: t.name, subject: t.subject || null, phone: t.phone || null, email: t.email || null,
@@ -1254,6 +1254,17 @@ export default function App() {
   // Student form
   const [showStudentForm, setShowStudentForm] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
+  const [removedStudents, setRemovedStudents] = useState(null); // null = not loaded/hidden; [] = loaded
+  const toggleRemovedStudents = async () => {
+    if (removedStudents) { setRemovedStudents(null); return; }
+    const { data, error } = await supabase
+      .from("student_id_history")
+      .select("student_code, student_name, class_name, phone, removed_at")
+      .not("removed_at", "is", null)
+      .order("student_code");
+    if (error) { showToast("Couldn't load removed students"); return; }
+    setRemovedStudents(data);
+  };
   const [teacherSearch, setTeacherSearch] = useState("");
   const [classSearch, setClassSearch] = useState("");
   const [editingStudentId, setEditingStudentId] = useState(null);
@@ -3794,6 +3805,7 @@ export default function App() {
                     <div style={{ fontSize: "13px" }}>
                       <span style={{ color: C.a }}>Class: </span>{classes.find((c) => c.id === attClassId)?.name || ""}
                       <span style={{ color: C.a }}> · Student: </span><strong>{selectedStudent ? selectedStudent.name : ""}</strong>
+                      {selectedStudent && selectedStudent.studentCode && <span style={{ color: C.a, fontSize: "11px", marginLeft: "6px" }}>{selectedStudent.studentCode}</span>}
                     </div>
                     <button className="lc-btn" onClick={() => { setAttStudentId(""); closeDetail(); }}>Change student</button>
                   </div>
@@ -4532,6 +4544,11 @@ export default function App() {
                         <div className="tp-card" style={{ marginBottom: "18px" }}>
                           <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: TP.navy }}>
                             {editingStudentId ? "Edit student" : "New student"}
+                            {editingStudentId && (
+                              <span style={{ fontSize: "11px", fontWeight: 400, color: TP.secondaryText, marginLeft: "8px" }}>
+                                {students.find((st) => st.id === editingStudentId)?.studentCode}
+                              </span>
+                            )}
                           </div>
                           <div className="lc-form-grid">
                             <div>
@@ -4608,7 +4625,7 @@ export default function App() {
                             <Search size={15} color={C.a} aria-hidden="true" />
                             <input
                               className="lc-input"
-                              placeholder="Search students or classes…"
+                              placeholder="Search students, IDs or classes…"
                               value={studentSearch}
                               onChange={(e) => setStudentSearch(e.target.value)}
                             />
@@ -4626,7 +4643,7 @@ export default function App() {
                         {(() => {
                           const q = studentSearch.trim().toLowerCase();
                           const filteredStudents = q
-                            ? students.filter((s) => s.name.toLowerCase().includes(q) || (s.className || "").toLowerCase().includes(q))
+                            ? students.filter((s) => s.name.toLowerCase().includes(q) || (s.className || "").toLowerCase().includes(q) || (s.studentCode || "").toLowerCase().includes(q))
                             : students;
                           if (students.length === 0) {
                             return (
@@ -4654,7 +4671,7 @@ export default function App() {
                                 const paid = !!(rec && rec.paid);
                                 return (
                                   <tr key={s.id}>
-                                    <td>{s.name}</td>
+                                    <td>{s.name}<div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{s.studentCode}</div></td>
                                     <td>{s.className || "—"}</td>
                                     <td>{teacherName(s.teacherId)}</td>
                                     <td>{fmtMoney(s.fee)}</td>
@@ -4692,9 +4709,37 @@ export default function App() {
                           );
                         })()}
                       </div>
-                      <div className="tp-subtext" style={{ marginBottom: 0 }}>
+                      <div className="tp-subtext" style={{ marginBottom: "10px" }}>
                         Marking paid/pending here updates the same record shown in Finance.
                       </div>
+                      <button className="lc-btn" onClick={toggleRemovedStudents}>
+                        {removedStudents ? "Hide removed students" : "Show removed students"}
+                      </button>
+                      {removedStudents && (
+                        <div className="tp-card" style={{ marginTop: "12px" }}>
+                          <div style={{ fontSize: "13px", color: TP.secondaryText, marginBottom: "10px" }}>
+                            Student IDs stay with the student who received them and are never given to anyone else.
+                          </div>
+                          {removedStudents.length === 0 ? (
+                            <div style={{ fontSize: "14px", color: TP.secondaryText }}>No students have been removed.</div>
+                          ) : (
+                            <div className="tp-table-wrap"><table className="tp-list-table">
+                              <thead><tr><th>Student ID</th><th>Name</th><th>Class</th><th>Phone</th><th>Removed on</th></tr></thead>
+                              <tbody>
+                                {removedStudents.map((r) => (
+                                  <tr key={r.student_code}>
+                                    <td>{r.student_code}</td>
+                                    <td>{r.student_name}</td>
+                                    <td>{r.class_name || "—"}</td>
+                                    <td>{r.phone || "—"}</td>
+                                    <td>{new Date(r.removed_at).toLocaleDateString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table></div>
+                          )}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -4877,7 +4922,7 @@ export default function App() {
                                           <tbody>
                                             {classStudents.map((s) => (
                                               <tr key={s.id}>
-                                                <td>{s.name}</td>
+                                                <td>{s.name}<div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{s.studentCode}</div></td>
                                                 <td>{s.phone || "—"}</td>
                                                 <td>{fmtMoney(s.fee)}</td>
                                                 <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
@@ -5681,7 +5726,7 @@ export default function App() {
                   {role === "admin" && financeView === "student" && (() => {
                     const q = finStudentSearch.trim().toLowerCase();
                     const matches = q
-                      ? students.filter((s) => s.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
+                      ? students.filter((s) => s.name.toLowerCase().includes(q) || (s.studentCode || "").toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)
                       : [];
                     const selected = finStudentId ? students.find((s) => s.id === finStudentId) : null;
                     const rec = selected ? monthData[selected.id] : null;
@@ -5697,7 +5742,7 @@ export default function App() {
                             className="lc-input"
                             value={finStudentSearch}
                             onChange={(e) => setFinStudentSearch(e.target.value)}
-                            placeholder="Search student by name…"
+                            placeholder="Search student by name or ID…"
                           />
                           {finStudentSearch && (
                             <button className="lc-search-clear" onClick={() => setFinStudentSearch("")} aria-label="Clear search"><X size={14} /></button>
@@ -5719,7 +5764,7 @@ export default function App() {
                                     style={{ marginBottom: 0, ...(s.id === finStudentId ? { borderColor: TP.blue } : {}) }}
                                     onClick={() => { setFinStudentId(s.id); setFinStudentSearch(""); }}
                                   >
-                                    <span className="tp-accordion-title">{s.name}</span>
+                                    <span className="tp-accordion-title">{s.name} <span style={{ fontSize: "11px", fontWeight: 400, color: TP.secondaryText }}>{s.studentCode}</span></span>
                                     <span className="tp-count-badge">{s.className || "No class"}</span>
                                     {isEnrolledInMonth(s, month) && (
                                       <span className={`lc-badge ${sPaid ? "lc-badge-paid" : "lc-badge-pending"}`} style={{ cursor: "inherit" }}>{sPaid ? "Paid" : "Pending"}</span>
@@ -5743,6 +5788,7 @@ export default function App() {
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
                               <div>
                                 <div style={{ fontSize: "18px", fontWeight: 700, color: TP.navy }}>{selected.name}</div>
+                                <div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{selected.studentCode}</div>
                                 <div style={{ fontSize: "13px", color: TP.secondaryText }}>
                                   {selected.className || "No class"} · Monthly fee {fmtMoney(selected.fee)}
                                 </div>
