@@ -2356,9 +2356,17 @@ export default function App() {
   }, [dashboardMonthKeys, paymentsByMonth, students]);
 
   const salaryByTeacher = useMemo(() => {
-    const rows = teachers.map((t) => ({ teacherId: t.id, name: t.name, collected: 0, payout: 0, studentCount: 0 }));
+    const rows = teachers.map((t) => ({ teacherId: t.id, name: t.name, collected: 0, payout: 0, studentCount: 0, activeCount: 0, expected: 0, estimated: 0 }));
     const byId = Object.fromEntries(rows.map((r) => [r.teacherId, r]));
     activeStudents.forEach((s) => {
+      // Estimate: every active student's monthly fee, whether or not it has been paid yet.
+      if (s.teacherId && byId[s.teacherId]) {
+        const fee = Number(s.fee) || 0;
+        const pct = Math.min(100, Math.max(0, s.sharePercent || 0));
+        byId[s.teacherId].activeCount += 1;
+        byId[s.teacherId].expected += fee;
+        byId[s.teacherId].estimated += fee * (pct / 100);
+      }
       const rec = monthData[s.id];
       if (!rec || !rec.paid || !s.teacherId || !byId[s.teacherId]) return;
       const amt = rec.amountPaid || 0;
@@ -5649,34 +5657,56 @@ export default function App() {
                           <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No teachers yet. Add one in the Teachers section, then assign students to them.</div>
                         ) : (
                           <div className="tp-table-wrap"><table className="tp-list-table">
-                            <thead><tr><th>Teacher</th><th>Paid students</th><th>Fee collected</th><th>Salary ({monthLabel(month)})</th></tr></thead>
+                            <thead><tr><th>Teacher</th><th>Active students</th><th>Monthly fees</th><th>Estimated salary</th><th>Paid students</th><th>Fee collected</th><th>Salary on paid fees</th></tr></thead>
                             <tbody>
                               {salaryByTeacher.map((r) => (
                                 <tr key={r.teacherId}>
                                   <td>{r.name}</td>
+                                  <td>{r.activeCount}</td>
+                                  <td>{fmtMoney(r.expected)}</td>
+                                  <td style={{ fontWeight: 600, color: TP.navy }}>{fmtMoney(r.estimated)}</td>
                                   <td>{r.studentCount}</td>
                                   <td>{fmtMoney(r.collected)}</td>
-                                  <td style={{ fontWeight: 600 }}>{fmtMoney(r.payout)}</td>
+                                  <td>{fmtMoney(r.payout)}</td>
                                 </tr>
                               ))}
+                              <tr style={{ fontWeight: 700 }}>
+                                <td>Total</td>
+                                <td>{salaryByTeacher.reduce((n, r) => n + r.activeCount, 0)}</td>
+                                <td>{fmtMoney(salaryByTeacher.reduce((n, r) => n + r.expected, 0))}</td>
+                                <td style={{ color: TP.navy }}>{fmtMoney(salaryByTeacher.reduce((n, r) => n + r.estimated, 0))}</td>
+                                <td>{salaryByTeacher.reduce((n, r) => n + r.studentCount, 0)}</td>
+                                <td>{fmtMoney(salaryByTeacher.reduce((n, r) => n + r.collected, 0))}</td>
+                                <td>{fmtMoney(totalPayouts)}</td>
+                              </tr>
                             </tbody>
                           </table></div>
                         )}
+                        <div style={{ fontSize: "12px", color: TP.secondaryText, marginTop: "10px" }}>
+                          <strong>Estimated salary</strong> for {monthLabel(month)} counts every active student's monthly fee × the teacher's share %, whether or not they have paid yet. <strong>Salary on paid fees</strong> counts only what has actually been received so far.
+                        </div>
                       </div>
 
                       <div className="tp-card">
                         <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "10px", color: TP.navy }}>Profit summary — {monthLabel(month)}</div>
-                        <div className="tp-table-wrap"><table className="tp-list-table">
-                          <tbody>
-                            <tr><td>Total received</td><td style={{ textAlign: "right" }}>{fmtMoney(totals.received)}</td></tr>
-                            <tr><td>Other income</td><td style={{ textAlign: "right" }}>+ {fmtMoney(totalOtherIncomeThisMonth)}</td></tr>
-                            <tr><td>Total teacher payouts</td><td style={{ textAlign: "right" }}>− {fmtMoney(totalPayouts)}</td></tr>
-                            <tr><td>Expenses</td><td style={{ textAlign: "right" }}>− {fmtMoney(totalExpensesThisMonth)}</td></tr>
-                            <tr><td style={{ fontWeight: 600 }}>Center profit</td><td style={{ textAlign: "right", fontWeight: 600, color: C.d }}>{fmtMoney(centerProfit)}</td></tr>
-                          </tbody>
-                        </table></div>
+                        {(() => {
+                          const estPayouts = salaryByTeacher.reduce((sum, r) => sum + r.estimated, 0);
+                          const estCenterProfit = totals.expected + totalOtherIncomeThisMonth - estPayouts - totalExpensesThisMonth;
+                          return (
+                            <div className="tp-table-wrap"><table className="tp-list-table">
+                              <thead><tr><th></th><th style={{ textAlign: "right" }}>Estimated (all active students)</th><th style={{ textAlign: "right" }}>Received so far</th></tr></thead>
+                              <tbody>
+                                <tr><td>Student fees</td><td style={{ textAlign: "right" }}>{fmtMoney(totals.expected)}</td><td style={{ textAlign: "right" }}>{fmtMoney(totals.received)}</td></tr>
+                                <tr><td>Other income</td><td style={{ textAlign: "right" }}>+ {fmtMoney(totalOtherIncomeThisMonth)}</td><td style={{ textAlign: "right" }}>+ {fmtMoney(totalOtherIncomeThisMonth)}</td></tr>
+                                <tr><td>Teacher salaries</td><td style={{ textAlign: "right" }}>− {fmtMoney(estPayouts)}</td><td style={{ textAlign: "right" }}>− {fmtMoney(totalPayouts)}</td></tr>
+                                <tr><td>Expenses</td><td style={{ textAlign: "right" }}>− {fmtMoney(totalExpensesThisMonth)}</td><td style={{ textAlign: "right" }}>− {fmtMoney(totalExpensesThisMonth)}</td></tr>
+                                <tr><td style={{ fontWeight: 600 }}>Center (admin) profit</td><td style={{ textAlign: "right", fontWeight: 600, color: C.d }}>{fmtMoney(estCenterProfit)}</td><td style={{ textAlign: "right", fontWeight: 600, color: C.d }}>{fmtMoney(centerProfit)}</td></tr>
+                              </tbody>
+                            </table></div>
+                          );
+                        })()}
                         <div style={{ fontSize: "12px", color: TP.secondaryText, marginTop: "10px" }}>
-                          Profit is based on fees actually received this month. Students with no teacher assigned, or a 0% share, are fully retained by the center.
+                          "Estimated" assumes every active student pays this month; "Received so far" counts only fees actually paid. Students with no teacher assigned, or a 0% share, are fully retained by the center.
                         </div>
                       </div>
                     </>
