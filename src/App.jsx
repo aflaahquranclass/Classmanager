@@ -1953,6 +1953,15 @@ export default function App() {
     setShowStudentForm(true);
   };
 
+  // Remove a student who has left (same as Remove in All students): they stop
+  // counting as active and drop out of Finance. Their ID stays reserved in the
+  // removed-students record and is never given to anyone else.
+  const removeStudentWhoLeft = (s) => {
+    if (!window.confirm(`Remove ${s.name} (${s.studentCode || "no ID"})?\n\nThey will no longer count as an active student and will be removed from Finance, including their payment and attendance records. Their ID stays reserved under "Show removed students".`)) return;
+    removeStudent(s.id);
+    showToast(`${s.name} removed`);
+  };
+
   const removeStudent = (id) => {
     saveStudents(students.filter((s) => s.id !== id));
     // Drop any cached payment entries for this student so a later save for
@@ -4926,7 +4935,8 @@ export default function App() {
                                                 <td>{s.phone || "—"}</td>
                                                 <td>{fmtMoney(s.fee)}</td>
                                                 <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                                                  <button className="lc-btn" onClick={() => { setClassesView("students"); startEditStudent(s); }}>Edit student</button>
+                                                  <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => { setClassesView("students"); startEditStudent(s); }}>Edit student</button>
+                                                  <button className="lc-btn lc-btn-danger" onClick={() => removeStudentWhoLeft(s)}>Remove student</button>
                                                 </td>
                                               </tr>
                                             ))}
