@@ -4832,12 +4832,12 @@ export default function App() {
                       })()}
 
                       <div className="tp-card">
-                        {classes.length > 0 && (
+                        {(classes.length > 0 || teachers.length > 0) && (
                           <div className="lc-search-wrap" style={{ marginBottom: "14px", maxWidth: "320px" }}>
                             <Search size={15} color={C.a} aria-hidden="true" />
                             <input
                               className="lc-input"
-                              placeholder="Search classes…"
+                              placeholder="Search teacher or class…"
                               value={classSearch}
                               onChange={(e) => setClassSearch(e.target.value)}
                             />
@@ -4848,10 +4848,7 @@ export default function App() {
                         )}
                         {(() => {
                           const q = classSearch.trim().toLowerCase();
-                          const filteredClasses = q
-                            ? classes.filter((c) => c.name.toLowerCase().includes(q) || teacherName(c.teacherId).toLowerCase().includes(q))
-                            : classes;
-                          if (classes.length === 0) {
+                          if (classes.length === 0 && teachers.length === 0) {
                             return (
                               <div className="lc-empty-state">
                                 <Layers size={32} aria-hidden="true" />
@@ -4859,96 +4856,150 @@ export default function App() {
                               </div>
                             );
                           }
-                          if (filteredClasses.length === 0) {
+
+                          // One group per teacher (A–Z), plus "Unassigned" for classes with no teacher.
+                          const groups = [...teachers]
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map((t) => ({ key: `admin-teacher:${t.id}`, name: t.name, classes: classes.filter((c) => c.teacherId === t.id) }));
+                          const orphanClasses = classes.filter((c) => !teachers.some((t) => t.id === c.teacherId));
+                          if (orphanClasses.length > 0) groups.push({ key: "admin-teacher:none", name: "Unassigned", classes: orphanClasses });
+
+                          const visibleGroups = groups
+                            .map((g) => {
+                              if (!q) return g;
+                              const teacherMatch = g.name.toLowerCase().includes(q);
+                              const matched = teacherMatch
+                                ? g.classes
+                                : g.classes.filter((c) => c.name.toLowerCase().includes(q) || (c.code || "").toLowerCase().includes(q));
+                              return teacherMatch || matched.length > 0 ? { ...g, classes: matched } : null;
+                            })
+                            .filter(Boolean);
+
+                          if (visibleGroups.length === 0) {
                             return (
                               <div className="lc-empty-state">
                                 <Search size={32} aria-hidden="true" />
-                                <div>No classes match "{classSearch}".</div>
+                                <div>No teacher or class matches "{classSearch}".</div>
                               </div>
                             );
                           }
-                          return (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                            {filteredClasses.map((c) => {
-                              const classStudents = students.filter((s) => s.classId === c.id);
-                              const key = `admin-class:${c.id}`;
-                              const isOpen = expandedClasses.has(key);
-                              const badge = classBadgeStyle(c.code || classCode(c.name));
-                              return (
-                                <div key={c.id}>
-                                  <div className="tp-accordion-row" style={{ cursor: "default", flexWrap: "wrap", rowGap: "10px" }}>
+
+                          const renderClass = (c) => {
+                            const classStudents = students.filter((s) => s.classId === c.id);
+                            const key = `admin-class:${c.id}`;
+                            const isOpen = expandedClasses.has(key);
+                            const badge = classBadgeStyle(c.code || classCode(c.name));
+                            return (
+                              <div key={c.id}>
+                                <div className="tp-accordion-row" style={{ cursor: "default", flexWrap: "wrap", rowGap: "10px" }}>
+                                  <button
+                                    type="button"
+                                    aria-expanded={isOpen}
+                                    onClick={() => toggleClassExpand(key)}
+                                    style={{ display: "flex", alignItems: "center", gap: "14px", flex: "1 1 200px", minWidth: "200px", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", textAlign: "left" }}
+                                  >
+                                    <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
+                                    {c.code && <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{c.code}</span>}
+                                    <span className="tp-accordion-title">{c.name}</span>
+                                    <span className="tp-count-badge">{classStudents.length} student{classStudents.length === 1 ? "" : "s"}</span>
+                                  </button>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                                    <span style={{ fontSize: "13px", color: TP.secondaryText }}>
+                                      {formatSchedule({ days: c.days, startTime: c.startTime, endTime: c.endTime })}
+                                    </span>
                                     <button
                                       type="button"
+                                      className="tp-btn-outline"
+                                      style={{ height: "36px", minHeight: "36px", padding: "0 12px", fontSize: "13px" }}
+                                      onClick={() => startEditClass(c)}
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="tp-btn-outline"
+                                      style={{ height: "36px", minHeight: "36px", padding: "0 12px", fontSize: "13px", color: "#A5432C", borderColor: "#E3C3BA" }}
+                                      onClick={() => removeClass(c.id)}
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                </div>
+                                {isOpen && (
+                                  <div className="lc-expand-panel" style={{ marginTop: "8px", paddingLeft: "8px" }}>
+                                    <div style={{ marginBottom: "10px" }}>
+                                      <button
+                                        className="lc-btn"
+                                        style={{ fontSize: "12px", padding: "5px 10px" }}
+                                        onClick={() => { setClassesView("students"); resetStudentForm(); setSClassId(c.id); setShowStudentForm(true); }}
+                                      >
+                                        + Add student
+                                      </button>
+                                    </div>
+                                    {classStudents.length === 0 ? (
+                                      <div className="lc-card" style={{ fontSize: "13px", color: C.a }}>
+                                        No students in this class yet.
+                                      </div>
+                                    ) : (
+                                      <div className="tp-table-wrap"><table className="tp-list-table">
+                                        <thead><tr><th>Student</th><th>Phone</th><th>Monthly fee</th><th></th></tr></thead>
+                                        <tbody>
+                                          {classStudents.map((s) => (
+                                            <tr key={s.id}>
+                                              <td>{s.name}<div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{s.studentCode}</div></td>
+                                              <td>{s.phone || "—"}</td>
+                                              <td>{fmtMoney(s.fee)}</td>
+                                              <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                                                <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => { setClassesView("students"); startEditStudent(s); }}>Edit student</button>
+                                                <button className="lc-btn lc-btn-danger" onClick={() => removeStudentWhoLeft(s)}>Remove student</button>
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table></div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          };
+
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                              {visibleGroups.map((g) => {
+                                // While searching, matching teachers are shown open so results are visible at once.
+                                const isOpen = !!q || expandedClasses.has(g.key);
+                                const allOfTeacher = groups.find((x) => x.key === g.key).classes;
+                                const classIds = new Set(allOfTeacher.map((c) => c.id));
+                                const studentCount = students.filter((s) => classIds.has(s.classId)).length;
+                                const sortedClasses = [...g.classes].sort((a, b) => a.name.localeCompare(b.name));
+                                return (
+                                  <div key={g.key}>
+                                    <button
+                                      type="button"
+                                      className="tp-accordion-row"
+                                      style={{ marginBottom: 0, flexWrap: "wrap", rowGap: "8px" }}
                                       aria-expanded={isOpen}
-                                      onClick={() => toggleClassExpand(key)}
-                                      style={{ display: "flex", alignItems: "center", gap: "14px", flex: "1 1 200px", minWidth: "200px", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", textAlign: "left" }}
+                                      onClick={() => toggleClassExpand(g.key)}
                                     >
                                       <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
-                                      {c.code && <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{c.code}</span>}
-                                      <span className="tp-accordion-title">{c.name}</span>
-                                      <span className="tp-count-badge">{classStudents.length} student{classStudents.length === 1 ? "" : "s"}</span>
+                                      <span className="tp-accordion-title">{g.name}</span>
+                                      <span className="tp-count-badge">{allOfTeacher.length} class{allOfTeacher.length === 1 ? "" : "es"}</span>
+                                      <span className="tp-count-badge">{studentCount} student{studentCount === 1 ? "" : "s"}</span>
                                     </button>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                                      <span style={{ fontSize: "13px", color: TP.secondaryText }}>
-                                        {teacherName(c.teacherId)} · {formatSchedule({ days: c.days, startTime: c.startTime, endTime: c.endTime })}
-                                      </span>
-                                      <button
-                                        type="button"
-                                        className="tp-btn-outline"
-                                        style={{ height: "36px", minHeight: "36px", padding: "0 12px", fontSize: "13px" }}
-                                        onClick={() => startEditClass(c)}
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="tp-btn-outline"
-                                        style={{ height: "36px", minHeight: "36px", padding: "0 12px", fontSize: "13px", color: "#A5432C", borderColor: "#E3C3BA" }}
-                                        onClick={() => removeClass(c.id)}
-                                      >
-                                        Remove
-                                      </button>
-                                    </div>
-                                  </div>
-                                  {isOpen && (
-                                    <div className="lc-expand-panel" style={{ marginTop: "8px", paddingLeft: "8px" }}>
-                                      <div style={{ marginBottom: "10px" }}>
-                                        <button
-                                          className="lc-btn"
-                                          style={{ fontSize: "12px", padding: "5px 10px" }}
-                                          onClick={() => { setClassesView("students"); resetStudentForm(); setSClassId(c.id); setShowStudentForm(true); }}
-                                        >
-                                          + Add student
-                                        </button>
+                                    {isOpen && (
+                                      <div className="lc-expand-panel" style={{ marginTop: "8px", paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                                        {sortedClasses.length === 0 ? (
+                                          <div className="lc-card" style={{ fontSize: "13px", color: C.a }}>No classes for this teacher yet.</div>
+                                        ) : (
+                                          sortedClasses.map(renderClass)
+                                        )}
                                       </div>
-                                      {classStudents.length === 0 ? (
-                                        <div className="lc-card" style={{ fontSize: "13px", color: C.a }}>
-                                          No students in this class yet.
-                                        </div>
-                                      ) : (
-                                        <div className="tp-table-wrap"><table className="tp-list-table">
-                                          <thead><tr><th>Student</th><th>Phone</th><th>Monthly fee</th><th></th></tr></thead>
-                                          <tbody>
-                                            {classStudents.map((s) => (
-                                              <tr key={s.id}>
-                                                <td>{s.name}<div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{s.studentCode}</div></td>
-                                                <td>{s.phone || "—"}</td>
-                                                <td>{fmtMoney(s.fee)}</td>
-                                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                                                  <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => { setClassesView("students"); startEditStudent(s); }}>Edit student</button>
-                                                  <button className="lc-btn lc-btn-danger" onClick={() => removeStudentWhoLeft(s)}>Remove student</button>
-                                                </td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table></div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           );
                         })()}
                       </div>
