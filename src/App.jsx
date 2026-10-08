@@ -2710,6 +2710,253 @@ export default function App() {
     downloadCanvasAsPDF(canvas, width, height, filename);
   };
 
+  // ---- Class list PDF (multi-page A4) ----
+  // One block per class: class name/code, teacher, schedule, then every student
+  // with their Student ID and phone number. Pages are drawn onto canvases and
+  // embedded as JPEGs, the same approach as the other PDFs in this app.
+  const classPdfGroups = (onlyKey) => {
+    const byName = (a, b) => a.name.localeCompare(b.name);
+    const groups = [...teachers].sort(byName).map((t) => ({
+      key: `admin-teacher:${t.id}`, teacher: t.name, classes: classes.filter((c) => c.teacherId === t.id).sort(byName),
+    }));
+    const orphans = classes.filter((c) => !teachers.some((t) => t.id === c.teacherId)).sort(byName);
+    if (orphans.length > 0) groups.push({ key: "admin-teacher:none", teacher: "Unassigned", classes: orphans });
+    return groups.filter((g) => g.classes.length > 0 && (!onlyKey || g.key === onlyKey));
+  };
+
+  const downloadClassListPDF = (groups, title, filename) => {
+    const PW = 595, PH = 842, S = 2.5, M = 36, FOOT = 22;
+    const fontFamily = "system-ui, -apple-system, sans-serif";
+    const contentW = PW - M * 2;
+    const bottom = PH - M - FOOT;
+    const colW = [28, 92, 250, contentW - 28 - 92 - 250];
+    const colX = [M];
+    colW.forEach((w) => colX.push(colX[colX.length - 1] + w));
+    const ROW_H = 20, CLASS_H = 38, COLHEAD_H = 22, TEACHER_H = 30;
+
+    const studentsOf = (c) => students.filter((s) => s.classId === c.id).sort((a, b) => a.name.localeCompare(b.name));
+    const totalClasses = groups.reduce((n, g) => n + g.classes.length, 0);
+    const totalStudents = groups.reduce((n, g) => n + g.classes.reduce((m, c) => m + studentsOf(c).length, 0), 0);
+    const today = fmtDateStr(new Date());
+    const single = groups.length === 1;
+
+    const pages = [];
+    let canvas, ctx, y;
+
+    const fit = (text, maxW) => {
+      let t = String(text ?? "");
+      if (ctx.measureText(t).width <= maxW) return t;
+      while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+      return t + "…";
+    };
+
+    const newPage = (first) => {
+      canvas = document.createElement("canvas");
+      canvas.width = PW * S;
+      canvas.height = PH * S;
+      ctx = canvas.getContext("2d");
+      ctx.scale(S, S);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, PW, PH);
+      pages.push(canvas);
+      y = M;
+      const counts = `${totalClasses} class${totalClasses === 1 ? "" : "es"} · ${totalStudents} student${totalStudents === 1 ? "" : "s"}`;
+      if (first && single) {
+        // One teacher: their name is the title at the very top of the page.
+        const logoH = 36;
+        if (logoImg) {
+          const logoW = logoH * (logoImg.width / logoImg.height);
+          ctx.drawImage(logoImg, PW - M - logoW, y, logoW, logoH);
+        }
+        ctx.fillStyle = C.f;
+        ctx.font = "700 22px " + fontFamily;
+        ctx.fillText(fit(groups[0].teacher, contentW - 120), M, y + 22);
+        ctx.fillStyle = C.a;
+        ctx.font = "12px " + fontFamily;
+        ctx.fillText(`Aflaah Quran Class · Class list · ${counts} · ${today}`, M, y + 40);
+        y += 50;
+        ctx.fillStyle = C.e;
+        ctx.fillRect(M, y, contentW, 2);
+        y += 14;
+      } else if (first) {
+        const logoH = 36;
+        const logoW = logoImg ? logoH * (logoImg.width / logoImg.height) : 0;
+        let textX = M;
+        if (logoImg) { ctx.drawImage(logoImg, M, y, logoW, logoH); textX = M + logoW + 12; }
+        ctx.fillStyle = C.f;
+        ctx.font = "700 15px " + fontFamily;
+        ctx.fillText("Aflaah Quran Class", textX, y + 15);
+        ctx.fillStyle = C.a;
+        ctx.font = "12px " + fontFamily;
+        ctx.fillText(`${title} · ${counts}`, textX, y + 32);
+        ctx.textAlign = "right";
+        ctx.fillText(today, PW - M, y + 15);
+        ctx.textAlign = "left";
+        y += logoH + 8;
+        ctx.fillStyle = C.e;
+        ctx.fillRect(M, y, contentW, 2);
+        y += 14;
+      } else {
+        ctx.fillStyle = C.a;
+        ctx.font = "11px " + fontFamily;
+        ctx.fillText(single ? `${groups[0].teacher} — Class list` : `Aflaah Quran Class — ${title}`, M, y + 10);
+        y += 24;
+      }
+    };
+
+    const need = (h) => { if (y + h > bottom) newPage(false); };
+
+    const drawTeacherHeading = (g) => {
+      const n = g.classes.length;
+      const count = g.classes.reduce((m, c) => m + studentsOf(c).length, 0);
+      ctx.fillStyle = C.f;
+      ctx.font = "700 14px " + fontFamily;
+      ctx.fillText(fit(g.teacher, contentW - 190), M, y + 16);
+      ctx.fillStyle = C.a;
+      ctx.font = "12px " + fontFamily;
+      ctx.textAlign = "right";
+      ctx.fillText(`${n} class${n === 1 ? "" : "es"} · ${count} student${count === 1 ? "" : "s"}`, PW - M, y + 16);
+      ctx.textAlign = "left";
+      ctx.fillStyle = "#C9DCEE";
+      ctx.fillRect(M, y + 22, contentW, 1);
+      y += TEACHER_H;
+    };
+
+    const drawClassHeader = (c, g, count, continued) => {
+      ctx.fillStyle = "#EAF3FC";
+      ctx.fillRect(M, y, contentW, CLASS_H);
+      ctx.fillStyle = C.f;
+      ctx.font = "700 13px " + fontFamily;
+      const label = `${c.name}${c.code ? `  [${c.code}]` : ""}${continued ? "  (continued)" : ""}`;
+      ctx.fillText(fit(label, contentW - 110), M + 10, y + 16);
+      ctx.textAlign = "right";
+      ctx.font = "700 12px " + fontFamily;
+      ctx.fillText(`${count} student${count === 1 ? "" : "s"}`, PW - M - 10, y + 16);
+      ctx.textAlign = "left";
+      ctx.fillStyle = C.a;
+      ctx.font = "11px " + fontFamily;
+      const sched = formatSchedule({ days: c.days, startTime: c.startTime, endTime: c.endTime });
+      ctx.fillText(fit(`Teacher: ${g.teacher}  ·  ${sched}`, contentW - 20), M + 10, y + 31);
+      y += CLASS_H;
+    };
+
+    const drawColHeader = () => {
+      ctx.fillStyle = C.a;
+      ctx.font = "700 10px " + fontFamily;
+      ["#", "STUDENT ID", "STUDENT NAME", "PHONE"].forEach((h, i) => ctx.fillText(h, colX[i] + 6, y + 15));
+      ctx.fillStyle = "#9DB6CC";
+      ctx.fillRect(M, y + COLHEAD_H - 1, contentW, 1);
+      y += COLHEAD_H;
+    };
+
+    newPage(true);
+    groups.forEach((g) => {
+      if (!single) {
+        need(TEACHER_H + CLASS_H + COLHEAD_H + ROW_H * 2);
+        drawTeacherHeading(g);
+      }
+      g.classes.forEach((c) => {
+        const list = studentsOf(c);
+        need(CLASS_H + COLHEAD_H + ROW_H * Math.min(2, Math.max(list.length, 1)));
+        drawClassHeader(c, g, list.length, false);
+        drawColHeader();
+        if (list.length === 0) {
+          ctx.fillStyle = C.a;
+          ctx.font = "italic 12px " + fontFamily;
+          ctx.fillText("No students in this class.", colX[1] + 6, y + 14);
+          y += ROW_H;
+        }
+        list.forEach((s, i) => {
+          if (y + ROW_H > bottom) {
+            newPage(false);
+            drawClassHeader(c, g, list.length, true);
+            drawColHeader();
+          }
+          ctx.fillStyle = C.m;
+          ctx.font = "12px " + fontFamily;
+          ctx.fillText(String(i + 1), colX[0] + 6, y + 14);
+          ctx.fillText(s.studentCode || "—", colX[1] + 6, y + 14);
+          ctx.fillText(fit(s.name, colW[2] - 12), colX[2] + 6, y + 14);
+          ctx.fillText(fit(s.phone || "—", colW[3] - 12), colX[3] + 6, y + 14);
+          ctx.fillStyle = "#E3ECF4";
+          ctx.fillRect(M, y + ROW_H - 1, contentW, 1);
+          y += ROW_H;
+        });
+        y += 12;
+      });
+      y += 4;
+    });
+
+    // Footer on every page now that the page count is known.
+    pages.forEach((cv, i) => {
+      const fc = cv.getContext("2d");
+      fc.fillStyle = C.a;
+      fc.font = "10px " + fontFamily;
+      fc.textAlign = "center";
+      fc.fillText(`Page ${i + 1} of ${pages.length}`, PW / 2, PH - M / 2 - 2);
+      fc.textAlign = "left";
+    });
+
+    // ---- Assemble a multi-page PDF (one full-page JPEG per page) ----
+    const enc = new TextEncoder();
+    const chunks = [];
+    let offset = 0;
+    const objOffsets = [];
+    const push = (data) => {
+      const bytes = typeof data === "string" ? enc.encode(data) : data;
+      chunks.push(bytes);
+      offset += bytes.length;
+    };
+    const startObj = (num) => { objOffsets[num] = offset; };
+
+    const n = pages.length;
+    const pageObj = (i) => 3 + i * 3;
+    push("%PDF-1.4\n");
+    startObj(1);
+    push("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+    startObj(2);
+    push(`2 0 obj\n<< /Type /Pages /Kids [${pages.map((_, i) => `${pageObj(i)} 0 R`).join(" ")}] /Count ${n} >>\nendobj\n`);
+
+    pages.forEach((cv, i) => {
+      const binary = atob(cv.toDataURL("image/jpeg", 0.92).split(",")[1]);
+      const jpegBytes = new Uint8Array(binary.length);
+      for (let k = 0; k < binary.length; k++) jpegBytes[k] = binary.charCodeAt(k);
+      const pNum = pageObj(i), cNum = pNum + 1, iNum = pNum + 2;
+      startObj(pNum);
+      push(`${pNum} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 ${iNum} 0 R >> >> /Contents ${cNum} 0 R >>\nendobj\n`);
+      const stream = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
+      startObj(cNum);
+      push(`${cNum} 0 obj\n<< /Length ${stream.length} >>\nstream\n${stream}\nendstream\nendobj\n`);
+      startObj(iNum);
+      push(`${iNum} 0 obj\n<< /Type /XObject /Subtype /Image /Width ${cv.width} /Height ${cv.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpegBytes.length} >>\nstream\n`);
+      push(jpegBytes);
+      push("\nendstream\nendobj\n");
+    });
+
+    const objCount = 2 + n * 3;
+    const xrefStart = offset;
+    let xref = `xref\n0 ${objCount + 1}\n0000000000 65535 f \n`;
+    for (let i = 1; i <= objCount; i++) xref += String(objOffsets[i]).padStart(10, "0") + " 00000 n \n";
+    push(xref);
+    push(`trailer\n<< /Size ${objCount + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`);
+
+    const total = chunks.reduce((sum, c) => sum + c.length, 0);
+    const pdfBytes = new Uint8Array(total);
+    let pos = 0;
+    for (const c of chunks) { pdfBytes.set(c, pos); pos += c.length; }
+    const url = URL.createObjectURL(new Blob([pdfBytes], { type: "application/pdf" }));
+    triggerDownload(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  };
+
+  const downloadClassesPDF = (onlyKey) => {
+    const groups = classPdfGroups(onlyKey);
+    if (groups.length === 0) { showToast("No classes to download yet"); return; }
+    const title = onlyKey ? `Class list — ${groups[0].teacher}` : "Class list";
+    const slug = onlyKey ? `-${groups[0].teacher.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "")}` : "";
+    downloadClassListPDF(groups, title, `AQC-Class-list${slug}-${fmtDateStr(new Date())}.pdf`);
+  };
+
   // Builds a printable Hifz exam report: header (student/date/teacher/result),
   // a questions table, and a wrapped Recitation Comments block underneath.
   const buildExamReportCanvas = (exam, teacherLabel) => {
@@ -4983,18 +5230,30 @@ export default function App() {
                                 const sortedClasses = [...g.classes].sort((a, b) => a.name.localeCompare(b.name));
                                 return (
                                   <div key={g.key}>
-                                    <button
-                                      type="button"
-                                      className="tp-accordion-row"
-                                      style={{ marginBottom: 0, flexWrap: "wrap", rowGap: "8px" }}
-                                      aria-expanded={isOpen}
-                                      onClick={() => toggleClassExpand(g.key)}
-                                    >
-                                      <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
-                                      <span className="tp-accordion-title">{g.name}</span>
-                                      <span className="tp-count-badge">{allOfTeacher.length} class{allOfTeacher.length === 1 ? "" : "es"}</span>
-                                      <span className="tp-count-badge">{studentCount} student{studentCount === 1 ? "" : "s"}</span>
-                                    </button>
+                                    <div className="tp-accordion-row" style={{ cursor: "default", marginBottom: 0, flexWrap: "wrap", rowGap: "8px" }}>
+                                      <button
+                                        type="button"
+                                        aria-expanded={isOpen}
+                                        onClick={() => toggleClassExpand(g.key)}
+                                        style={{ display: "flex", alignItems: "center", gap: "14px", flex: "1 1 200px", minWidth: "200px", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", textAlign: "left" }}
+                                      >
+                                        <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
+                                        <span className="tp-accordion-title">{g.name}</span>
+                                        <span className="tp-count-badge">{allOfTeacher.length} class{allOfTeacher.length === 1 ? "" : "es"}</span>
+                                        <span className="tp-count-badge">{studentCount} student{studentCount === 1 ? "" : "s"}</span>
+                                      </button>
+                                      {allOfTeacher.length > 0 && (
+                                        <button
+                                          type="button"
+                                          className="tp-btn-outline"
+                                          style={{ height: "36px", minHeight: "36px", padding: "0 12px", fontSize: "13px", gap: "6px" }}
+                                          onClick={() => downloadClassesPDF(g.key)}
+                                          title={`Download ${g.name}'s classes as PDF`}
+                                        >
+                                          <FileText size={14} aria-hidden="true" /> Download PDF
+                                        </button>
+                                      )}
+                                    </div>
                                     {isOpen && (
                                       <div className="lc-expand-panel" style={{ marginTop: "8px", paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
                                         {sortedClasses.length === 0 ? (
