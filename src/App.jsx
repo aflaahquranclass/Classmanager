@@ -1962,21 +1962,24 @@ export default function App() {
     showToast(`${s.name} removed`);
   };
 
-  const removeStudent = (id) => {
-    saveStudents(students.filter((s) => s.id !== id));
-    // Drop any cached payment entries for this student so a later save for
+  const removeStudents = (ids) => {
+    const gone = new Set(ids);
+    saveStudents(students.filter((s) => !gone.has(s.id)));
+    // Drop any cached payment entries for these students so a later save for
     // someone else doesn't try to upsert a row for a student that's gone
     // (that FK violation used to fail the whole month's batch, not just theirs).
     setPaymentsByMonth((prev) => {
       const next = {};
       Object.entries(prev).forEach(([key, monthMap]) => {
-        if (!monthMap[id]) { next[key] = monthMap; return; }
-        const { [id]: _removed, ...rest } = monthMap;
+        const rest = {};
+        Object.entries(monthMap).forEach(([studentId, rec]) => { if (!gone.has(studentId)) rest[studentId] = rec; });
         next[key] = rest;
       });
       return next;
     });
   };
+
+  const removeStudent = (id) => removeStudents([id]);
 
   // ---- Classes ----
   const resetClassForm = () => {
@@ -2058,11 +2061,19 @@ export default function App() {
     setShowClassForm(true);
   };
 
+  // Removing a class also removes its students: they stop counting as active
+  // and drop out of Finance (their IDs stay reserved in the removed-students record).
   const removeClass = (id) => {
+    const cls = classes.find((c) => c.id === id);
+    const classStudents = students.filter((s) => s.classId === id);
+    const n = classStudents.length;
+    const msg = n > 0
+      ? `Remove class "${cls ? cls.name : ""}"?\n\nIts ${n} student${n === 1 ? "" : "s"} will also be removed from the app and from Finance, including their payment and attendance records. Their IDs stay reserved under "Show removed students".`
+      : `Remove class "${cls ? cls.name : ""}"?`;
+    if (!window.confirm(msg)) return;
     saveClasses(classes.filter((c) => c.id !== id));
-    saveStudents(students.map((s) =>
-      s.classId === id ? { ...s, classId: null, className: "", teacherId: null, schedule: null } : s
-    ));
+    if (classStudents.length > 0) removeStudents(classStudents.map((s) => s.id));
+    showToast(classStudents.length > 0 ? `Class and ${classStudents.length} student${classStudents.length === 1 ? "" : "s"} removed` : "Class removed");
   };
 
   const classLabel = (id) => classes.find((c) => c.id === id)?.name || "No class";
