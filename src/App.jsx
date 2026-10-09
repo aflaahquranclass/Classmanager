@@ -5767,23 +5767,101 @@ export default function App() {
                           <div style={{ color: TP.secondaryText, fontSize: "14px" }}>No students yet. Add one in the Students section.</div>
                         ) : pendingStudents.length === 0 ? (
                           <div className="lc-celebrate" style={{ color: C.d, fontSize: "14px" }}><PartyPopper size={16} aria-hidden="true" />Everyone has paid for this month.</div>
-                        ) : (
-                          <div className="tp-table-wrap"><table className="tp-list-table">
-                            <thead><tr><th>Name</th><th>Class</th><th>Monthly fee</th><th></th></tr></thead>
-                            <tbody>
-                              {pendingStudents.map((s) => (
-                                <tr key={s.id}>
-                                  <td>{s.name}</td>
-                                  <td>{s.className || "—"}</td>
-                                  <td>{fmtMoney(s.fee)}</td>
-                                  <td style={{ textAlign: "right" }}>
-                                    <button className="lc-btn lc-btn-primary" onClick={() => markPaid(s.id, s.fee)}>Mark paid</button>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table></div>
-                        )}
+                        ) : (() => {
+                          // Pending students grouped like the Classes page: teacher → class → students.
+                          const classById = new Map(classes.map((c) => [c.id, c]));
+                          const byTeacher = new Map();
+                          pendingStudents.forEach((s) => {
+                            const cls = s.classId ? classById.get(s.classId) : null;
+                            const tid = (cls ? cls.teacherId : s.teacherId) || null;
+                            const tKey = tid && teachers.some((t) => t.id === tid) ? tid : "none";
+                            if (!byTeacher.has(tKey)) {
+                              byTeacher.set(tKey, { id: tKey, key: `pend-teacher:${tKey}`, name: tKey === "none" ? "Unassigned" : teacherName(tKey), classes: new Map(), count: 0, amount: 0 });
+                            }
+                            const g = byTeacher.get(tKey);
+                            const cKey = cls ? cls.id : "none";
+                            if (!g.classes.has(cKey)) {
+                              g.classes.set(cKey, { key: `pend-class:${tKey}:${cKey}`, name: cls ? cls.name : "No class", code: cls ? (cls.code || classCode(cls.name)) : "", students: [], amount: 0 });
+                            }
+                            const cg = g.classes.get(cKey);
+                            cg.students.push(s);
+                            cg.amount += Number(s.fee) || 0;
+                            g.count += 1;
+                            g.amount += Number(s.fee) || 0;
+                          });
+                          const teacherGroups = [...byTeacher.values()].sort((a, b) =>
+                            a.id === "none" ? 1 : b.id === "none" ? -1 : a.name.localeCompare(b.name)
+                          );
+                          return (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                              {teacherGroups.map((g) => {
+                                const isOpen = expandedClasses.has(g.key);
+                                const classGroups = [...g.classes.values()].sort((a, b) =>
+                                  a.name === "No class" ? 1 : b.name === "No class" ? -1 : a.name.localeCompare(b.name)
+                                );
+                                return (
+                                  <div key={g.key}>
+                                    <button
+                                      type="button"
+                                      className="tp-accordion-row"
+                                      style={{ marginBottom: 0, flexWrap: "wrap", rowGap: "8px" }}
+                                      aria-expanded={isOpen}
+                                      onClick={() => toggleClassExpand(g.key)}
+                                    >
+                                      <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
+                                      <span className="tp-accordion-title">{g.name}</span>
+                                      <span className="tp-count-badge">{g.count} pending</span>
+                                      <span style={{ fontSize: "13px", fontWeight: 600, color: C.b, minWidth: "72px", textAlign: "right" }}>{fmtMoney(g.amount)}</span>
+                                    </button>
+                                    {isOpen && (
+                                      <div className="lc-expand-panel" style={{ marginTop: "8px", paddingLeft: "14px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                                        {classGroups.map((cg) => {
+                                          const cOpen = expandedClasses.has(cg.key);
+                                          const badge = cg.code ? classBadgeStyle(cg.code) : null;
+                                          return (
+                                            <div key={cg.key}>
+                                              <button
+                                                type="button"
+                                                className="tp-accordion-row"
+                                                style={{ marginBottom: 0, flexWrap: "wrap", rowGap: "8px" }}
+                                                aria-expanded={cOpen}
+                                                onClick={() => toggleClassExpand(cg.key)}
+                                              >
+                                                <ChevronRight size={18} className={`tp-accordion-chevron ${cOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
+                                                {badge && <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{cg.code}</span>}
+                                                <span className="tp-accordion-title">{cg.name}</span>
+                                                <span className="tp-count-badge">{cg.students.length} pending</span>
+                                                <span style={{ fontSize: "13px", fontWeight: 600, color: C.b, minWidth: "72px", textAlign: "right" }}>{fmtMoney(cg.amount)}</span>
+                                              </button>
+                                              {cOpen && (
+                                                <div className="lc-expand-panel" style={{ marginTop: "8px", paddingLeft: "8px" }}>
+                                                  <div className="tp-table-wrap"><table className="tp-list-table">
+                                                    <thead><tr><th>Student</th><th>Monthly fee</th><th></th></tr></thead>
+                                                    <tbody>
+                                                      {[...cg.students].sort((a, b) => a.name.localeCompare(b.name)).map((s) => (
+                                                        <tr key={s.id}>
+                                                          <td>{s.name}<div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{s.studentCode}</div></td>
+                                                          <td>{fmtMoney(s.fee)}</td>
+                                                          <td style={{ textAlign: "right" }}>
+                                                            <button className="lc-btn lc-btn-primary" onClick={() => markPaid(s.id, s.fee)}>Mark paid</button>
+                                                          </td>
+                                                        </tr>
+                                                      ))}
+                                                    </tbody>
+                                                  </table></div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </>
                   )}
