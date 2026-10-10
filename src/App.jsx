@@ -5847,11 +5847,12 @@ export default function App() {
                                               {cOpen && (
                                                 <div className="lc-expand-panel" style={{ marginTop: "8px", paddingLeft: "8px" }}>
                                                   <div className="tp-table-wrap"><table className="tp-list-table">
-                                                    <thead><tr><th>Student</th><th>Monthly fee</th><th></th></tr></thead>
+                                                    <thead><tr><th>Student</th><th>Phone</th><th>Monthly fee</th><th></th></tr></thead>
                                                     <tbody>
                                                       {[...cg.students].sort((a, b) => a.name.localeCompare(b.name)).map((s) => (
                                                         <tr key={s.id}>
                                                           <td>{s.name}<div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{s.studentCode}</div></td>
+                                                          <td style={{ whiteSpace: "nowrap" }}>{s.phone || "—"}</td>
                                                           <td>{fmtMoney(s.fee)}</td>
                                                           <td style={{ textAlign: "right" }}>
                                                             <button className="lc-btn lc-btn-primary" onClick={() => markPaid(s.id, s.fee)}>Mark paid</button>
@@ -5953,7 +5954,7 @@ export default function App() {
                               {isOpen && (
                                 <div className="tp-card lc-expand-panel" style={{ marginTop: "8px" }}>
                                   <div className="tp-table-wrap"><table className="tp-list-table">
-                                    <thead><tr><th>Name</th><th>Fee</th><th>Status</th><th>Amount</th><th></th></tr></thead>
+                                    <thead><tr><th>Name</th><th>Phone</th><th>Fee</th><th>Status</th><th>Amount</th><th></th></tr></thead>
                                     <tbody>
                                       {sorted.map((s) => {
                                         const rec = monthData[s.id];
@@ -5961,6 +5962,7 @@ export default function App() {
                                         return (
                                           <tr key={s.id}>
                                             <td>{s.name}</td>
+                                            <td style={{ whiteSpace: "nowrap" }}>{s.phone || "—"}</td>
                                             <td>{fmtMoney(s.fee)}</td>
                                             <td>
                                               <span className={`lc-badge ${paid ? "lc-badge-paid" : "lc-badge-pending"}`}>{paid ? "Paid" : "Pending"}</span>
@@ -6204,6 +6206,7 @@ export default function App() {
                                     onClick={() => { setFinStudentId(s.id); setFinStudentSearch(""); }}
                                   >
                                     <span className="tp-accordion-title">{s.name} <span style={{ fontSize: "11px", fontWeight: 400, color: TP.secondaryText }}>{s.studentCode}</span></span>
+                                    {s.phone && <span style={{ fontSize: "13px", color: TP.secondaryText, whiteSpace: "nowrap" }}>{s.phone}</span>}
                                     <span className="tp-count-badge">{s.className || "No class"}</span>
                                     {isEnrolledInMonth(s, month) && (
                                       <span className={`lc-badge ${sPaid ? "lc-badge-paid" : "lc-badge-pending"}`} style={{ cursor: "inherit" }}>{sPaid ? "Paid" : "Pending"}</span>
@@ -6229,7 +6232,7 @@ export default function App() {
                                 <div style={{ fontSize: "18px", fontWeight: 700, color: TP.navy }}>{selected.name}</div>
                                 <div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{selected.studentCode}</div>
                                 <div style={{ fontSize: "13px", color: TP.secondaryText }}>
-                                  {selected.className || "No class"} · Monthly fee {fmtMoney(selected.fee)}
+                                  {selected.className || "No class"} · Monthly fee {fmtMoney(selected.fee)} · Phone {selected.phone || "—"}
                                 </div>
                               </div>
                               {enrolled && (
