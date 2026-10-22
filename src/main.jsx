@@ -1,10 +1,11 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App.jsx";
+import App, { PORTAL } from "./App.jsx";
+import StudentPortal from "./StudentPortal.jsx";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    {PORTAL === "student" ? <StudentPortal /> : <App />}
   </React.StrictMode>
 );
 

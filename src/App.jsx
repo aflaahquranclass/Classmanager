@@ -31,7 +31,7 @@ const LOGIN_LOGO_ICON_URL = "/images/logo-icon-only.png";
 // Palette for the redesigned Teacher Portal shell (sidebar + "My timetable"
 // page). Kept separate from `C` so the rest of the teacher portal (Attendance,
 // Class records) is unaffected.
-const TP = {
+export const TP = {
   bg: "#EEF6FA",
   navy: "#123B67",
   blue: "#176FD1",
@@ -509,21 +509,23 @@ function CountUp({ value, formatter }) {
 }
 
 // Which portal this web address serves. aqc-teachers.* shows only the teacher
-// login and aqc-admin.* only the admin login; any other address (the original
-// aflaah-app.vercel.app, localhost) keeps both. On localhost, ?portal=teacher|admin
-// lets you try the single-portal modes. This is UX separation only — the real
+// login, aqc-admin.* only the admin login and aqc-students.* the student portal;
+// any other address (the original aflaah-app.vercel.app, localhost) keeps
+// teacher + admin. On localhost, ?portal=teacher|admin|student lets you try the
+// single-portal modes. This is UX separation only — the real
 // access control is the database's row-level security.
 function detectPortal() {
   const host = window.location.hostname;
   if (host === "localhost" || host === "127.0.0.1") {
     const q = new URLSearchParams(window.location.search).get("portal");
-    return q === "teacher" || q === "admin" ? q : null;
+    return q === "teacher" || q === "admin" || q === "student" ? q : null;
   }
+  if (host.startsWith("aqc-students")) return "student";
   if (host.startsWith("aqc-teachers")) return "teacher";
   if (host.startsWith("aqc-admin")) return "admin";
   return null;
 }
-const PORTAL = detectPortal();
+export const PORTAL = detectPortal();
 
 // Unified sign-in screen: Teachers Portal and Admin Portal (or just one of
 // them when this address is dedicated to a single portal).
