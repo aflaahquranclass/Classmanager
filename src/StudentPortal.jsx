@@ -6,6 +6,7 @@ import HifzTracker, { HIFZ_CSS, completedCounts } from "./HifzTracker.jsx";
 import { loadTracker } from "./hifz/service.js";
 import { createSupabaseRepo, createMemoryRepo, createMemoryStore } from "./hifz/repos.js";
 import { countAyahs, TOTAL_AYAHS } from "./hifz/ayahs.js";
+import { StudentExams } from "./exams/ExamUI.jsx";
 
 const TOTAL_SURAHS = 114;
 const TOTAL_JUZ = 30;
@@ -426,6 +427,8 @@ export default function StudentPortal() {
             <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("hifz")}>Set up your Hifz plan</button>
           )}
         </section>
+
+        {!DEMO && <StudentExams />}
 
         <section className="sp-card sp-motivation" aria-label="My motivation">
           <span className="sp-accent" aria-hidden="true" />

@@ -1,6 +1,10 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Users, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
+import { AdminExamScheduler, TeacherScheduledExams, QuestionCard, Passage, examCss } from "./exams/ExamUI.jsx";
+import { examTypeLabel, questionRange } from "./exams/questions.js";
+import { confirmDialog } from "./ConfirmDialog.jsx";
+import { buildPassageReport, canvasToPagedPdf, hasPassages } from "./exams/examReport.js";
 
 const LOGO_DATA_URI = "data:image/png;base64,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";
 const LOGO_WHITE_DATA_URI = "data:image/png;base64,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";
@@ -326,7 +330,7 @@ function uid() {
 // pure CSS positioning — no separate mobile code path — except the dropdown
 // panel switches to a bottom-anchored fixed sheet under 640px so it's always
 // reachable with a thumb instead of getting clipped by the viewport.
-function SearchableSelect({ options, value, onChange, placeholder = "Select…", disabled = false, style, className = "" }) {
+export function SearchableSelect({ options, value, onChange, placeholder = "Select…", disabled = false, style, className = "" }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
@@ -445,6 +449,7 @@ const SURAH_OPTIONS_EN = SURAH_NAMES_EN.map((name, i) => ({ value: name, label: 
 
 const EXAM_QUESTION_TYPES = [
   "Continue recitation",
+  "End of surah → next surah",
   "Recite from memory",
   "Identify next ayah",
   "Tajweed check",
@@ -1218,7 +1223,10 @@ export default function App() {
   const [expandedClasses, setExpandedClasses] = useState(new Set());
 
   // ---- Hifz Exams (teacher portal "Exams" page) ----
-  const [examView, setExamView] = useState("details"); // details | history
+  const [examView, setExamView] = useState("scheduled"); // scheduled | details | history
+  // The admin-scheduled exam being marked (exam_candidates row), if any.
+  const [examCandidate, setExamCandidate] = useState(null);
+  const [scheduledExamsReload, setScheduledExamsReload] = useState(0);
   const [examStudentName, setExamStudentName] = useState("");
   const [examDate, setExamDate] = useState(() => {
     const d = new Date();
@@ -1336,6 +1344,7 @@ export default function App() {
   const [unrecordedDismissingId, setUnrecordedDismissingId] = useState(null);
 
   // ---- Admin Exams (all teachers' Hifz exam reports) ----
+  const [adminExamTab, setAdminExamTab] = useState("schedule"); // schedule | reports
   const [adminExamSearch, setAdminExamSearch] = useState("");
   const [adminExamTeacherId, setAdminExamTeacherId] = useState("");
   const [adminExamResultFilter, setAdminExamResultFilter] = useState("");
@@ -1818,11 +1827,17 @@ export default function App() {
     setExamComments("");
     setExamFinalResult(null);
     setEditingExamId(null);
+    setExamCandidate(null);
   };
 
   // Loads a previously-submitted report back into the form so the teacher can
   // correct it — Submit then updates the same row instead of creating a new one.
-  const startEditExam = (exam) => {
+  const startEditExam = async (exam) => {
+    // A report from an admin-scheduled exam reopens with its question passages.
+    const { data: candidate } = await supabase.from("exam_candidates")
+      .select("*, exam_sessions(title, exam_date, exam_type)").eq("report_id", exam.id).maybeSingle();
+    if (candidate) { startScheduledExam(candidate, exam); return; }
+    resetExamForm();
     setExamStudentName(exam.studentName);
     setExamDate(exam.examDate);
     setExamQuestions(
@@ -1836,9 +1851,49 @@ export default function App() {
     setExamView("details");
   };
 
+  // Fills the exam form from an admin-scheduled exam and its generated
+  // questions. With `report` (the submitted hifz_exams result) it reopens that
+  // result for editing; resubmitting updates the same report.
+  const startScheduledExam = (candidate, report = null) => {
+    resetExamForm();
+    setExamCandidate(candidate);
+    setExamStudentName(candidate.student_name);
+    setExamDate(report?.examDate || candidate.exam_sessions.exam_date);
+    setExamQuestions(candidate.questions.map((g, i) => {
+      // Saved marks are in the same order as the generated questions.
+      const saved = report?.questions[i];
+      const match = saved && (saved.ayahNumber == null || saved.ayahNumber === g.prompt.number) ? saved : null;
+      return {
+        id: i + 1,
+        surah: SURAH_NAMES_EN[g.prompt.surah - 1],
+        ayah: String(g.prompt.ayah),
+        questionType: g.kind === "surah_end" ? "End of surah → next surah" : "Continue recitation",
+        result: match?.result || null, // the teacher marks each one after the student recites it
+        remark: match?.remark || "",
+        mistakes: match?.mistakes || [], // highlighted words, "ayahNumber:wordIndex"
+        generated: g,
+      };
+    }));
+    if (report) {
+      setExamComments(report.comments || "");
+      setExamFinalResult(report.finalResult);
+      setEditingExamId(report.id);
+    }
+    setExamView("details");
+  };
+
+  // "Edit result" on a finished scheduled exam.
+  const editScheduledExam = async (candidate) => {
+    const { data, error } = await supabase.from("hifz_exams").select("*").eq("id", candidate.report_id).maybeSingle();
+    if (error || !data) { showToast("Couldn't open the submitted result. Please try again."); return; }
+    startScheduledExam(candidate, EXAM_FROM_DB(data));
+  };
+
   const submitExam = async () => {
     if (!examStudentName.trim()) { showToast("Enter the student's name."); return; }
     if (!examDate) { showToast("Pick an exam date."); return; }
+    const unmarked = examQuestions.findIndex((q) => !q.result);
+    if (unmarked >= 0) { showToast(`Mark question ${unmarked + 1} as Correct or Not correct.`); return; }
     const missingRemark = examQuestions.find((q) => q.result === "incorrect" && !q.remark.trim());
     if (missingRemark) { showToast("Add a mistake/remark for every question marked Incorrect."); return; }
     if (!examFinalResult) { showToast("Choose a final decision — Pass or Not Passed."); return; }
@@ -1848,17 +1903,23 @@ export default function App() {
         teacher_id: loggedInTeacherId,
         student_name: examStudentName.trim(),
         exam_date: examDate,
-        questions: examQuestions.map(({ id, ...q }) => q),
+        questions: examQuestions.map(({ id, generated, ...q }) => (generated ? { ...q, ayahNumber: generated.prompt.number, range: questionRange(generated) } : q)),
         recitation_comments: examComments.trim() || null,
         final_result: examFinalResult,
       };
-      const { error } = editingExamId
-        ? await supabase.from("hifz_exams").update(payload).eq("id", editingExamId)
-        : await supabase.from("hifz_exams").insert(payload);
+      const { data: saved, error } = editingExamId
+        ? await supabase.from("hifz_exams").update(payload).eq("id", editingExamId).select("id").single()
+        : await supabase.from("hifz_exams").insert(payload).select("id").single();
       if (error) throw error;
-      showToast(editingExamId ? "Exam result updated" : "Exam result submitted");
+      if (examCandidate) {
+        const { error: linkError } = await supabase.rpc("complete_exam_candidate", { p_candidate: examCandidate.id, p_report: saved.id });
+        if (linkError) throw linkError;
+        setScheduledExamsReload((n) => n + 1);
+      }
+      showToast(editingExamId ? "Exam result updated and resubmitted" : "Exam result submitted");
       resetExamForm();
-      setExamView("history");
+      // Scheduled exams go back to the list, where they can be edited again.
+      setExamView(examCandidate ? "scheduled" : "history");
       setExamReportsLoaded(false);
     } catch {
       showToast("Couldn't save the exam. Please try again.");
@@ -1867,6 +1928,7 @@ export default function App() {
   };
 
   const deleteExam = async (examId) => {
+    if (!(await confirmDialog({ title: "Delete this exam report?", message: "The report and its marks are deleted for good.", confirmLabel: "Delete report" }))) return;
     setExamDeletingId(examId);
     try {
       const { error } = await supabase.from("hifz_exams").delete().eq("id", examId);
@@ -1958,8 +2020,12 @@ export default function App() {
   // Remove a student who has left (same as Remove in All students): they stop
   // counting as active and drop out of Finance. Their ID stays reserved in the
   // removed-students record and is never given to anyone else.
-  const removeStudentWhoLeft = (s) => {
-    if (!window.confirm(`Remove ${s.name} (${s.studentCode || "no ID"})?\n\nThey will no longer count as an active student and will be removed from Finance, including their payment and attendance records. Their ID stays reserved under "Show removed students".`)) return;
+  const removeStudentWhoLeft = async (s) => {
+    if (!(await confirmDialog({
+      title: `Remove ${s.name} (${s.studentCode || "no ID"})?`,
+      message: `They will no longer count as an active student and will be removed from Finance, including their payment and attendance records. Their ID stays reserved under "Show removed students".`,
+      confirmLabel: "Remove student",
+    }))) return;
     removeStudent(s.id);
     showToast(`${s.name} removed`);
   };
@@ -2065,14 +2131,14 @@ export default function App() {
 
   // Removing a class also removes its students: they stop counting as active
   // and drop out of Finance (their IDs stay reserved in the removed-students record).
-  const removeClass = (id) => {
+  const removeClass = async (id) => {
     const cls = classes.find((c) => c.id === id);
     const classStudents = students.filter((s) => s.classId === id);
     const n = classStudents.length;
-    const msg = n > 0
-      ? `Remove class "${cls ? cls.name : ""}"?\n\nIts ${n} student${n === 1 ? "" : "s"} will also be removed from the app and from Finance, including their payment and attendance records. Their IDs stay reserved under "Show removed students".`
-      : `Remove class "${cls ? cls.name : ""}"?`;
-    if (!window.confirm(msg)) return;
+    const message = n > 0
+      ? `Its ${n} student${n === 1 ? "" : "s"} will also be removed from the app and from Finance, including their payment and attendance records. Their IDs stay reserved under "Show removed students".`
+      : "";
+    if (!(await confirmDialog({ title: `Remove class "${cls ? cls.name : ""}"?`, message, confirmLabel: "Remove class" }))) return;
     saveClasses(classes.filter((c) => c.id !== id));
     if (classStudents.length > 0) removeStudents(classStudents.map((s) => s.id));
     showToast(classStudents.length > 0 ? `Class and ${classStudents.length} student${classStudents.length === 1 ? "" : "s"} removed` : "Class removed");
@@ -2224,6 +2290,7 @@ export default function App() {
   }, [role, section, adminExamReportsLoaded, adminExamReportsLoading, loadAdminExamReports]);
 
   const deleteAdminExam = async (examId) => {
+    if (!(await confirmDialog({ title: "Delete this exam report?", message: "The report and its marks are deleted for good.", confirmLabel: "Delete report" }))) return;
     setAdminExamDeletingId(examId);
     try {
       const { error } = await supabase.from("hifz_exams").delete().eq("id", examId);
@@ -3128,13 +3195,34 @@ export default function App() {
     return { canvas, width, height };
   };
 
-  const downloadExamReportAsImage = (exam, teacherLabel, filename) => {
-    const { canvas } = buildExamReportCanvas(exam, teacherLabel);
-    downloadCanvasAsImage(canvas, filename);
+  // Reports of admin-scheduled exams show every question's full Quran passage
+  // with the teacher's highlighted mistakes; other reports keep the table layout.
+  const downloadExamReportAsImage = async (exam, teacherLabel, filename) => {
+    if (!hasPassages(exam)) { downloadCanvasAsImage(buildExamReportCanvas(exam, teacherLabel).canvas, filename); return; }
+    try {
+      showToast("Preparing the report…");
+      const { canvas } = await buildPassageReport(exam, teacherLabel, logoImg);
+      downloadCanvasAsImage(canvas, filename);
+    } catch {
+      showToast("Couldn't load the Quran text for the report. Check the internet connection and try again.");
+    }
   };
-  const downloadExamReportAsPDF = (exam, teacherLabel, filename) => {
-    const { canvas, width, height } = buildExamReportCanvas(exam, teacherLabel);
-    downloadCanvasAsPDF(canvas, width, height, filename);
+  const downloadExamReportAsPDF = async (exam, teacherLabel, filename) => {
+    if (!hasPassages(exam)) {
+      const { canvas, width, height } = buildExamReportCanvas(exam, teacherLabel);
+      downloadCanvasAsPDF(canvas, width, height, filename);
+      return;
+    }
+    try {
+      showToast("Preparing the report…");
+      const { canvas, width, height, breaks } = await buildPassageReport(exam, teacherLabel, logoImg);
+      const { blob } = canvasToPagedPdf(canvas, width, height, breaks);
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, filename);
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch {
+      showToast("Couldn't load the Quran text for the report. Check the internet connection and try again.");
+    }
   };
 
   return (
@@ -3341,7 +3429,7 @@ export default function App() {
           navItems={[
             { key: "timetable", label: "My timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
             { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAttendanceView("day"); } },
-            { key: "exams", label: "Exams", icon: FileText, onClick: () => { setSection("exams"); setExamView("details"); } },
+            { key: "exams", label: "Exams", icon: FileText, onClick: () => { setSection("exams"); setExamView("scheduled"); } },
           ]}
           teacherDisplayName={teacherName(loggedInTeacherId)}
           onLogout={() => { setSection("dashboard"); signOutUser(); }}
@@ -4307,6 +4395,14 @@ export default function App() {
                     <div className="tp-segment" role="group" aria-label="Exams view">
                       <button
                         type="button"
+                        aria-pressed={examView === "scheduled"}
+                        className={`tp-segment-btn ${examView === "scheduled" ? "tp-segment-btn-active" : ""}`}
+                        onClick={() => setExamView("scheduled")}
+                      >
+                        Scheduled Exams
+                      </button>
+                      <button
+                        type="button"
                         aria-pressed={examView === "details"}
                         className={`tp-segment-btn ${examView === "details" ? "tp-segment-btn-active" : ""}`}
                         onClick={() => setExamView("details")}
@@ -4323,19 +4419,29 @@ export default function App() {
                       </button>
                     </div>
 
-                    {examView === "details" ? (
+                    {examView === "scheduled" ? (
+                      <TeacherScheduledExams key={scheduledExamsReload} teacherId={loggedInTeacherId} onStart={startScheduledExam} onEdit={editScheduledExam} showToast={showToast} />
+                    ) : examView === "details" ? (
                       <div className="lc-card">
+                        <style>{examCss()}</style>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
-                          <div style={{ fontSize: "18px", fontWeight: 700 }}>{editingExamId ? "Edit Hifz Exam" : "Create Hifz Exam"}</div>
-                          {editingExamId && (
-                            <button type="button" className="lc-btn" onClick={resetExamForm}>Cancel edit</button>
+                          <div style={{ fontSize: "18px", fontWeight: 700 }}>{editingExamId ? "Edit Hifz Exam" : examCandidate ? "Scheduled Hifz Exam" : "Create Hifz Exam"}</div>
+                          {(editingExamId || examCandidate) && (
+                            <button type="button" className="lc-btn" onClick={() => { const back = examCandidate ? "scheduled" : "details"; resetExamForm(); setExamView(back); }}>{examCandidate && !editingExamId ? "Cancel" : "Cancel edit"}</button>
                           )}
                         </div>
+                        {examCandidate && (
+                          <div style={{ background: C.v, border: "1px solid #D3E9F7", borderRadius: "12px", padding: "10px 14px", fontSize: "13px", color: C.f, marginBottom: "16px" }}>
+                            {examCandidate.exam_sessions.title} ({examTypeLabel(examCandidate.exam_sessions.exam_type)}) · {fmtTime12(examCandidate.start_time.slice(0, 5))}
+                            {examCandidate.end_time ? `–${fmtTime12(examCandidate.end_time.slice(0, 5))}` : ""} · Juz {examCandidate.juz.join(", ")}.
+                            {" "}Read out the highlighted ayah of each question; when the student finishes, mark it Correct or Not correct.
+                          </div>
+                        )}
 
                         <div className="lc-form-grid" style={{ marginBottom: "20px" }}>
                           <div>
                             <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Student name</label>
-                            <input className="lc-input" value={examStudentName} onChange={(e) => setExamStudentName(e.target.value)} placeholder="Enter student name" />
+                            <input className="lc-input" value={examStudentName} onChange={(e) => setExamStudentName(e.target.value)} placeholder="Enter student name" readOnly={!!examCandidate} />
                           </div>
                           <div>
                             <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Exam date</label>
@@ -4343,6 +4449,39 @@ export default function App() {
                           </div>
                         </div>
 
+                        {examCandidate ? (
+                          <div>
+                            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "12px" }}>
+                              <div style={{ fontSize: "15px", fontWeight: 700 }}>Questions</div>
+                              <div className="ex-mark-progress">{examQuestions.filter((q) => q.result).length} of {examQuestions.length} marked</div>
+                            </div>
+                            {examQuestions.map((q, i) => {
+                              const remarkMissing = q.result === "incorrect" && !q.remark.trim();
+                              return (
+                                <QuestionCard key={q.id} q={q.generated} index={i} marks={q.mistakes || []} onMarksChange={(update) => setExamQuestions((prev) => prev.map((x) => (x.id === q.id ? { ...x, mistakes: update(x.mistakes || []) } : x)))}>
+                                  <div className="ex-mark">
+                                    <div className="ex-mark-label">After the student finishes — Q{i + 1} result</div>
+                                    <div className="ex-mark-btns" role="group" aria-label={`Question ${i + 1} result`}>
+                                      <button type="button" className="ex-mark-btn ex-mark-correct" aria-pressed={q.result === "correct"} onClick={() => updateExamQuestion(q.id, "result", "correct")}>
+                                        <CheckCircle2 size={18} aria-hidden="true" />Correct
+                                      </button>
+                                      <button type="button" className="ex-mark-btn ex-mark-incorrect" aria-pressed={q.result === "incorrect"} onClick={() => updateExamQuestion(q.id, "result", "incorrect")}>
+                                        <XCircle size={18} aria-hidden="true" />Not correct
+                                      </button>
+                                    </div>
+                                    <input
+                                      className={`lc-input ex-mark-remark ${remarkMissing ? "ex-mark-missing" : ""}`}
+                                      value={q.remark}
+                                      onChange={(e) => updateExamQuestion(q.id, "remark", e.target.value)}
+                                      placeholder={q.result === "incorrect" ? "Required — describe the mistake" : "Remark (optional)"}
+                                      aria-label={`Question ${i + 1} remark`}
+                                    />
+                                  </div>
+                                </QuestionCard>
+                              );
+                            })}
+                          </div>
+                        ) : (<>
                         <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "12px" }}>Hifz Questions</div>
                         <div className="lc-table-wrap">
                           <table className="tp-exam-table">
@@ -4417,6 +4556,7 @@ export default function App() {
                           <Plus size={14} aria-hidden="true" style={{ marginRight: "6px", verticalAlign: "-2px" }} />
                           Add question
                         </button>
+                        </>)}
 
                         <div style={{ marginTop: "24px" }}>
                           <label style={{ fontSize: "14px", fontWeight: 700, display: "block", marginBottom: "8px" }}>Recitation comments</label>
@@ -4552,6 +4692,13 @@ export default function App() {
                                 {(q.surah ?? q.startSurah) || "—"}{(q.ayah ?? q.startAyah) ? `:${q.ayah ?? q.startAyah}` : ""}
                               </div>
                               {q.remark && <div style={{ fontSize: "13px", marginTop: "4px" }}>{q.remark}</div>}
+                              {q.range && q.mistakes?.length > 0 && (
+                                <div style={{ marginTop: "8px" }}>
+                                  <style>{examCss()}</style>
+                                  <span className="ex-mistake-count" style={{ fontSize: "12px" }}>{q.mistakes.length} mistake{q.mistakes.length === 1 ? "" : "s"} highlighted</span>
+                                  <Passage first={q.range[0]} last={q.range[1]} marks={q.mistakes} />
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -6993,6 +7140,20 @@ export default function App() {
               })()}
               {/* ---------------- EXAMS (admin) ---------------- */}
               {section === "exams" && role === "admin" && (() => {
+                const examTabs = (
+                  <div className="tp-segment" role="group" aria-label="Exams view" style={{ margin: 0 }}>
+                    {[["schedule", "Schedule Exams"], ["reports", "Exam Reports"]].map(([key, label]) => (
+                      <button key={key} type="button" aria-pressed={adminExamTab === key}
+                        className={`tp-segment-btn ${adminExamTab === key ? "tp-segment-btn-active" : ""}`}
+                        onClick={() => { setAdminExamTab(key); if (key === "reports") setAdminExamReportsLoaded(false); }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                );
+                if (adminExamTab === "schedule") {
+                  return <AdminExamScheduler students={students} teachers={teachers} showToast={showToast} tabs={examTabs} />;
+                }
                 const q = adminExamSearch.trim().toLowerCase();
                 const filteredExams = adminExamReports
                   .filter((e) => !q || e.studentName.toLowerCase().includes(q))
@@ -7032,6 +7193,7 @@ export default function App() {
                           <div className="tp-subtext" style={{ margin: 0 }}>Hifz exams submitted by every teacher</div>
                         </div>
                       </div>
+                      {examTabs}
                       {adminExamReportsLoading && (
                         <span style={{ fontSize: "13px", color: TP.secondaryText, display: "inline-flex", alignItems: "center" }}>
                           <span className="lc-spinner"></span>Loading…
@@ -7151,6 +7313,13 @@ export default function App() {
                                   {(q.surah ?? q.startSurah) || "—"}{(q.ayah ?? q.startAyah) ? `:${q.ayah ?? q.startAyah}` : ""}
                                 </div>
                                 {q.remark && <div style={{ fontSize: "13px", marginTop: "4px" }}>{q.remark}</div>}
+                              {q.range && q.mistakes?.length > 0 && (
+                                <div style={{ marginTop: "8px" }}>
+                                  <style>{examCss()}</style>
+                                  <span className="ex-mistake-count" style={{ fontSize: "12px" }}>{q.mistakes.length} mistake{q.mistakes.length === 1 ? "" : "s"} highlighted</span>
+                                  <Passage first={q.range[0]} last={q.range[1]} marks={q.mistakes} />
+                                </div>
+                              )}
                               </div>
                             ))}
                           </div>

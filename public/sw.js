@@ -43,8 +43,8 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Built assets (hashed filenames), images and icons: cache first.
-  if (/^\/(assets|images|icons)\//.test(url.pathname)) {
+  // Built assets (hashed filenames), images, icons and fonts: cache first.
+  if (/^\/(assets|images|icons|fonts)\//.test(url.pathname)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
