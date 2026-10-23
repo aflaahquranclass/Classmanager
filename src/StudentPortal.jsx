@@ -1,7 +1,12 @@
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, Mail, Lock } from "lucide-react";
 import { TP } from "./App.jsx";
+import { supabase } from "./supabaseClient.js";
+import HifzTracker, { HIFZ_CSS, completedCounts } from "./HifzTracker.jsx";
+import { loadTracker } from "./hifz/service.js";
+import { createSupabaseRepo, createMemoryRepo, createMemoryStore } from "./hifz/repos.js";
+import { describeAmount } from "./hifz/quran.js";
 
-const TOTAL_AYAAT = 6236;
 const TOTAL_SURAHS = 114;
 const TOTAL_JUZ = 30;
 
@@ -9,22 +14,16 @@ const TOTAL_JUZ = 30;
 const PATTERN_MAIN_URL = "/images/tp-pattern-main.png";
 const PATTERN_ON_BLUE_URL = "/images/tp-pattern-sidebar.png";
 
-// Sample student shown until the portal is connected to a student login and
-// Supabase data. Same shape the real data will need.
-const SAMPLE_STUDENT = {
-  name: "Student Name",
-  studentId: "Student ID",
-  streak: 12,
-  ayaatMemorised: 1372,
-  surahsCompleted: 25,
-  juzCompleted: 15,
-  targetYear: 2030,
-  motivation: "dont give up i can do it",
-  hadith: {
-    text: "It will said to the one who had memorised the quran [ and acted upon it ] : Recite the quran .......",
-    source: "( HADITH )",
-  },
+const MOTIVATION = "dont give up i can do it";
+const HADITH = {
+  text: "It will said to the one who had memorised the quran [ and acted upon it ] : Recite the quran .......",
+  source: "( HADITH )",
 };
+
+// On localhost, ?portal=student&demo=1 runs the portal on in-browser sample
+// storage (no login, nothing saved to the database) for trying the UI.
+const DEMO = ["localhost", "127.0.0.1"].includes(window.location.hostname) && new URLSearchParams(window.location.search).get("demo") === "1";
+const demoStore = createMemoryStore();
 
 // Student wearing a kufi cap, drawn in the brand blue for the profile tile.
 function StudentAvatarIcon({ size = 64 }) {
@@ -40,12 +39,102 @@ function StudentAvatarIcon({ size = 64 }) {
   );
 }
 
-export default function StudentPortal({ student = SAMPLE_STUDENT }) {
-  const percent = Math.round((student.ayaatMemorised / TOTAL_AYAAT) * 100);
+function StudentLogin({ error, onSignIn }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    await onSignIn(email.trim(), password);
+    setBusy(false);
+  };
+  return (
+    <form className="sp-card sp-login" onSubmit={submit} aria-label="Student sign in">
+      <div className="sp-avatar sp-login-avatar"><StudentAvatarIcon /></div>
+      <h1>Student Portal</h1>
+      <p className="hz-muted">Sign in with the login your class gave you.</p>
+      <label className="sp-login-field"><Mail size={18} aria-hidden="true" />
+        <input className="hz-input" type="email" autoComplete="email" placeholder="Email" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      </label>
+      <label className="sp-login-field"><Lock size={18} aria-hidden="true" />
+        <input className="hz-input" type="password" autoComplete="current-password" placeholder="Password" aria-label="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+      </label>
+      {error && <div className="hz-error" role="alert">{error}</div>}
+      <button className="hz-btn hz-btn-primary" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+    </form>
+  );
+}
+
+// Signed-in student → their students row (row-level security only returns their own).
+async function loadStudentForUser(userId) {
+  const { data, error } = await supabase.from("students").select("id, name, student_code").eq("user_id", userId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export default function StudentPortal() {
+  const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode" } } : { status: "loading" });
+  const [loginError, setLoginError] = useState("");
+  const [view, setView] = useState("dashboard");
+  const [summary, setSummary] = useState(null);
+
+  const routeUser = useCallback(async (userId) => {
+    try {
+      const student = await loadStudentForUser(userId);
+      if (!student) {
+        await supabase.auth.signOut();
+        setLoginError("This login isn't linked to a student yet. Ask the admin to link it.");
+        setAuth({ status: "login" });
+        return;
+      }
+      setAuth({ status: "ready", student });
+    } catch (e) {
+      setLoginError(e.message);
+      setAuth({ status: "login" });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (DEMO) return undefined;
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
+      if (session) routeUser(session.user.id);
+      else setAuth({ status: "login" });
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") { setAuth({ status: "login" }); setSummary(null); }
+    });
+    return () => { cancelled = true; sub.subscription.unsubscribe(); };
+  }, [routeUser]);
+
+  const signIn = async (email, password) => {
+    setLoginError("");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { setLoginError("Incorrect email or password."); return; }
+    await routeUser(data.user.id);
+  };
+
+  const student = auth.student;
+  const repo = useMemo(() => {
+    if (!student) return null;
+    return DEMO ? createMemoryRepo(demoStore, student.id) : createSupabaseRepo(supabase, student.id);
+  }, [student]);
+
+  useEffect(() => {
+    if (!repo) return;
+    loadTracker(repo).then(setSummary).catch(() => setSummary(null));
+  }, [repo]);
+
+  const ready = auth.status === "ready";
+  const hasPlan = summary && !summary.needsSetup;
+  const percent = hasPlan ? summary.stats.percent : 0;
+  const counts = hasPlan ? completedCounts(summary.stats.memorizedRanges) : { surahs: 0, juz: 0 };
   const stats = [
-    { label: "Surah’s completed", Icon: BookOpen, value: `${student.surahsCompleted} / ${TOTAL_SURAHS}` },
-    { label: "Juz completed", Icon: Layers, value: `${student.juzCompleted} / ${TOTAL_JUZ}` },
-    { label: "Target Year", Icon: CalendarDays, value: student.targetYear },
+    { label: "Surah’s completed", Icon: BookOpen, value: `${counts.surahs} / ${TOTAL_SURAHS}` },
+    { label: "Juz completed", Icon: Layers, value: `${counts.juz} / ${TOTAL_JUZ}` },
+    { label: "Target Year", Icon: CalendarDays, value: hasPlan ? summary.settings.goalYear : "—" },
   ];
 
   return (
@@ -104,6 +193,22 @@ export default function StudentPortal({ student = SAMPLE_STUDENT }) {
         .sp-hadith p { margin: 0; text-align: center; font-size: clamp(14px, 3.4vw, 18px); line-height: 1.6; color: #0F2F8A; }
         .sp-hadith .sp-hadith-src { margin-top: 12px; font-weight: 700; }
 
+        .sp-wrap-wide { max-width: 920px; }
+        .sp-nav { display: flex; gap: 8px; background: rgba(255,255,255,0.85); border: 1px solid #DCEBF8; border-radius: 16px; padding: 6px; box-shadow: 0 6px 18px rgba(18,59,103,0.06); }
+        .sp-nav button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: none; border-radius: 12px; background: transparent; color: ${TP.navy}; font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; }
+        .sp-nav button[aria-current="page"] { background: linear-gradient(90deg, ${TP.blue}, ${TP.teal}); color: #FFFFFF; box-shadow: 0 6px 14px rgba(23,111,209,0.25); }
+        .sp-nav .sp-nav-out { flex: 0 0 auto; padding: 0 12px; color: ${TP.secondaryText}; }
+        .sp-nav button:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
+        .sp-setup-btn { margin-top: 14px; width: 100%; }
+        .sp-login { max-width: 420px; width: 100%; margin: 8vh auto 0; padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; text-align: center; box-sizing: border-box; }
+        .sp-login h1 { margin: 0; font-size: 26px; color: #0F2F8A; }
+        .sp-login p { margin: 0; }
+        .sp-login-avatar { margin: 0 auto; background: linear-gradient(135deg, #E4F1FC, #FFFFFF); width: 92px; }
+        .sp-login-field { position: relative; display: flex; align-items: center; }
+        .sp-login-field svg { position: absolute; left: 14px; color: #8FADC0; pointer-events: none; }
+        .sp-login-field .hz-input { padding-left: 42px; }
+        ${HIFZ_CSS}
+
         @media (max-width: 420px) {
           .sp-header { gap: 10px; padding: 12px; }
           .sp-divider { display: none; }
@@ -118,18 +223,21 @@ export default function StudentPortal({ student = SAMPLE_STUDENT }) {
 
       <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-top" alt="" aria-hidden="true" />
       <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-bottom" alt="" aria-hidden="true" />
-      <main className="sp-wrap">
+      {auth.status === "loading" && <main className="sp-wrap"><div className="hz-card hz-muted">Loading…</div></main>}
+      {auth.status === "login" && <main className="sp-wrap"><StudentLogin error={loginError} onSignIn={signIn} /></main>}
+      {ready && (
+      <main className={`sp-wrap ${view === "hifz" ? "sp-wrap-wide" : ""}`}>
         <section className="sp-card sp-grad sp-header" aria-label="Student profile">
           <img src={PATTERN_ON_BLUE_URL} className="sp-blue-pattern" alt="" aria-hidden="true" />
           <div className="sp-avatar"><StudentAvatarIcon /></div>
           <div className="sp-ident">
             <div className="sp-name">{student.name}</div>
-            <div className="sp-id">{student.studentId}</div>
+            <div className="sp-id">{student.student_code}</div>
           </div>
           <div className="sp-divider" aria-hidden="true" />
           <div className="sp-streak-box">
             <span>Streak</span>
-            <strong>{student.streak}</strong>
+            <strong>{hasPlan ? summary.streak.current : 0}</strong>
           </div>
           <div className="sp-flame" aria-hidden="true">
             <Flame strokeWidth={1.8} />
@@ -137,6 +245,15 @@ export default function StudentPortal({ student = SAMPLE_STUDENT }) {
           </div>
         </section>
 
+        <nav className="sp-nav" aria-label="Student portal">
+          <button aria-current={view === "dashboard" ? "page" : undefined} onClick={() => setView("dashboard")}><LayoutDashboard size={18} aria-hidden="true" />Dashboard</button>
+          <button aria-current={view === "hifz" ? "page" : undefined} onClick={() => setView("hifz")}><BookOpenText size={18} aria-hidden="true" />Hifz Tracker</button>
+          {!DEMO && <button className="sp-nav-out" onClick={() => supabase.auth.signOut()} aria-label="Sign out"><LogOut size={18} aria-hidden="true" /></button>}
+        </nav>
+
+        {view === "hifz" && <HifzTracker repo={repo} onSummary={setSummary} />}
+
+        {view === "dashboard" && <>
         <section className="sp-card sp-tracker" aria-label="Hifz progress">
           <div className="sp-tracker-head">
             <BookOpenText size={44} color="#1452A8" strokeWidth={1.8} aria-hidden="true" />
@@ -147,14 +264,17 @@ export default function StudentPortal({ student = SAMPLE_STUDENT }) {
             <div className="sp-bar-fill" style={{ width: `${percent}%` }} />
           </div>
           <div className="sp-tracker-foot">
-            <span>{student.ayaatMemorised} / {TOTAL_AYAAT} ayaat</span>
+            <span>{hasPlan ? describeAmount(summary.stats.memorizedUnits) : "0 pages"} / 604 pages</span>
             <span>{percent}% completed</span>
           </div>
+          {summary?.needsSetup && (
+            <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("hifz")}>Set up your Hifz plan</button>
+          )}
         </section>
 
         <section className="sp-card sp-motivation" aria-label="My motivation">
           <span className="sp-accent" aria-hidden="true" />
-          <p>{student.motivation}</p>
+          <p>{MOTIVATION}</p>
         </section>
 
         <section className="sp-stats" aria-label="Progress summary">
@@ -173,10 +293,12 @@ export default function StudentPortal({ student = SAMPLE_STUDENT }) {
         <section className="sp-card sp-hadith" aria-label="Hadith">
           <span className="sp-accent" aria-hidden="true" />
           <h3>Hadith</h3>
-          <p>{student.hadith.text}</p>
-          <p className="sp-hadith-src">{student.hadith.source}</p>
+          <p>{HADITH.text}</p>
+          <p className="sp-hadith-src">{HADITH.source}</p>
         </section>
+        </>}
       </main>
+      )}
     </div>
   );
 }
