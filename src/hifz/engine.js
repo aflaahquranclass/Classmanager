@@ -150,6 +150,7 @@ export function backlogAfter(row) {
 }
 
 // Revision order: Short follows the memorization path, Long follows the Mushaf.
+// (Short only ever uses the newest end of this order; see latestPortion.)
 function revisionOrder(activity, settings, rows) {
   if (activity === "short") return intersect(newHifzSequence(settings), memorizedNew(settings, rows));
   return memorizedAll(settings, rows);
@@ -198,6 +199,14 @@ function takeRevision(order, cursor, cycle, n, exclude) {
   return { taken, cursorAfter: lastRange ? lastRange[1] : cursor, cycleAfter: newCycle };
 }
 
+// Short Muraja'ah: the student's most recently memorized n units on their
+// New Hifz path (skipping units already assigned today), in reading order.
+function latestPortion(order, n, exclude) {
+  const available = subtract(order, exclude);
+  const total = unitsOf(available);
+  return slice(available, Math.max(0, total - n), total);
+}
+
 // ---------- daily plan ----------
 
 // Build one activity's assignment for planDate from the rows of earlier days.
@@ -223,6 +232,10 @@ export function planDay({ activity, settings, priorRows, planDate, now }) {
   if (activity === "new") {
     const available = subtract(newHifzSequence(settings), union(memAll, pendingIn));
     [fresh] = takeFirst(available, room);
+  } else if (activity === "short") {
+    // Revise the latest pages memorized before today, so the window moves
+    // forward as New Hifz is completed.
+    fresh = room > 0 ? latestPortion(revisionOrder("short", settings, prior), room, pendingIn) : [];
   } else {
     const { cursor, cycle } = revisionCursor(activity, settings, last);
     const order = revisionOrder(activity, settings, prior);
@@ -295,15 +308,15 @@ export function computeStats(settings, rows, today) {
   const onTrack = seqRemaining === 0 || settings.newTarget >= neededPerDay;
   const recommended = onTrack ? null : NEW_TARGET_OPTIONS.find((o) => o.units >= neededPerDay) || null;
 
-  const revision = {};
-  for (const activity of ["short", "long"]) {
-    const order = revisionOrder(activity, settings, rows);
-    const total = unitsOf(order);
-    const last = rows.filter((r) => r.activity === activity).sort((a, b) => (a.planDate < b.planDate ? -1 : 1)).pop();
-    const { cursor, cycle } = revisionCursor(activity, settings, last);
-    const pos = total ? cursorPosition(order, cursor) : 0;
-    revision[activity] = { eligibleUnits: total, position: cursor, cycle, cycleProgress: total ? pos / total : 0 };
-  }
+  const shortOrder = revisionOrder("short", settings, rows);
+  const longOrder = revisionOrder("long", settings, rows);
+  const lastLong = rows.filter((r) => r.activity === "long").sort((a, b) => (a.planDate < b.planDate ? -1 : 1)).pop();
+  const { cursor, cycle } = revisionCursor("long", settings, lastLong);
+  const longTotal = unitsOf(longOrder);
+  const revision = {
+    short: { eligibleUnits: unitsOf(shortOrder), latest: toSet(latestPortion(shortOrder, settings.shortTarget, [])) },
+    long: { eligibleUnits: longTotal, position: cursor, cycle, cycleProgress: longTotal ? cursorPosition(longOrder, cursor) / longTotal : 0 },
+  };
 
   return {
     memorizedRanges: memAll,

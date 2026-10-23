@@ -4,6 +4,7 @@ import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, juzOfPage, surahsOnPages, describeRange, describeUnit, describeAmount } from "./hifz/quran.js";
 import { NEW_TARGET_OPTIONS, SHORT_TARGET_OPTIONS, unitsOf, intersect, subtract, toSet, goalCheck, validateSettings, localDate } from "./hifz/engine.js";
 import { loadTracker, recordProgress, saveSettings, previewSettingsChange } from "./hifz/service.js";
+import { describeAyahRange, nearestAyahs } from "./hifz/ayahs.js";
 
 const ACTIVITY_INFO = {
   new: { title: "New Hifz", Icon: BookOpenText },
@@ -17,7 +18,11 @@ const pagesOfSurah = (num) => {
   const i = num - 1;
   return Array.from({ length: surahEndPage(i) - SURAHS[i].startPage + 1 }, (_, k) => SURAHS[i].startPage + k);
 };
-const surahNames = ([s, e]) => surahsOnPages(unitToPage(s), unitToPage(e - 1)).map((x) => x.name).join(", ");
+// Surahs in a range, from the ayah data (accurate even when a surah starts mid-page).
+const surahNames = (range) => {
+  const { first, last } = nearestAyahs(range);
+  return SURAHS.slice(first.surah - 1, last.surah).map((x) => x.name).join(", ");
+};
 
 // Surahs / juz whose pages are all memorized (page-level approximation).
 export function completedCounts(memorizedRanges) {
@@ -58,6 +63,7 @@ export const HIFZ_CSS = `
   .hz-badge-empty { background: #EEF0F3; color: #5B6B79; }
   .hz-portion { font-size: 15px; color: ${TP.navy}; font-weight: 600; }
   .hz-portion small { display: block; font-weight: 400; color: ${TP.secondaryText}; font-size: 13px; }
+  .hz-portion .hz-ayah { color: ${TP.blue}; font-weight: 600; }
   .hz-carry { font-size: 12px; font-weight: 700; color: #9C6B12; background: #FCF1DD; border-radius: 6px; padding: 1px 6px; margin-left: 6px; }
   .hz-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 12px; border: none; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer; }
   .hz-btn:disabled { opacity: 0.55; cursor: default; }
@@ -102,9 +108,63 @@ export const HIFZ_CSS = `
   .hz-modal-back { position: fixed; inset: 0; background: rgba(13,40,70,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; }
   .hz-modal { background: #FFFFFF; border-radius: 18px; padding: 22px; max-width: 460px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.25); }
   .hz-modal ul { padding-left: 18px; color: ${TP.navy}; font-size: 14px; line-height: 1.5; }
+
+  /* ---------- animations ---------- */
+  @keyframes hz-rise { from { opacity: 0; transform: translateY(16px) scale(0.98); } to { opacity: 1; transform: none; } }
+  @keyframes hz-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  @keyframes hz-done { 0% { transform: scale(1); } 35% { transform: scale(1.035); box-shadow: 0 0 0 8px rgba(30,138,90,0.15); } 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(30,138,90,0); } }
+  @keyframes hz-check { 0% { transform: scale(0) rotate(-45deg); } 60% { transform: scale(1.25) rotate(8deg); } 100% { transform: scale(1) rotate(0); } }
+  @keyframes hz-cell { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: none; } }
+  @keyframes hz-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(23,111,209,0.35); } 50% { box-shadow: 0 0 0 5px rgba(23,111,209,0); } }
+  @keyframes hz-slide { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+
+  .hz > * { animation: hz-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .hz > *:nth-child(2) { animation-delay: 0.08s; }
+  .hz > *:nth-child(3) { animation-delay: 0.16s; }
+  .hz > *:nth-child(4) { animation-delay: 0.24s; }
+  .hz > *:nth-child(5) { animation-delay: 0.32s; }
+  .hz > *:nth-child(6) { animation-delay: 0.4s; }
+  .hz-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+  .hz > .hz-card:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(18,59,103,0.13); }
+
+  .hz-task { animation: hz-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.3s, background 0.3s; }
+  .hz-task:nth-child(1) { animation-delay: 0.2s; }
+  .hz-task:nth-child(2) { animation-delay: 0.3s; }
+  .hz-task:nth-child(3) { animation-delay: 0.4s; }
+  .hz-task:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(23,111,209,0.16); }
+  .hz-task-icon { transition: transform 0.3s ease, background 0.3s; }
+  .hz-task:hover .hz-task-icon { transform: rotate(-8deg) scale(1.08); }
+  .hz-task-done { animation: hz-done 0.7s ease both; }
+  .hz-task-done .hz-task-icon svg { animation: hz-check 0.55s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+  .hz-badge { transition: background 0.3s, color 0.3s; animation: hz-cell 0.35s ease both; }
+  .hz-btn { transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s; }
+  .hz-btn:not(:disabled):hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .hz-btn:not(:disabled):active { transform: scale(0.97); }
+  .hz-option, .hz-chip { transition: transform 0.15s ease, background 0.2s, color 0.2s, box-shadow 0.2s; }
+  .hz-option:hover, .hz-chip:hover { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(23,111,209,0.14); }
+
+  .hz-bar > div { transform-origin: left center; animation: hz-grow 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.3s both; }
+  .hz-cal div { animation: hz-cell 0.35s ease both; }
+  .hz-cal div:nth-child(7n+1) { animation-delay: 0.05s; } .hz-cal div:nth-child(7n+2) { animation-delay: 0.1s; }
+  .hz-cal div:nth-child(7n+3) { animation-delay: 0.15s; } .hz-cal div:nth-child(7n+4) { animation-delay: 0.2s; }
+  .hz-cal div:nth-child(7n+5) { animation-delay: 0.25s; } .hz-cal div:nth-child(7n+6) { animation-delay: 0.3s; }
+  .hz-cal div:nth-child(7n) { animation-delay: 0.35s; }
+  .hz-cal .on.today { animation: hz-cell 0.35s ease both, hz-glow 2s ease-in-out 0.6s infinite; }
+  .hz-streak div, .hz-kv div, .hz-rev > div { transition: transform 0.2s ease; }
+  .hz-streak div:hover, .hz-kv div:hover, .hz-rev > div:hover { transform: translateY(-2px); }
+  .hz-wiz-body { animation: hz-slide 0.35s ease both; }
+  .hz-note { animation: hz-rise 0.4s ease both; }
+  .hz-modal { animation: hz-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hz *, .hz *::before, .hz *::after { animation: none !important; transition: none !important; }
+  }
+  @media (max-width: 520px) {
+    .hz-grid3 { grid-template-columns: 1fr 1fr; }
+    .hz-grid3 > :first-child { grid-column: 1 / -1; }
+  }
   @media (max-width: 420px) {
     .hz-card { padding: 16px; }
-    .hz-grid3 { grid-template-columns: 1fr; }
     .hz-kv { grid-template-columns: 1fr 1fr; }
   }
 `;
@@ -209,6 +269,7 @@ export function SetupWizard({ repo, initial, onDone, onCancel }) {
         {steps.map((name, i) => <span key={name} className={i <= step ? "on" : ""} />)}
       </div>
 
+      <div key={step} className="hz-wiz-body">
       {step === 0 && (
         <>
           <p className="hz-q">By which year do you want to complete memorizing the Quran?</p>
@@ -271,7 +332,7 @@ export function SetupWizard({ repo, initial, onDone, onCancel }) {
               <button key={o.units} className="hz-option" aria-pressed={s.shortTarget === o.units} onClick={() => set({ shortTarget: o.units })}>{o.label}</button>
             ))}
           </div>
-          <p className="hz-muted" style={{ marginTop: 12 }}>Short Muraja'ah goes through what you've memorized on your Hifz path, in order, and starts again from the beginning when it reaches the end. New pages are added as you memorize them.</p>
+          <p className="hz-muted" style={{ marginTop: 12 }}>Each day you revise your most recently memorized pages, up to this amount. As you memorize new pages, they join this revision and older ones drop off. Long Muraja'ah goes through everything you've memorized over a longer cycle.</p>
         </>
       )}
 
@@ -302,6 +363,8 @@ export function SetupWizard({ repo, initial, onDone, onCancel }) {
           </div>
         </>
       )}
+
+      </div>
 
       {error && <div className="hz-error" style={{ marginTop: 14 }} role="alert">{error}</div>}
 
@@ -357,6 +420,7 @@ function TaskCard({ activity, row, onProgress, busy }) {
             <div key={r.join("-")} className="hz-portion">
               {describeRange(r)}{isCarried(r) && <span className="hz-carry">Carried over</span>}
               <small>{surahNames(r)}</small>
+              {activity !== "long" && <small className="hz-ayah">Ayah {describeAyahRange(r)}</small>}
             </div>
           ))}
           <div className="hz-muted">Daily target: {describeAmount(row.target)} · Done: {describeAmount(done)} of {describeAmount(total)}</div>
@@ -506,11 +570,19 @@ export default function HifzTracker({ repo, onSummary }) {
       <section className="hz-card" aria-label="Revision tracking">
         <h2 className="hz-h2"><RotateCw size={22} aria-hidden="true" />Revision Tracking</h2>
         <div className="hz-rev">
-          {["short", "long"].map((a) => {
-            const r = stats.revision[a];
+          <div>
+            <strong style={{ color: TP.navy }}>{ACTIVITY_INFO.short.title}</strong>
+            <span className="hz-muted">Your latest {describeAmount(state.settings.shortTarget)}, revised every day</span>
+            <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${stats.revision.short.eligibleUnits ? Math.min(100, (unitsOf(stats.revision.short.latest) / state.settings.shortTarget) * 100) : 0}%` }} /></div>
+            <span className="hz-muted">
+              {stats.revision.short.latest.length ? <>Latest pages: {stats.revision.short.latest.map(describeRange).join(", ")}</> : "Nothing memorized for this revision yet"}
+            </span>
+          </div>
+          {(() => {
+            const r = stats.revision.long;
             return (
-              <div key={a}>
-                <strong style={{ color: TP.navy }}>{ACTIVITY_INFO[a].title}</strong>
+              <div>
+                <strong style={{ color: TP.navy }}>{ACTIVITY_INFO.long.title}</strong>
                 <span className="hz-muted">Cycle {r.cycle} · {Math.round(r.cycleProgress * 100)}% through</span>
                 <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${r.cycleProgress * 100}%` }} /></div>
                 <span className="hz-muted">
@@ -518,7 +590,7 @@ export default function HifzTracker({ repo, onSummary }) {
                 </span>
               </div>
             );
-          })}
+          })()}
         </div>
       </section>
     </div>

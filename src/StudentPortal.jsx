@@ -5,7 +5,7 @@ import { supabase } from "./supabaseClient.js";
 import HifzTracker, { HIFZ_CSS, completedCounts } from "./HifzTracker.jsx";
 import { loadTracker } from "./hifz/service.js";
 import { createSupabaseRepo, createMemoryRepo, createMemoryStore } from "./hifz/repos.js";
-import { describeAmount } from "./hifz/quran.js";
+import { countAyahs, TOTAL_AYAHS } from "./hifz/ayahs.js";
 
 const TOTAL_SURAHS = 114;
 const TOTAL_JUZ = 30;
@@ -24,6 +24,85 @@ const HADITH = {
 // storage (no login, nothing saved to the database) for trying the UI.
 const DEMO = ["localhost", "127.0.0.1"].includes(window.location.hostname) && new URLSearchParams(window.location.search).get("demo") === "1";
 const demoStore = createMemoryStore();
+
+// Counts a number up from 0 (eases out). Shows the final value straight away
+// when the viewer prefers reduced motion.
+export function CountUp({ value, duration = 900 }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !Number.isFinite(value)) { setShown(value); return undefined; }
+    let raf;
+    const start = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - start) / duration);
+      setShown(value * (1 - Math.pow(1 - p, 3)));
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+  return <>{Number.isInteger(value) ? Math.round(shown) : Math.round(shown * 10) / 10}</>;
+}
+
+// Mushaf that opens, turns three pages and closes again (animation in the
+// .sp-book* styles). Drawn around a spine at x = 32: closed, the book sits on
+// the right of the spine and is shifted left to stay centred.
+function QuranIcon() {
+  const lines = (x) => <path d={`M${x} 11h18M${x} 15h18M${x} 19h18M${x} 23h18M${x} 27h18M${x} 31h12`} stroke="#D9C79C" strokeWidth="0.7" />;
+  return (
+    <svg viewBox="0 0 64 46" aria-hidden="true">
+      <defs>
+        <linearGradient id="sp-quran-cover" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={TP.gradStart} />
+          <stop offset="0.6" stopColor={TP.blue} />
+          <stop offset="1" stopColor={TP.gradEnd} />
+        </linearGradient>
+        {/* turning page: shaded at the spine, light at the outer edge */}
+        <linearGradient id="sp-quran-page" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#E9D9AE" />
+          <stop offset="0.35" stopColor="#FFF9EA" />
+          <stop offset="1" stopColor="#FFFFFF" />
+        </linearGradient>
+        <clipPath id="sp-quran-clip"><rect x="32" y="2" width="28" height="38" rx="3" /></clipPath>
+      </defs>
+      <g className="sp-book">
+        <ellipse cx="32" cy="44" rx="16" ry="1.8" fill={TP.navy} opacity="0.25" />
+        {/* right-hand pages (always underneath) */}
+        <rect x="32" y="4" width="27" height="37" rx="2.5" fill="#FFF8E7" stroke="#E2CFA0" strokeWidth="0.8" />
+        {lines(37)}
+        {/* cover: blue front, cream inside once it has turned over */}
+        <g className="sp-book-turn sp-book-cover">
+          <g className="sp-book-front">
+            <rect x="32" y="2" width="28" height="38" rx="3" fill="url(#sp-quran-cover)" />
+            <rect x="32" y="2" width="4.5" height="38" fill={TP.navy} opacity="0.35" />
+            <rect x="39" y="7" width="16.5" height="28" rx="2" fill="none" stroke="#E9C46A" strokeWidth="1.2" />
+            <g transform="translate(47.3 21)" fill="none" stroke="#F3D27A" strokeWidth="1.2" strokeLinejoin="round">
+              <rect x="-4.2" y="-4.2" width="8.4" height="8.4" />
+              <rect x="-4.2" y="-4.2" width="8.4" height="8.4" transform="rotate(45)" />
+              <circle r="1.5" fill="#F3D27A" stroke="none" />
+            </g>
+            <g clipPath="url(#sp-quran-clip)">
+              <rect className="sp-quran-shine" x="32" y="0" width="7" height="46" fill="#FFFFFF" opacity="0.35" />
+            </g>
+          </g>
+          <g className="sp-book-inside">
+            <rect x="32" y="2" width="28" height="38" rx="3" fill="#FFFDF5" stroke="#E2CFA0" strokeWidth="0.8" />
+            {lines(37)}
+          </g>
+        </g>
+        {/* pages that turn from right to left */}
+        {[1, 2, 3].map((n) => (
+          <g key={n} className={`sp-book-turn sp-book-page sp-book-page-${n}`}>
+            <rect x="32" y="4.5" width="26" height="36" rx="2" fill="url(#sp-quran-page)" stroke="#CDB57E" strokeWidth="0.8" />
+            {lines(36)}
+          </g>
+        ))}
+        <path d="M32 3v38" stroke="#C9B27E" strokeWidth="0.9" />
+      </g>
+    </svg>
+  );
+}
 
 // Student wearing a kufi cap, drawn in the brand blue for the profile tile.
 function StudentAvatarIcon({ size = 64 }) {
@@ -129,11 +208,13 @@ export default function StudentPortal() {
 
   const ready = auth.status === "ready";
   const hasPlan = summary && !summary.needsSetup;
-  const percent = hasPlan ? summary.stats.percent : 0;
+  // Dashboard progress is measured in ayahs (out of 6236), not pages.
+  const ayahsMemorized = hasPlan ? countAyahs(summary.stats.memorizedRanges) : 0;
+  const percent = Math.floor((ayahsMemorized / TOTAL_AYAHS) * 1000) / 10;
   const counts = hasPlan ? completedCounts(summary.stats.memorizedRanges) : { surahs: 0, juz: 0 };
   const stats = [
-    { label: "Surah’s completed", Icon: BookOpen, value: `${counts.surahs} / ${TOTAL_SURAHS}` },
-    { label: "Juz completed", Icon: Layers, value: `${counts.juz} / ${TOTAL_JUZ}` },
+    { label: "Surah’s completed", Icon: BookOpen, value: <><CountUp value={counts.surahs} /> / {TOTAL_SURAHS}</> },
+    { label: "Juz completed", Icon: Layers, value: <><CountUp value={counts.juz} /> / {TOTAL_JUZ}</> },
     { label: "Target Year", Icon: CalendarDays, value: hasPlan ? summary.settings.goalYear : "—" },
   ];
 
@@ -159,7 +240,7 @@ export default function StudentPortal() {
         .sp-avatar { flex-shrink: 0; width: clamp(76px, 20vw, 118px); aspect-ratio: 1; border-radius: 18px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
         .sp-avatar svg { width: 62%; height: 62%; }
         .sp-ident { flex: 1 1 auto; min-width: 0; }
-        .sp-name { font-size: clamp(19px, 4.6vw, 28px); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+        .sp-name { font-size: clamp(18px, 4.6vw, 28px); font-weight: 700; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; }
         .sp-id { font-size: clamp(14px, 3.4vw, 20px); opacity: 0.9; margin-top: 6px; }
         .sp-divider { align-self: stretch; width: 1px; margin: 14px 0; background: rgba(255,255,255,0.45); flex-shrink: 0; }
         .sp-streak-box { flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.85); border-radius: 12px; padding: 8px 14px; text-align: center; }
@@ -172,7 +253,10 @@ export default function StudentPortal() {
         .sp-tracker-head { display: flex; align-items: center; gap: 14px; }
         .sp-tracker-head h2 { flex: 1; margin: 0; font-size: clamp(17px, 4vw, 24px); font-weight: 700; color: #0F2F8A; }
         .sp-tracker-head .sp-pct { font-size: clamp(22px, 5vw, 30px); font-weight: 700; color: #1452A8; }
-        .sp-bar { height: 30px; border-radius: 999px; background: #E3EAF1; margin: 18px 0 14px; overflow: hidden; }
+        .sp-bar-wrap { position: relative; margin: 22px 0 18px; }
+        .sp-bar { height: 30px; border-radius: 999px; background: #E3EAF1; overflow: hidden; }
+        .sp-bar-icon { position: absolute; top: 50%; width: 60px; height: 44px; display: block; transform: translate(-50%, -50%); z-index: 1; pointer-events: none; }
+        .sp-bar-icon svg { display: block; width: 100%; height: 100%; overflow: visible; }
         .sp-bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, ${TP.gradStart} 0%, ${TP.blue} 45%, #22D3E0 100%); transition: width 0.8s ease; }
         .sp-tracker-foot { display: flex; justify-content: space-between; gap: 12px; font-size: clamp(13px, 3.2vw, 18px); color: #1452A8; }
 
@@ -208,10 +292,75 @@ export default function StudentPortal() {
         .sp-login-field svg { position: absolute; left: 14px; color: #8FADC0; pointer-events: none; }
         .sp-login-field .hz-input { padding-left: 42px; }
         ${HIFZ_CSS}
+        /* ---------- animations ---------- */
+        @keyframes sp-rise { from { opacity: 0; transform: translateY(18px) scale(0.98); } to { opacity: 1; transform: none; } }
+        @keyframes sp-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(260%) skewX(-18deg); } }
+        @keyframes sp-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); } 25% { transform: scale(1.08, 1.12) rotate(2deg); } 50% { transform: scale(0.96, 1.04) rotate(-1deg); } 75% { transform: scale(1.06) rotate(1.5deg); } }
+        @keyframes sp-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
+        @keyframes sp-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @keyframes sp-accent { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
-        @media (max-width: 420px) {
+        .sp-wrap > * { animation: sp-rise 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .sp-wrap > *:nth-child(2) { animation-delay: 0.07s; }
+        .sp-wrap > *:nth-child(3) { animation-delay: 0.14s; }
+        .sp-wrap > *:nth-child(4) { animation-delay: 0.21s; }
+        .sp-wrap > *:nth-child(5) { animation-delay: 0.28s; }
+        .sp-wrap > *:nth-child(6) { animation-delay: 0.35s; }
+        .sp-wrap > *:nth-child(7) { animation-delay: 0.42s; }
+        .sp-stats { animation: none !important; }
+        .sp-stat { animation: sp-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .sp-stat:nth-child(1) { animation-delay: 0.3s; }
+        .sp-stat:nth-child(2) { animation-delay: 0.4s; }
+        .sp-stat:nth-child(3) { animation-delay: 0.5s; }
+
+        .sp-card, .sp-stat { transition: transform 0.25s ease, box-shadow 0.25s ease; }
+        .sp-card:not(.sp-login):hover, .sp-stat:hover { transform: translateY(-4px); box-shadow: 0 18px 38px rgba(13,79,133,0.18); }
+        .sp-stat:hover .sp-stat-value svg { animation: sp-float 1.2s ease-in-out infinite; }
+
+        .sp-header::before, .sp-stat::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 35%; pointer-events: none; z-index: 2;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent); animation: sp-shine 5s ease-in-out 1s infinite; }
+        .sp-stat::before { animation-duration: 6s; animation-delay: 1.6s; }
+        .sp-flame svg { animation: sp-flicker 1.8s ease-in-out infinite; transform-origin: 50% 90%; filter: drop-shadow(0 0 6px rgba(255,200,120,0.55)); }
+        .sp-pop { animation: sp-pop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+        .sp-avatar { transition: transform 0.3s ease; }
+        .sp-header:hover .sp-avatar { transform: rotate(-4deg) scale(1.04); }
+
+        /* Quran icon riding at the end of the progress bar */
+        /* Book icon: closed → cover opens → three pages turn → rests open → closes. 6s loop.
+           Cover and pages turn around the spine (x = 32) by flipping scaleX through 0. */
+        @keyframes sp-quran-float { 0%, 100% { transform: translate(-50%, -50%); } 50% { transform: translate(-50%, calc(-50% - 3px)); } }
+        @keyframes sp-book-shift { 0%, 12% { transform: translateX(-14px); } 24%, 66% { transform: translateX(0); } 78%, 100% { transform: translateX(-14px); } }
+        @keyframes sp-book-cover { 0%, 12% { transform: scaleX(1); } 24%, 66% { transform: scaleX(-1); } 78%, 100% { transform: scaleX(1); } }
+        @keyframes sp-book-front { 0%, 17.9% { opacity: 1; } 18%, 71.9% { opacity: 0; } 72%, 100% { opacity: 1; } }
+        @keyframes sp-book-inside { 0%, 17.9% { opacity: 0; } 18%, 71.9% { opacity: 1; } 72%, 100% { opacity: 0; } }
+        @keyframes sp-book-page-1 { 0%, 23.9% { transform: scaleX(1); opacity: 0; } 24% { transform: scaleX(1); opacity: 1; } 34%, 66% { transform: scaleX(-1); opacity: 1; } 71.9% { transform: scaleX(-0.05); opacity: 1; } 72%, 100% { transform: scaleX(1); opacity: 0; } }
+        @keyframes sp-book-page-2 { 0%, 33.9% { transform: scaleX(1); opacity: 0; } 34% { transform: scaleX(1); opacity: 1; } 44%, 66% { transform: scaleX(-1); opacity: 1; } 71.9% { transform: scaleX(-0.05); opacity: 1; } 72%, 100% { transform: scaleX(1); opacity: 0; } }
+        @keyframes sp-book-page-3 { 0%, 43.9% { transform: scaleX(1); opacity: 0; } 44% { transform: scaleX(1); opacity: 1; } 54%, 66% { transform: scaleX(-1); opacity: 1; } 71.9% { transform: scaleX(-0.05); opacity: 1; } 72%, 100% { transform: scaleX(1); opacity: 0; } }
+        @keyframes sp-quran-shine { 0%, 80% { transform: translateX(-12px) skewX(-20deg); } 100% { transform: translateX(34px) skewX(-20deg); } }
+        .sp-bar-icon { animation: sp-quran-float 3s ease-in-out infinite; filter: drop-shadow(0 4px 6px rgba(13,79,133,0.35)); }
+        .sp-book { transform: translateX(-14px); animation: sp-book-shift 6s ease-in-out infinite; }
+        .sp-book-turn { transform-box: view-box; transform-origin: 32px 0; }
+        .sp-book-cover { animation: sp-book-cover 6s ease-in-out infinite; }
+        .sp-book-front { animation: sp-book-front 6s linear infinite; }
+        .sp-book-inside { opacity: 0; animation: sp-book-inside 6s linear infinite; }
+        .sp-book-page { opacity: 0; }
+        .sp-book-page-1 { animation: sp-book-page-1 6s ease-in-out infinite; }
+        .sp-book-page-2 { animation: sp-book-page-2 6s ease-in-out infinite; }
+        .sp-book-page-3 { animation: sp-book-page-3 6s ease-in-out infinite; }
+        .sp-quran-shine { animation: sp-quran-shine 6s ease-in-out infinite; }
+        .sp-accent { transform-origin: top; animation: sp-accent 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.4s both; }
+
+        @media (prefers-reduced-motion: reduce) {
+          .sp-page *, .sp-page *::before, .sp-page *::after { animation: none !important; transition: none !important; }
+        }
+
+
+        @media (max-width: 520px) {
           .sp-header { gap: 10px; padding: 12px; }
           .sp-divider { display: none; }
+          .sp-avatar { width: 72px; }
+        }
+        @media (max-width: 420px) {
           .sp-streak-box { padding: 6px 10px; }
           .sp-stats { gap: 8px; }
           .sp-stat-value { flex-direction: column; gap: 6px; }
@@ -237,7 +386,7 @@ export default function StudentPortal() {
           <div className="sp-divider" aria-hidden="true" />
           <div className="sp-streak-box">
             <span>Streak</span>
-            <strong>{hasPlan ? summary.streak.current : 0}</strong>
+            <strong key={hasPlan ? summary.streak.current : 0} className="sp-pop"><CountUp value={hasPlan ? summary.streak.current : 0} /></strong>
           </div>
           <div className="sp-flame" aria-hidden="true">
             <Flame strokeWidth={1.8} />
@@ -258,14 +407,20 @@ export default function StudentPortal() {
           <div className="sp-tracker-head">
             <BookOpenText size={44} color="#1452A8" strokeWidth={1.8} aria-hidden="true" />
             <h2>Hifz percentage Tracker</h2>
-            <span className="sp-pct">{percent}%</span>
+            <span className="sp-pct"><CountUp value={percent} />%</span>
           </div>
-          <div className="sp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
-            <div className="sp-bar-fill" style={{ width: `${percent}%` }} />
+          <div className="sp-bar-wrap">
+            <div className="sp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
+              <div className="sp-bar-fill" style={{ width: `${percent}%` }} />
+            </div>
+            {/* Kept inside the bar's ends so it never spills off the card at 0% or 100%. */}
+            <span className="sp-bar-icon" style={{ left: `clamp(16px, ${percent}%, calc(100% - 16px))` }} aria-hidden="true">
+              <QuranIcon />
+            </span>
           </div>
           <div className="sp-tracker-foot">
-            <span>{hasPlan ? describeAmount(summary.stats.memorizedUnits) : "0 pages"} / 604 pages</span>
-            <span>{percent}% completed</span>
+            <span><CountUp value={ayahsMemorized} /> / {TOTAL_AYAHS} ayaat</span>
+            <span><CountUp value={percent} />% completed</span>
           </div>
           {summary?.needsSetup && (
             <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("hifz")}>Set up your Hifz plan</button>

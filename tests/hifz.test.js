@@ -36,6 +36,7 @@ async function setup(over) {
   return { store, repo };
 }
 const day = (repo, date) => loadTracker(repo, at(date));
+const intersectPages = (list, from, to) => list.filter(([s, e]) => s < pageToUnit(to + 1) && e > pageToUnit(from));
 const seg = (t, a) => toSet(t.todayRows[a].segments);
 
 test("1. first-time setup saves the plan and creates today's three tasks", async () => {
@@ -46,7 +47,7 @@ test("1. first-time setup saves the plan and creates today's three tasks", async
   const t = await day(repo, MON);
   assert.equal(t.needsSetup, false);
   assert.deepEqual(seg(t, "new"), pages(45, 46));
-  assert.deepEqual(seg(t, "short"), pages(2));
+  assert.deepEqual(seg(t, "short"), pages(44)); // latest memorized page
   assert.deepEqual(seg(t, "long"), pages(2));
   assert.equal(t.rows.length, 3);
 });
@@ -171,34 +172,42 @@ test("9. pending work larger than one day's target is spread over days, oldest f
   assert.deepEqual(thu.todayRows.new.segments, [page(47)]);
 });
 
-test("10. Short Muraja'ah wraps to the start of the memorized range and starts a new cycle", async () => {
-  const { repo } = await setup({ currentUnit: pageToUnit(5), shortTarget: 2 * PAGE }); // memorized 2–4
+test("10. Short Muraja'ah revises the latest memorized pages, up to the chosen amount", async () => {
+  const { repo } = await setup({ shortTarget: 3 * PAGE }); // memorized 2–44
   const mon = await day(repo, MON);
-  assert.deepEqual(toSet(mon.todayRows.short.segments), pages(2, 3));
-  assert.equal(mon.todayRows.short.cycleAfter, 1);
-  await markComplete(repo, mon.todayRows.short, at(MON));
-  const tue = await day(repo, TUE);
-  assert.deepEqual(tue.todayRows.short.segments, [page(4), page(2)]);
-  assert.equal(tue.todayRows.short.cycleAfter, 2);
+  assert.deepEqual(toSet(mon.todayRows.short.segments), pages(42, 43, 44));
+  assert.equal(unitsOf(mon.todayRows.short.segments), 3 * PAGE);
 });
 
-test("Short Muraja'ah never includes unmemorized pages and grows as New Hifz is completed", async () => {
-  const { repo } = await setup({ currentUnit: pageToUnit(3), shortTarget: 4 * PAGE }); // only page 2 memorized
+test("Short Muraja'ah window moves forward as New Hifz is completed", async () => {
+  const { repo } = await setup({ shortTarget: 3 * PAGE });
   const mon = await day(repo, MON);
-  assert.deepEqual(mon.todayRows.short.segments, [page(2)]);
-  await markComplete(repo, mon.todayRows.new, at(MON)); // pages 3–4 memorized
+  await markComplete(repo, mon.todayRows.new, at(MON)); // 45–46 memorized
   await markComplete(repo, mon.todayRows.short, at(MON));
   const tue = await day(repo, TUE);
-  assert.deepEqual(toSet(tue.todayRows.short.segments), pages(2, 3, 4));
-  assert.ok(unitsOf(tue.todayRows.short.segments) <= 4 * PAGE);
+  assert.deepEqual(toSet(tue.todayRows.short.segments), pages(44, 45, 46));
+  // Today's New Hifz pages (47–48) aren't revised until they're memorized.
+  assert.ok(!unitsOf(intersectPages(tue.todayRows.short.segments, 47, 48)));
+});
+
+test("Short Muraja'ah never includes unmemorized pages", async () => {
+  const { repo } = await setup({ currentUnit: pageToUnit(4), shortTarget: 4 * PAGE }); // only 2–3 memorized
+  const mon = await day(repo, MON);
+  assert.deepEqual(toSet(mon.todayRows.short.segments), pages(2, 3));
+  const fresh = await setup({ currentUnit: pageToUnit(2) }); // nothing memorized yet
+  const t = await day(fresh.repo, MON);
+  assert.equal(t.todayRows.short.status, "empty");
 });
 
 test("Short Muraja'ah carries unfinished revision forward within the limit", async () => {
   const { repo } = await setup({ shortTarget: 2 * PAGE });
   const mon = await day(repo, MON);
-  await recordProgress(repo, mon.todayRows.short.id, PAGE, at(MON));
+  assert.deepEqual(toSet(mon.todayRows.short.segments), pages(43, 44));
+  await recordProgress(repo, mon.todayRows.short.id, PAGE, at(MON)); // 43 done, 44 left
+  await recordProgress(repo, mon.todayRows.new.id, PAGE, at(MON)); // 45 memorized
   const tue = await day(repo, TUE);
-  assert.deepEqual(tue.todayRows.short.segments, [page(3), page(4)]);
+  assert.deepEqual(tue.todayRows.short.segments, [page(44), page(45)]);
+  assert.equal(unitsOf(tue.todayRows.short.segments), 2 * PAGE);
 });
 
 test("11. Long Muraja'ah completes a cycle over memorized pages only", async () => {
@@ -348,4 +357,38 @@ test("goal check recommends a bigger target without changing the chosen one", ()
   assert.equal(g.onTrack, false);
   assert.ok(g.recommended && g.recommended.units > s.newTarget);
   assert.equal(s.newTarget, 5 * LINE);
+});
+
+test("nearest ayah: exact for whole pages, estimated inside a page", async () => {
+  const { describeAyahRange, ayahRef } = await import("../src/hifz/ayahs.js");
+  assert.equal(describeAyahRange(page(2)), "Al-Baqarah 1 – 5");
+  assert.equal(describeAyahRange(toSet([page(45), page(46)])[0]), "Al-Baqarah 265 – 274");
+  assert.equal(describeAyahRange(page(582)), "An-Naba 1 – 30");
+  assert.equal(describeAyahRange(page(604)), "Al-Ikhlas 1 – An-Nas 6");
+  assert.match(describeAyahRange([pageToUnit(45, 1), pageToUnit(45, 6)]), /^≈ Al-Baqarah 265/);
+  assert.deepEqual(ayahRef(6236), { surah: 114, ayah: 6 });
+  assert.deepEqual(ayahRef(8), { surah: 2, ayah: 1 });
+});
+
+test("Short Muraja'ah ends right before today's New Hifz (New = Adh-Dhariyat 31 → Short ends at Adh-Dhariyat 30)", async () => {
+  const { describeAyahRange } = await import("../src/hifz/ayahs.js");
+  for (const [n, expected] of [[1, "Adh-Dhariyat 7 – 30"], [2, "Qaf 36 – Adh-Dhariyat 30"], [3, "Qaf 16 – Adh-Dhariyat 30"]]) {
+    const { repo } = await setup({ currentUnit: pageToUnit(522), newTarget: PAGE, shortTarget: n * PAGE });
+    const t = await day(repo, MON);
+    assert.equal(describeAyahRange(toSet(t.todayRows.new.segments)[0]), "Adh-Dhariyat 31 – 51");
+    assert.equal(describeAyahRange(toSet(t.todayRows.short.segments)[0]), expected);
+  }
+  // Mid-page: if New Hifz starts at line 8 of a page, Short ends at line 7½ of that page.
+  const { repo } = await setup({ currentUnit: pageToUnit(522, 8), newTarget: PAGE / 2, shortTarget: PAGE });
+  const t = await day(repo, MON);
+  assert.deepEqual(toSet(t.todayRows.short.segments), [[pageToUnit(521, 8), pageToUnit(522, 8)]]);
+  assert.equal(toSet(t.todayRows.short.segments)[0][1], toSet(t.todayRows.new.segments)[0][0]);
+});
+
+test("ayah count for the Dashboard tracker (out of 6236)", async () => {
+  const { countAyahs } = await import("../src/hifz/ayahs.js");
+  assert.equal(countAyahs([[0, pageToUnit(605)]]), 6236);
+  assert.equal(countAyahs([page(2)]), 5); // Al-Baqarah 1–5
+  assert.equal(countAyahs([[pageToUnit(582), pageToUnit(605)]]), 564); // Juz 30
+  assert.equal(countAyahs(pages(2, 3, 50)), countAyahs([page(2)]) + countAyahs([page(3)]) + countAyahs([page(50)]));
 });
