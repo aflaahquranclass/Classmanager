@@ -12,6 +12,22 @@ import { generateExamQuestions, describeJuzList, describeAyah, questionRange, pa
 
 const DEFAULT_QUESTIONS = 5;
 
+// Table rows as stacked cards (used below a certain width).
+const CARD_ROWS = `
+    .ex-table thead { display: none; }
+    .ex-table, .ex-table tbody, .ex-table tr, .ex-table td { display: block; width: 100%; box-sizing: border-box; }
+    .ex-table tr { border: 1px solid #DCEBF8; border-radius: 14px; padding: 8px 12px; margin-bottom: 10px; background: #FFFFFF; }
+    .ex-table td { border: none; padding: 6px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: right; min-width: 0; }
+    .ex-table td::before { content: attr(data-label); flex: 0 0 auto; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: #5B6B79; text-align: left; }
+    .ex-table td.ex-td-actions::before { display: none; }
+    .ex-table td > select { flex: 1; min-width: 0; max-width: 70%; }
+    .ex-table td.ex-td-time { flex-wrap: wrap; }
+    .ex-table td.ex-td-time > .ex-time-pair { flex: 1 1 100%; }
+    .ex-time-input { width: auto; flex: 1; min-width: 0; }
+    .ex-row-actions { width: 100%; justify-content: flex-end; padding-top: 4px; }
+    .ex-row-actions .lc-btn { min-height: 40px; }
+`;
+
 // A function, not a constant: TP comes from App.jsx, which imports this file.
 export const examCss = () => `
   .ex-q { border: 1px solid #DCEBF8; border-radius: 14px; padding: 14px 16px; background: #FFFFFF; }
@@ -50,8 +66,13 @@ export const examCss = () => `
   .ex-mark-remark { margin-top: 10px; }
   .ex-mark-missing { border-color: #A5432C !important; background: #FBEAE6 !important; }
   .ex-mark-progress { font-size: 13px; font-weight: 600; color: ${TP.secondaryText}; }
-  .ex-layout { display: grid; grid-template-columns: 280px 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 960px) { .ex-layout { grid-template-columns: 1fr; } }
+  /* Sized by the space the page actually has (container queries), not the
+     screen, so it fits beside the sidebar on laptops as well as on phones. */
+  .ex-root { container: exroot / inline-size; }
+  .ex-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .ex-layout > * { min-width: 0; }
+  @container exroot (max-width: 900px) { .ex-layout { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 960px) { .ex-layout { grid-template-columns: minmax(0, 1fr); } }
   .ex-session { display: block; width: 100%; text-align: left; border: 1px solid #DCEBF8; background: #FFFFFF; border-radius: 12px; padding: 12px 14px; cursor: pointer; font: inherit; color: ${TP.navy}; }
   .ex-session + .ex-session { margin-top: 8px; }
   .ex-session[aria-current="true"] { border-color: ${TP.blue}; box-shadow: 0 0 0 2px rgba(23,111,209,0.15); background: #F4F9FD; }
@@ -89,25 +110,21 @@ export const examCss = () => `
   .ex-type[aria-pressed="true"] small { color: rgba(255,255,255,0.85); }
   .ex-type:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
   .ex-type-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: #EEE7F8; color: #6A3FA0; }
-  .ex-span-2 { grid-column: span 2; min-width: 0; }
+  .ex-span-2 { grid-column: 1 / -1; min-width: 0; }
   .ex-time-pair { display: flex; gap: 4px; align-items: center; }
-  /* Phones: tables become stacked cards, one per student. */
+  .ex-table-wrap { container: extable / inline-size; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Not enough room for the table (phones, tablets, beside the sidebar on
+     small laptops): each student becomes a stacked card. */
+  @container extable (max-width: 880px) { ${CARD_ROWS} }
+  /* The teacher's list has no inputs, so it stays a table down to a narrower width. */
+  .ex-table-wrap-compact { container-name: extablec; }
+  @container extablec (max-width: 660px) { ${CARD_ROWS} }
+  @media (max-width: 720px) { ${CARD_ROWS} }
   @media (max-width: 720px) {
-    .ex-span-2 { grid-column: auto; }
-    .ex-table thead { display: none; }
-    .ex-table, .ex-table tbody, .ex-table tr, .ex-table td { display: block; width: 100%; box-sizing: border-box; }
-    .ex-table tr { border: 1px solid #DCEBF8; border-radius: 14px; padding: 8px 12px; margin-bottom: 10px; background: #FFFFFF; }
-    .ex-table td { border: none; padding: 6px 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: right; }
-    .ex-table td::before { content: attr(data-label); flex: 0 0 auto; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; color: #5B6B79; text-align: left; }
-    .ex-table td.ex-td-actions::before { display: none; }
-    .ex-table td > select, .ex-table td > .ex-time-pair { flex: 1; max-width: 70%; }
-    .ex-time-input { width: auto; flex: 1; min-width: 0; }
-    .ex-row-actions { width: 100%; justify-content: flex-end; padding-top: 4px; }
-    .ex-row-actions .lc-btn { min-height: 40px; }
-    .ex-mushaf { padding: 10px 12px; }
-    .ex-mushaf-text { font-size: 25px; }
+    .ex-mushaf { padding: 8px 10px; }
+    .ex-mushaf-text { font-size: 24px; line-height: 2; }
     .ex-basmala { font-size: 22px; }
-    .ex-q { padding: 12px; }
+    .ex-q { padding: 10px; }
   }
 `;
 
@@ -476,6 +493,7 @@ export function AdminExamScheduler({ students, teachers, showToast, tabs }) {
         {tabs}
       </div>
 
+      <div className="ex-root">
       <div className="ex-layout">
         <div className="tp-card">
           <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "12px" }}>New exam</div>
@@ -580,7 +598,7 @@ export function AdminExamScheduler({ students, teachers, showToast, tabs }) {
               {sessionCandidates.length === 0 ? (
                 <div className="ex-empty">No students added yet.</div>
               ) : (
-                <div className="lc-table-wrap">
+                <div className="ex-table-wrap">
                   <table className="ex-table">
                     <thead>
                       <tr><th>Time</th><th>Student</th><th>Examiner</th><th>Juz</th><th>Questions</th><th>Status</th><th></th></tr>
@@ -590,7 +608,7 @@ export function AdminExamScheduler({ students, teachers, showToast, tabs }) {
                         const locked = c.status !== "scheduled";
                         return (
                           <tr key={c.id}>
-                            <td data-label="Time" style={{ whiteSpace: "nowrap" }}>
+                            <td data-label="Time" className={locked ? undefined : "ex-td-time"} style={{ whiteSpace: "nowrap" }}>
                               {locked ? fmtSlot(c.start_time, c.end_time) : (
                                 <div className="ex-time-pair">
                                   <input className="lc-input ex-time-input" type="time" aria-label={`Start time for ${c.student_name}`} defaultValue={hhmm(c.start_time)} onBlur={(e) => changeTime(c, "start_time", e.target.value)} />
@@ -639,6 +657,7 @@ export function AdminExamScheduler({ students, teachers, showToast, tabs }) {
           <div className="tp-card ex-empty">Create an exam to start adding students.</div>
         )}
       </div>
+      </div>
 
       {viewing && (
         <QuestionsModal
@@ -677,7 +696,7 @@ export function TeacherScheduledExams({ teacherId, onStart, onEdit, showToast })
   const preview = rows.find((r) => r.id === previewId);
 
   const table = (list, active) => (
-    <div className="lc-table-wrap">
+    <div className="ex-table-wrap ex-table-wrap-compact">
       <table className="ex-table">
         <thead><tr><th>Date</th><th>Time</th><th>Student</th><th>Juz</th><th>Questions</th><th>Status</th><th></th></tr></thead>
         <tbody>

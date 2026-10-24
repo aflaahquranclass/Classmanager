@@ -4367,7 +4367,10 @@ export default function App() {
                       .tp-exams-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
                     }
                     @media (max-width: 640px) {
-                      .tp-exams-page { padding: 20px; }
+                      .tp-exams-page { padding: 14px 10px; }
+                      /* Phones: no card-inside-a-card frame, so the Quran text gets the screen width. */
+                      .tp-exams-page > .tp-card { padding: 12px 10px; }
+                      .tp-exams-page > .tp-card > .lc-card { padding: 0; border: none; box-shadow: none; background: transparent; }
                     }
                     .tp-exam-table { width: 100%; border-collapse: collapse; font-size: 13px; }
                     .tp-exam-table th { text-align: left; color: #5B6B79; font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 8px; border-bottom: 1px solid #D3E9F7; white-space: nowrap; }
@@ -4614,8 +4617,9 @@ export default function App() {
                             <div>No exam reports submitted yet.</div>
                           </div>
                         ) : (
-                          <div className="lc-table-wrap">
-                            <table className="lc-table">
+                          <div className="ex-table-wrap ex-table-wrap-compact">
+<style>{examCss()}</style>
+                            <table className="ex-table">
                               <thead>
                                 <tr>
                                   <th>Student</th>
@@ -4628,12 +4632,12 @@ export default function App() {
                               <tbody>
                                 {examReports.map((exam) => (
                                   <tr key={exam.id}>
-                                    <td style={{ fontWeight: 600 }}>{exam.studentName}</td>
-                                    <td>{exam.examDate}</td>
-                                    <td>{teacherLabel}</td>
-                                    <td>{resultBadge(exam.finalResult)}</td>
-                                    <td>
-                                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                    <td data-label="Student" style={{ fontWeight: 600 }}>{exam.studentName}</td>
+                                    <td data-label="Exam date">{exam.examDate}</td>
+                                    <td data-label="Teacher">{teacherLabel}</td>
+                                    <td data-label="Final result">{resultBadge(exam.finalResult)}</td>
+                                    <td className="ex-td-actions">
+                                      <div className="ex-row-actions">
                                         <button type="button" className="lc-btn" onClick={() => setViewExamId(exam.id)}>
                                           <FileText size={14} aria-hidden="true" style={{ marginRight: "4px", verticalAlign: "-2px" }} />
                                           View Report
@@ -7240,8 +7244,9 @@ export default function App() {
                           <div>No exam reports match your filters.</div>
                         </div>
                       ) : (
-                        <div className="lc-table-wrap">
-                          <table className="lc-table">
+                        <div className="ex-table-wrap ex-table-wrap-compact">
+<style>{examCss()}</style>
+                          <table className="ex-table">
                             <thead>
                               <tr>
                                 <th>Student</th>
@@ -7254,12 +7259,12 @@ export default function App() {
                             <tbody>
                               {filteredExams.map((exam) => (
                                 <tr key={exam.id}>
-                                  <td style={{ fontWeight: 600 }}>{exam.studentName}</td>
-                                  <td>{exam.examDate}</td>
-                                  <td>{teacherName(exam.teacherId)}</td>
-                                  <td>{resultBadge(exam.finalResult)}</td>
-                                  <td>
-                                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                                  <td data-label="Student" style={{ fontWeight: 600 }}>{exam.studentName}</td>
+                                  <td data-label="Exam date">{exam.examDate}</td>
+                                  <td data-label="Teacher">{teacherName(exam.teacherId)}</td>
+                                  <td data-label="Final result">{resultBadge(exam.finalResult)}</td>
+                                  <td className="ex-td-actions">
+                                    <div className="ex-row-actions">
                                       <button type="button" className="lc-btn" onClick={() => setAdminViewExamId(exam.id)}>
                                         <FileText size={14} aria-hidden="true" style={{ marginRight: "4px", verticalAlign: "-2px" }} />
                                         View Report
