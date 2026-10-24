@@ -1,10 +1,12 @@
 // Downloadable Hifz exam report for scheduled exams: every question with its
 // full Quran passage (Uthmani text, quran.com Hafs font), the starting ayah in
 // darker blue, the teacher's highlighted mistakes in red, and each question's
-// result and remark. Drawn on a canvas, then saved as a PNG or a multi-page A4 PDF.
+// result and remark, after a short note to the student, in English or
+// Dhivehi. Drawn on a canvas, then saved as a PNG or a multi-page A4 PDF.
 
 import { fetchVerses, BASMALA, SURAH_NAMES_AR } from "./quranText.js";
-import { describeAyah, passageLines } from "./questions.js";
+import { describeAyah } from "./questions.js";
+import { reportTranslator, loadThaanaFont, THAANA_FONT } from "./reportStrings.js";
 
 const UI_FONT = "system-ui, -apple-system, 'Segoe UI', sans-serif";
 const QURAN_FONT = "UthmanicHafsReport";
@@ -22,6 +24,7 @@ const COLORS = {
   mistakeBg: "#F6B3A3", mistakeText: "#7A1E0C",
   passBg: "#E3F0E7", passText: "#1E6B45", failBg: "#FBEAE6", failText: "#A5432C",
   noneBg: "#EDEFF2", noneText: "#4B5563",
+  noteBg: "#F3F9F4", noteBorder: "#CFE6D6", noteAccent: "#3E9B6A",
 };
 
 let fontReady = null;
@@ -93,36 +96,64 @@ function roundRect(ctx, x, y, w, h, r, fill, stroke) {
   if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
 }
 
-const statusOf = (q) => (q.result === "correct"
-  ? { label: "Correct", bg: COLORS.passBg, fg: COLORS.passText }
+const statusOf = (q, t) => (q.result === "correct"
+  ? { label: t("correct"), bg: COLORS.passBg, fg: COLORS.passText }
   : q.result === "incorrect"
-    ? { label: "Not correct", bg: COLORS.failBg, fg: COLORS.failText }
-    : { label: "Not marked", bg: COLORS.noneBg, fg: COLORS.noneText });
+    ? { label: t("incorrect"), bg: COLORS.failBg, fg: COLORS.failText }
+    : { label: t("notMarked"), bg: COLORS.noneBg, fg: COLORS.noneText });
 
 // Builds the report. Returns { canvas, width, height, breaks } where breaks
 // are y positions between blocks, safe places to start a new PDF page.
-export async function buildPassageReport(exam, teacherLabel, logoImg) {
-  await loadQuranFont();
+// lang "dv" draws the report's own wording in Dhivehi, right to left; t is
+// the translator from reportStrings.js.
+export async function buildPassageReport(exam, logoImg, { lang = "en", t = reportTranslator("en") } = {}) {
+  const rtl = lang === "dv";
+  await Promise.all([loadQuranFont(), rtl ? loadThaanaFont() : null]);
   const passages = await Promise.all(exam.questions.map((q) => fetchVerses(q.range[0], q.range[1])));
   const measure = document.createElement("canvas").getContext("2d");
+
+  // Thaana (Faruma) is drawn a few sizes larger and with taller lines so its vowel marks
+  // stay readable. font(size, weight) picks the report font for the language.
+  const FAMILY = rtl ? THAANA_FONT : UI_FONT;
+  const font = (size, weight = 400) => `${weight} ${rtl ? size + 3 : size}px ${FAMILY}`;
+  const LINE = rtl ? 32 : 20;
+  const GAP = 44; // space between two questions
+  const surahName = (d) => (rtl ? SURAH_NAMES_AR[d.surah - 1] : d.surahName);
+  const studentName = (rtl ? t.studentName(exam.studentName) : exam.studentName) || "—";
 
   // ---- measure ----
   const blocks = exam.questions.map((q, i) => {
     const [a, b] = q.range;
     const layout = layoutPassage(measure, passages[i], a, q.mistakes || []);
-    measure.font = `13px ${UI_FONT}`;
-    const remark = q.remark ? wrapText(measure, `Remark: ${q.remark}`, INNER) : [];
+    measure.font = font(13);
+    const remark = q.remark ? wrapText(measure, `${t("remark")}${q.remark}`, INNER) : [];
     const passageH = BOX_PAD + layout.rows.reduce((h, r) => h + rowHeight(r), 0) + 4;
-    const footer = ((q.mistakes || []).length ? 20 : 0) + remark.length * 18;
-    const height = 30 + 22 + passageH + (footer ? footer + 10 : 0) + 22;
+    const footer = remark.length * LINE;
+    const height = 30 + 22 + passageH + (footer ? footer + 10 : 0) + GAP;
     return { q, i, a, b, layout, remark, passageH, height };
   });
-  measure.font = `13px ${UI_FONT}`;
+  measure.font = font(13);
   const comments = wrapText(measure, exam.comments || "—", INNER);
-  const headerH = 168;
-  const legendH = 34;
-  const commentsH = 30 + comments.length * 18 + 10;
-  const height = headerH + legendH + blocks.reduce((h, bl) => h + bl.height, 0) + commentsH + PAD;
+  measure.font = font(14);
+  const noteBody = wrapText(measure, t("noteBody", { student: studentName }), INNER - 40);
+  // Header: logo centred on top, then the exam name, student, exam type and
+  // date, and the result, each on its own centred line.
+  const LOGO_H = logoImg ? 70 : 0;
+  const examTitle = exam.examName ? t.examName(exam.examName) : t("title");
+  // Exam type and date. The line is drawn left to right with the parts in
+  // reverse for Dhivehi, so the type reads first and the date never flips.
+  const subParts = [exam.examType ? t(exam.examType === "new_juz" ? "examNewJuz" : "examMuraja") : "", exam.examDate].filter(Boolean);
+  const subLine = (rtl ? subParts.reverse() : subParts).join("   ·   ");
+  const headLines = [
+    { str: examTitle, size: 22, weight: 700, color: COLORS.navy, gap: rtl ? 40 : 34 },
+    { str: studentName, size: 18, weight: 700, color: COLORS.text, gap: rtl ? 36 : 30 },
+    { str: subLine, size: 14, weight: 400, color: COLORS.muted, gap: rtl ? 32 : 26, ltr: true },
+  ];
+  const headerH = PAD + LOGO_H + 14 + headLines.reduce((h, l) => h + l.gap, 0) + 52 + 64;
+  const NOTE_LINE = rtl ? 40 : 26; // space from one note line to the next
+  const noteH = 18 + 30 + noteBody.length * NOTE_LINE + 18 + 26;
+  const commentsH = 30 + comments.length * LINE + 10;
+  const height = headerH + noteH + blocks.reduce((h, bl) => h + bl.height, 0) + commentsH + PAD;
 
   const canvas = document.createElement("canvas");
   const scale = 2;
@@ -134,88 +165,93 @@ export async function buildPassageReport(exam, teacherLabel, logoImg) {
   ctx.fillRect(0, 0, WIDTH, height);
   ctx.textBaseline = "alphabetic";
 
+  // Everything outside the Quran passages is laid out left to right and
+  // mirrored for Dhivehi: X() flips an x position, box() a rectangle, and
+  // text() draws from the reading start (left in English, right in Dhivehi).
+  const X = (x) => (rtl ? WIDTH - x : x);
+  const box = (x, y, w, h, r, fill, stroke) => roundRect(ctx, rtl ? WIDTH - x - w : x, y, w, h, r, fill, stroke);
+  const text = (str, x, y, align = "start") => {
+    ctx.direction = rtl ? "rtl" : "ltr";
+    ctx.textAlign = align;
+    ctx.fillText(str, X(x), y);
+    ctx.direction = "ltr";
+    ctx.textAlign = "left";
+  };
+
   // ---- header ----
   let y = PAD;
-  let textX = PAD;
   if (logoImg) {
-    const h = 44;
-    const w = h * (logoImg.width / logoImg.height);
-    ctx.drawImage(logoImg, PAD, y - 6, w, h);
-    textX = PAD + w + 14;
+    const w = LOGO_H * (logoImg.width / logoImg.height);
+    ctx.drawImage(logoImg, (WIDTH - w) / 2, y, w, LOGO_H);
+    y += LOGO_H + 14;
   }
-  ctx.fillStyle = COLORS.navy;
-  ctx.font = `700 19px ${UI_FONT}`;
-  ctx.fillText("Hifz Exam Report", textX, y + 12);
-  const info = [["Student: ", exam.studentName], ["Exam date: ", exam.examDate], ["Teacher: ", teacherLabel]];
-  info.forEach(([label, value], k) => {
-    const ly = y + 38 + k * 19;
-    ctx.font = `13px ${UI_FONT}`;
-    ctx.fillStyle = COLORS.muted;
-    ctx.fillText(label, textX, ly);
-    const lw = ctx.measureText(label).width;
-    ctx.font = `700 13px ${UI_FONT}`;
-    ctx.fillStyle = COLORS.text;
-    ctx.fillText(value || "—", textX + lw, ly);
-  });
-  const pass = exam.finalResult === "pass";
-  roundRect(ctx, WIDTH - PAD - 140, y - 4, 140, 34, 8, pass ? COLORS.passBg : COLORS.failBg);
-  ctx.fillStyle = pass ? COLORS.passText : COLORS.failText;
-  ctx.font = `700 14px ${UI_FONT}`;
+  ctx.direction = rtl ? "rtl" : "ltr";
   ctx.textAlign = "center";
-  ctx.fillText(pass ? "PASS" : "NOT PASSED", WIDTH - PAD - 70, y + 18);
-  ctx.textAlign = "left";
-
+  for (const l of headLines) {
+    y += l.gap;
+    ctx.font = font(l.size, l.weight);
+    ctx.fillStyle = l.color;
+    ctx.direction = rtl && !l.ltr ? "rtl" : "ltr";
+    ctx.fillText(l.str, WIDTH / 2, y - 8);
+    ctx.direction = rtl ? "rtl" : "ltr";
+  }
+  const pass = exam.finalResult === "pass";
   const correct = exam.questions.filter((q) => q.result === "correct").length;
   const wrong = exam.questions.filter((q) => q.result === "incorrect").length;
-  const mistakes = exam.questions.reduce((n, q) => n + (q.mistakes || []).length, 0);
-  ctx.font = `600 13px ${UI_FONT}`;
+  ctx.font = font(14, 700);
+  const badge = pass ? t("pass") : t("notPassed");
+  const bw = ctx.measureText(badge).width + 40;
+  roundRect(ctx, (WIDTH - bw) / 2, y + 4, bw, 34, 17, pass ? COLORS.passBg : COLORS.failBg);
+  ctx.fillStyle = pass ? COLORS.passText : COLORS.failText;
+  ctx.fillText(badge, WIDTH / 2, y + 26);
+  ctx.font = font(13, 600);
   ctx.fillStyle = COLORS.navy;
-  ctx.fillText(`${exam.questions.length} questions  ·  ${correct} correct  ·  ${wrong} not correct  ·  ${mistakes} mistake${mistakes === 1 ? "" : "s"} highlighted`, PAD, y + 104);
+  ctx.fillText(t("summary", { total: exam.questions.length, correct, wrong }), WIDTH / 2, y + 66);
+  ctx.direction = "ltr";
+  ctx.textAlign = "left";
   ctx.fillStyle = COLORS.rule;
   ctx.fillRect(PAD, headerH - 18, INNER, 2);
   y = headerH;
-
-  // ---- legend ----
-  ctx.font = `12px ${UI_FONT}`;
-  let lx = PAD;
-  for (const [bg, label] of [[COLORS.startBg, "Starting ayah (read out by the teacher)"], [COLORS.mistakeBg, "Mistake highlighted by the teacher"]]) {
-    roundRect(ctx, lx, y, 16, 14, 3, bg);
-    ctx.fillStyle = COLORS.muted;
-    ctx.fillText(label, lx + 22, y + 11);
-    lx += 22 + ctx.measureText(label).width + 26;
-  }
-  y += legendH;
   const breaks = [0, y];
+
+  // ---- note to the student ----
+  const cardH = noteH - 26;
+  box(PAD, y, INNER, cardH, 14, COLORS.noteBg, COLORS.noteBorder);
+  ctx.fillStyle = COLORS.noteAccent;
+  ctx.fillRect(rtl ? WIDTH - PAD - 5 : PAD, y + 12, 5, cardH - 24);
+  ctx.font = font(15, 700);
+  ctx.fillStyle = COLORS.navy;
+  text(t("noteTitle", { student: studentName }), PAD + 22, y + 36);
+  ctx.font = font(14);
+  ctx.fillStyle = COLORS.text;
+  noteBody.forEach((line, k) => text(line, PAD + 22, y + 48 + (k + 1) * NOTE_LINE - (rtl ? 8 : 6)));
+  y += noteH;
+  breaks.push(y);
 
   // ---- questions ----
   for (const bl of blocks) {
     const { q, i, a, b, layout } = bl;
     const top = y;
-    const status = statusOf(q);
-    ctx.font = `800 15px ${UI_FONT}`;
+    const status = statusOf(q, t);
+    ctx.font = font(15, 800);
     ctx.fillStyle = COLORS.navy;
-    ctx.fillText(`Q${i + 1}`, PAD, y + 16);
-    const qw = ctx.measureText(`Q${i + 1}`).width;
-    ctx.font = `600 13px ${UI_FONT}`;
-    ctx.fillStyle = COLORS.muted;
-    ctx.fillText(q.questionType || "", PAD + qw + 10, y + 16);
-    ctx.font = `700 13px ${UI_FONT}`;
+    const qLabel = t("questionNo", { n: i + 1 });
+    text(qLabel, PAD, y + 16);
+    ctx.font = font(13, 700);
     const sw = ctx.measureText(status.label).width + 28;
-    roundRect(ctx, WIDTH - PAD - sw, y, sw, 24, 12, status.bg);
+    box(WIDTH - PAD - sw, y, sw, 24, 12, status.bg);
     ctx.fillStyle = status.fg;
-    ctx.textAlign = "center";
-    ctx.fillText(status.label, WIDTH - PAD - sw / 2, y + 17);
-    ctx.textAlign = "left";
+    text(status.label, WIDTH - PAD - sw / 2, y + 17, "center");
 
     const p = describeAyah(a);
     const e = describeAyah(b);
-    const endRef = e.surah === p.surah ? `ayah ${e.ayah}` : `${e.surahName} ${e.ayah}`;
-    ctx.font = `13px ${UI_FONT}`;
+    const endRef = e.surah === p.surah ? t("ayah", { n: e.ayah }) : `${surahName(e)} ${e.ayah}`;
+    ctx.font = font(13);
     ctx.fillStyle = COLORS.text;
-    ctx.fillText(`${p.surahName} ${p.ayah} → ${endRef}   ·   Page ${p.page}, line ${p.line}   ·   ≈ ${passageLines(a, b).toFixed(1)} lines`, PAD, y + 44);
+    text(t("range", { from: `${surahName(p)} ${p.ayah}`, to: endRef }), PAD, y + 44);
     y += 54;
 
-    // passage box
+    // passage box (always right to left, in physical coordinates)
     roundRect(ctx, PAD, y, INNER, bl.passageH, 12, COLORS.passageBg, COLORS.passageBorder);
     let ry = y + BOX_PAD;
     const right = WIDTH - PAD - BOX_PAD;
@@ -238,13 +274,13 @@ export async function buildPassageReport(exam, teacherLabel, logoImg) {
         ctx.font = `${AR_SIZE}px ${QURAN_FONT}`;
         const base = ry + 34;
         let x = right;
-        row.tokens.forEach((t, k) => {
-          x -= t.width;
-          const gap = k < row.tokens.length - 1 && row.tokens[k + 1].start === t.start ? layout.space : 0;
-          if (t.start) { ctx.fillStyle = COLORS.startBg; ctx.fillRect(x - gap, ry + 6, t.width + gap, AR_LINE - 10); }
-          if (t.mistake) roundRect(ctx, x - 3, ry + 7, t.width + 6, AR_LINE - 12, 6, COLORS.mistakeBg);
-          ctx.fillStyle = t.mistake ? COLORS.mistakeText : "#1B1B1B";
-          ctx.fillText(t.text, x, base);
+        row.tokens.forEach((tk, k) => {
+          x -= tk.width;
+          const gap = k < row.tokens.length - 1 && row.tokens[k + 1].start === tk.start ? layout.space : 0;
+          if (tk.start) { ctx.fillStyle = COLORS.startBg; ctx.fillRect(x - gap, ry + 6, tk.width + gap, AR_LINE - 10); }
+          if (tk.mistake) roundRect(ctx, x - 3, ry + 7, tk.width + 6, AR_LINE - 12, 6, COLORS.mistakeBg);
+          ctx.fillStyle = tk.mistake ? COLORS.mistakeText : "#1B1B1B";
+          ctx.fillText(tk.text, x, base);
           x -= layout.space;
         });
       }
@@ -252,30 +288,24 @@ export async function buildPassageReport(exam, teacherLabel, logoImg) {
     }
     y += bl.passageH + 10;
 
-    // mistakes + remark
-    ctx.font = `600 13px ${UI_FONT}`;
-    if ((q.mistakes || []).length) {
-      ctx.fillStyle = COLORS.failText;
-      ctx.fillText(`${q.mistakes.length} mistake${q.mistakes.length === 1 ? "" : "s"} highlighted`, PAD, y + 12);
-      y += 20;
-    }
-    ctx.font = `13px ${UI_FONT}`;
+    // remark
+    ctx.font = font(13);
     ctx.fillStyle = COLORS.text;
-    bl.remark.forEach((line) => { ctx.fillText(line, PAD, y + 12); y += 18; });
+    bl.remark.forEach((line) => { text(line, PAD, y + 12); y += LINE; });
 
     y = top + bl.height;
     ctx.fillStyle = COLORS.rule;
-    ctx.fillRect(PAD, y - 11, INNER, 1);
+    ctx.fillRect(PAD, y - GAP / 2, INNER, 1);
     breaks.push(y);
   }
 
   // ---- comments ----
-  ctx.font = `700 12px ${UI_FONT}`;
+  ctx.font = font(12, 700);
   ctx.fillStyle = COLORS.navy;
-  ctx.fillText("RECITATION COMMENTS", PAD, y + 14);
-  ctx.font = `13px ${UI_FONT}`;
+  text(t("comments"), PAD, y + 14);
+  ctx.font = font(13);
   ctx.fillStyle = COLORS.text;
-  comments.forEach((line, k) => ctx.fillText(line, PAD, y + 36 + k * 18));
+  comments.forEach((line, k) => text(line, PAD, y + 36 + k * LINE));
   breaks.push(height);
 
   return { canvas, width: WIDTH, height, breaks };

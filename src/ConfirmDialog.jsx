@@ -6,13 +6,21 @@
 // <ConfirmHost /> must be rendered once (see main.jsx).
 
 import { useState, useEffect, useRef } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Languages } from "lucide-react";
 
 let open = null;
 
 export function confirmDialog({ title, message = "", confirmLabel = "Delete", danger = true }) {
   if (!open) return Promise.resolve(window.confirm([title, message].filter(Boolean).join("\n\n")));
   return open({ title, message, confirmLabel, danger });
+}
+
+// Asks the user to pick one of a few options; resolves to its value, or null
+// when cancelled.
+//   const lang = await chooseDialog({ title: "Download in", choices: [{ value: "en", label: "English" }, …] });
+export function chooseDialog({ title, message = "", choices }) {
+  if (!open) return Promise.resolve(choices[0]?.value ?? null);
+  return open({ title, message, choices, danger: false });
 }
 
 export function ConfirmHost() {
@@ -34,7 +42,7 @@ export function ConfirmHost() {
 
   if (!req) return null;
   function close(ok) {
-    req.resolve(ok);
+    req.resolve(req.choices && ok === false ? null : ok);
     setReq(null);
   }
   return (
@@ -61,13 +69,17 @@ export function ConfirmHost() {
       `}</style>
       <div className="cd-dialog" role="alertdialog" aria-modal="true" aria-labelledby="cd-title" aria-describedby="cd-message" onClick={(e) => e.stopPropagation()}>
         <div className="cd-head">
-          <span className={`cd-icon ${req.danger ? "" : "cd-icon-info"}`} aria-hidden="true"><AlertTriangle size={20} /></span>
+          <span className={`cd-icon ${req.danger ? "" : "cd-icon-info"}`} aria-hidden="true">{req.choices ? <Languages size={20} /> : <AlertTriangle size={20} />}</span>
           <h2 id="cd-title" className="cd-title">{req.title}</h2>
         </div>
         {req.message && <p id="cd-message" className="cd-message">{req.message}</p>}
         <div className="cd-actions">
           <button ref={cancelRef} type="button" className="cd-btn" onClick={() => close(false)}>Cancel</button>
-          <button type="button" className={`cd-btn ${req.danger ? "cd-btn-danger" : "cd-btn-primary"}`} onClick={() => close(true)}>{req.confirmLabel}</button>
+          {req.choices
+            ? req.choices.map((c) => (
+              <button key={c.value} type="button" className="cd-btn cd-btn-primary" onClick={() => close(c.value)}>{c.label}</button>
+            ))
+            : <button type="button" className={`cd-btn ${req.danger ? "cd-btn-danger" : "cd-btn-primary"}`} onClick={() => close(true)}>{req.confirmLabel}</button>}
         </div>
       </div>
     </div>
