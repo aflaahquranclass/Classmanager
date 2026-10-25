@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus } from "lucide-react";
+import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 import { AdminExamScheduler, TeacherScheduledExams, QuestionCard, Passage, examCss } from "./exams/ExamUI.jsx";
 import { examTypeLabel, questionRange } from "./exams/questions.js";
@@ -1142,7 +1142,7 @@ export default function App() {
     id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, className: r.class_name,
     fee: r.fee, phone: r.phone, teacherId: r.teacher_id,
     sharePercent: r.teacher_share_percent, schedule: r.schedule, joinedMonth: r.joined_month,
-    email: r.email, studentCode: r.student_code || "",
+    email: r.email, studentCode: r.student_code || "", inGroup: !!r.in_group,
   });
   const TEACHER_TO_DB = (t) => ({
     name: t.name, subject: t.subject || null, phone: t.phone || null, email: t.email || null,
@@ -2017,6 +2017,18 @@ export default function App() {
     setSSharePercent(s.sharePercent != null ? String(s.sharePercent) : "0");
     setSJoinedMonth(s.joinedMonth || month);
     setShowStudentForm(true);
+  };
+
+  // Flip whether a student has been added to their class's student group.
+  // Updates only this one column so it can't overwrite other edits.
+  const toggleStudentGroup = async (s) => {
+    const next = !s.inGroup;
+    setStudents((prev) => prev.map((x) => (x.id === s.id ? { ...x, inGroup: next } : x)));
+    const { error } = await supabase.from("students").update({ in_group: next }).eq("id", s.id);
+    if (error) {
+      setStudents((prev) => prev.map((x) => (x.id === s.id ? { ...x, inGroup: !next } : x)));
+      showToast("Couldn't update the group status. Please try again.");
+    }
   };
 
   // Remove a student who has left (same as Remove in All students): they stop
@@ -5334,6 +5346,14 @@ export default function App() {
                                     {c.code && <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{c.code}</span>}
                                     <span className="tp-accordion-title">{c.name}</span>
                                     <span className="tp-count-badge">{classStudents.length} student{classStudents.length === 1 ? "" : "s"}</span>
+                                    {(() => {
+                                      const notInGroup = classStudents.filter((s) => !s.inGroup).length;
+                                      return notInGroup > 0 ? (
+                                        <span className="tp-count-badge" style={{ background: "#FBEDEA", color: "#A5432C" }} title="Students not yet added to the student group">
+                                          {notInGroup} not in group
+                                        </span>
+                                      ) : null;
+                                    })()}
                                   </button>
                                   <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                                     <span style={{ fontSize: "13px", color: TP.secondaryText }}>
@@ -5374,11 +5394,29 @@ export default function App() {
                                       </div>
                                     ) : (
                                       <div className="tp-table-wrap"><table className="tp-list-table">
-                                        <thead><tr><th>Student</th><th>Phone</th><th>Monthly fee</th><th></th></tr></thead>
+                                        <thead><tr><th>Student</th><th>Group</th><th>Phone</th><th>Monthly fee</th><th></th></tr></thead>
                                         <tbody>
                                           {classStudents.map((s) => (
                                             <tr key={s.id}>
                                               <td>{s.name}<div style={{ fontSize: "11px", color: TP.secondaryText, letterSpacing: "0.03em" }}>{s.studentCode}</div></td>
+                                              <td>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => toggleStudentGroup(s)}
+                                                  title={s.inGroup ? "Added to student group (click to mark not added)" : "Not added to student group (click to mark added)"}
+                                                  aria-label={s.inGroup ? `${s.name} is in the student group` : `${s.name} is not in the student group`}
+                                                  aria-pressed={s.inGroup}
+                                                  style={{
+                                                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                                    width: "30px", height: "30px", borderRadius: "50%", cursor: "pointer",
+                                                    border: `1px solid ${s.inGroup ? "#B7DCC4" : "#E3C3BA"}`,
+                                                    background: s.inGroup ? "#E6F4EA" : "#FBEDEA",
+                                                    color: s.inGroup ? "#2E7D4F" : "#A5432C",
+                                                  }}
+                                                >
+                                                  {s.inGroup ? <UserCheck size={15} aria-hidden="true" /> : <UserPlus size={15} aria-hidden="true" />}
+                                                </button>
+                                              </td>
                                               <td>{s.phone || "—"}</td>
                                               <td>{fmtMoney(s.fee)}</td>
                                               <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
