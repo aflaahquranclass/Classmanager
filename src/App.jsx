@@ -4995,84 +4995,6 @@ export default function App() {
 
                   {classesView === "students" ? (
                     <>
-                      {showStudentForm && (
-                        <div className="tp-card" style={{ marginBottom: "18px" }}>
-                          <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: TP.navy }}>
-                            {editingStudentId ? "Edit student" : "New student"}
-                            {editingStudentId && (
-                              <span style={{ fontSize: "11px", fontWeight: 400, color: TP.secondaryText, marginLeft: "8px" }}>
-                                {students.find((st) => st.id === editingStudentId)?.studentCode}
-                              </span>
-                            )}
-                          </div>
-                          <div className="lc-form-grid">
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Name</label>
-                              <input className="lc-input" value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Student name" />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Class</label>
-                              <SearchableSelect
-                                value={sClassId}
-                                onChange={setSClassId}
-                                placeholder="No class"
-                                options={classes.map((c) => ({ value: c.id, label: c.name }))}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Monthly fee</label>
-                              <input className="lc-input" type="number" min="0" step="0.01" value={sFee} onChange={(e) => setSFee(e.target.value)} placeholder="0.00" />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Phone (optional)</label>
-                              <input className="lc-input" value={sPhone} onChange={(e) => setSPhone(e.target.value)} placeholder="Contact number" />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Teacher's share of fee (%)</label>
-                              <input className="lc-input" type="number" min="0" max="100" step="1" value={sSharePercent} onChange={(e) => setSSharePercent(e.target.value)} placeholder="0" />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: "12px", color: C.a }}>Fee starts from</label>
-                              <input className="lc-input" type="month" value={sJoinedMonth} onChange={(e) => setSJoinedMonth(e.target.value)} />
-                            </div>
-                          </div>
-                          <div style={{ fontSize: "12px", color: C.a, marginBottom: "12px" }}>
-                            The rest of the fee goes to the center. Use 0% for classes that are fully retained by the center.
-                            {" "}Fee starts from {monthLabel(sJoinedMonth || month)} — no fee is shown as due before that month.
-                          </div>
-
-                          {classes.length === 0 ? (
-                            <div className="lc-card" style={{ background: C.g, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-                              <span style={{ fontSize: "13px", color: C.a }}>No classes set up yet. Create one to assign a teacher and time automatically.</span>
-                              <button className="lc-btn" onClick={() => { setClassesView("classes"); openNewClassForm(); }}>+ Add a class</button>
-                            </div>
-                          ) : sClassId ? (
-                            (() => {
-                              const cls = classes.find((c) => c.id === sClassId);
-                              if (!cls) return null;
-                              return (
-                                <div className="lc-card" style={{ background: C.g, marginBottom: "4px" }}>
-                                  <div style={{ fontSize: "13px", color: C.w }}>
-                                    <strong>{teacherName(cls.teacherId)}</strong> · {formatSchedule({ days: cls.days, startTime: cls.startTime, endTime: cls.endTime })}
-                                  </div>
-                                  <div style={{ fontSize: "12px", color: C.a, marginTop: "2px" }}>
-                                    Teacher and class time come from the class. Manage them under Classes.
-                                  </div>
-                                </div>
-                              );
-                            })()
-                          ) : (
-                            <div style={{ fontSize: "12px", color: C.a, marginBottom: "4px" }}>
-                              Choose a class above to automatically set this student's teacher and class time.
-                            </div>
-                          )}
-
-                          <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-                            <button className="lc-btn lc-btn-primary" onClick={handleSaveStudent}>{editingStudentId ? "Save changes" : "Add student"}</button>
-                            <button className="lc-btn" onClick={resetStudentForm}>Cancel</button>
-                          </div>
-                        </div>
-                      )}
 
                       <div className="tp-card" style={{ marginBottom: "14px" }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "12px" }}>
@@ -5385,7 +5307,7 @@ export default function App() {
                                       <button
                                         className="lc-btn"
                                         style={{ fontSize: "12px", padding: "5px 10px" }}
-                                        onClick={() => { setClassesView("students"); resetStudentForm(); setSClassId(c.id); setShowStudentForm(true); }}
+                                        onClick={() => { resetStudentForm(); setSClassId(c.id); setShowStudentForm(true); }}
                                       >
                                         + Add student
                                       </button>
@@ -5422,7 +5344,7 @@ export default function App() {
                                               <td>{s.phone || "—"}</td>
                                               <td>{fmtMoney(s.fee)}</td>
                                               <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                                                <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => { setClassesView("students"); startEditStudent(s); }}>Edit student</button>
+                                                <button className="lc-btn" style={{ marginRight: "8px" }} onClick={() => startEditStudent(s)}>Edit student</button>
                                                 <button className="lc-btn lc-btn-danger" onClick={() => removeStudentWhoLeft(s)}>Remove student</button>
                                               </td>
                                             </tr>
@@ -5488,6 +5410,86 @@ export default function App() {
                         })()}
                       </div>
                     </>
+                  )}
+                  {showStudentForm && (
+                    <div className="lc-modal-backdrop" onClick={resetStudentForm}>
+                      <div className="lc-modal-sheet" role="dialog" aria-modal="true" aria-label={editingStudentId ? "Edit student" : "New student"} onClick={(e) => e.stopPropagation()} style={{ maxWidth: "640px" }}>
+                              <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: TP.navy }}>
+                                {editingStudentId ? "Edit student" : "New student"}
+                                {editingStudentId && (
+                                  <span style={{ fontSize: "11px", fontWeight: 400, color: TP.secondaryText, marginLeft: "8px" }}>
+                                    {students.find((st) => st.id === editingStudentId)?.studentCode}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="lc-form-grid">
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Name</label>
+                                  <input className="lc-input" value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Student name" />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Class</label>
+                                  <SearchableSelect
+                                    value={sClassId}
+                                    onChange={setSClassId}
+                                    placeholder="No class"
+                                    options={classes.map((c) => ({ value: c.id, label: c.name }))}
+                                  />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Monthly fee</label>
+                                  <input className="lc-input" type="number" min="0" step="0.01" value={sFee} onChange={(e) => setSFee(e.target.value)} placeholder="0.00" />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Phone (optional)</label>
+                                  <input className="lc-input" value={sPhone} onChange={(e) => setSPhone(e.target.value)} placeholder="Contact number" />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Teacher's share of fee (%)</label>
+                                  <input className="lc-input" type="number" min="0" max="100" step="1" value={sSharePercent} onChange={(e) => setSSharePercent(e.target.value)} placeholder="0" />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Fee starts from</label>
+                                  <input className="lc-input" type="month" value={sJoinedMonth} onChange={(e) => setSJoinedMonth(e.target.value)} />
+                                </div>
+                              </div>
+                              <div style={{ fontSize: "12px", color: C.a, marginBottom: "12px" }}>
+                                The rest of the fee goes to the center. Use 0% for classes that are fully retained by the center.
+                                {" "}Fee starts from {monthLabel(sJoinedMonth || month)} — no fee is shown as due before that month.
+                              </div>
+
+                              {classes.length === 0 ? (
+                                <div className="lc-card" style={{ background: C.g, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                                  <span style={{ fontSize: "13px", color: C.a }}>No classes set up yet. Create one to assign a teacher and time automatically.</span>
+                                  <button className="lc-btn" onClick={() => { resetStudentForm(); setClassesView("classes"); openNewClassForm(); }}>+ Add a class</button>
+                                </div>
+                              ) : sClassId ? (
+                                (() => {
+                                  const cls = classes.find((c) => c.id === sClassId);
+                                  if (!cls) return null;
+                                  return (
+                                    <div className="lc-card" style={{ background: C.g, marginBottom: "4px" }}>
+                                      <div style={{ fontSize: "13px", color: C.w }}>
+                                        <strong>{teacherName(cls.teacherId)}</strong> · {formatSchedule({ days: cls.days, startTime: cls.startTime, endTime: cls.endTime })}
+                                      </div>
+                                      <div style={{ fontSize: "12px", color: C.a, marginTop: "2px" }}>
+                                        Teacher and class time come from the class. Manage them under Classes.
+                                      </div>
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div style={{ fontSize: "12px", color: C.a, marginBottom: "4px" }}>
+                                  Choose a class above to automatically set this student's teacher and class time.
+                                </div>
+                              )}
+
+                              <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
+                                <button className="lc-btn lc-btn-primary" onClick={handleSaveStudent}>{editingStudentId ? "Save changes" : "Add student"}</button>
+                                <button className="lc-btn" onClick={resetStudentForm}>Cancel</button>
+                              </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
