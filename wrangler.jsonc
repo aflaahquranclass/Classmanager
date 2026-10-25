@@ -1,0 +1,17 @@
+// Cloudflare Workers config: serves the built Vite app (dist/) as static
+// files on aflaahqc.com and its portal subdomains. Supabase env vars are
+// baked in at build time (VITE_*), so the Worker itself has no secrets.
+{
+  "name": "aflaah-app",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [
+    { "pattern": "aflaahqc.com", "custom_domain": true },
+    { "pattern": "admin.aflaahqc.com", "custom_domain": true },
+    { "pattern": "teachers.aflaahqc.com", "custom_domain": true },
+    { "pattern": "students.aflaahqc.com", "custom_domain": true }
+  ]
+}
