@@ -74,21 +74,29 @@ lists.
 
 ## Deploying
 
-This is a static site (Vite build output) that talks directly to Supabase,
-so it can be hosted anywhere that serves static files — Vercel, Netlify,
-GitHub Pages, Cloudflare Pages, etc.
+This is a static site (Vite build output) that talks directly to Supabase.
+It is hosted on **Cloudflare Workers** (static assets), configured in
+`wrangler.jsonc`:
 
-**Vercel / Netlify (recommended — easiest):**
-1. Push this repo to GitHub.
-2. Import the repo in Vercel or Netlify.
-3. Build command: `npm run build`. Output directory: `dist`.
-4. Add the two environment variables from `.env.example` in the host's
-   dashboard (Settings → Environment Variables).
-5. Deploy — you'll get a live URL automatically on every push.
+| Address | Portal |
+|---|---|
+| `aflaahqc.com` | Teacher + Admin login |
+| `admin.aflaahqc.com` | Admin login only |
+| `teachers.aflaahqc.com` | Teacher login only |
+| `students.aflaahqc.com` | Student portal |
 
-**GitHub Pages** works too but needs a bit more config (a base path and a
-GitHub Actions workflow to build and publish `dist/`) since Pages doesn't
-run a build step itself — ask if you'd like that set up.
+To deploy, with `.env` filled in (the `VITE_*` values are baked in at build
+time):
+
+```bash
+npm run build
+npx wrangler deploy
+```
+
+`public/_headers` sets the response headers (no-cache for `sw.js`, the
+manifest content type). Any new address must also be added in Supabase
+under **Authentication → URL Configuration → Redirect URLs**, or password
+reset links won't return to it.
 
 ## Project structure
 
