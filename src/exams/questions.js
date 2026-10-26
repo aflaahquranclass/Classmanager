@@ -164,7 +164,8 @@ export function generateExamQuestions({ type = "muraja", juz, count, random = Ma
   const total = Math.floor(Number(count));
   if (!(total >= 1 && total <= MAX_QUESTIONS)) throw new Error(`Number of questions must be between 1 and ${MAX_QUESTIONS}.`);
 
-  const ranges = juzList.map(juzAyahRange);
+  // No question starts in Al-Fatihah.
+  const ranges = juzList.map(juzAyahRange).map(([a, b]) => [Math.max(a, SURAH_FIRST[1]), b]);
   const inRange = (n) => ranges.some(([a, b]) => n >= a && n < b);
 
   // Where a question starting at ayah n would end, and how many lines it is.

@@ -170,3 +170,13 @@ test("Arabic surah names and numbers", async () => {
   assert.equal(SURAH_NAMES_AR[113], "الناس");
   assert.equal(arabicNumber(286), "٢٨٦");
 });
+
+test("no question starts in Al-Fatihah", () => {
+  for (let seed = 1; seed < 30; seed++) {
+    for (const type of ["muraja", "new_juz"]) {
+      const qs = generateExamQuestions({ type, juz: [1], count: 10, random: seeded(seed) });
+      assert.equal(qs.length, 10);
+      assert.ok(qs.every((q) => q.prompt.surah !== 1));
+    }
+  }
+});
