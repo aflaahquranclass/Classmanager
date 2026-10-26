@@ -7,6 +7,7 @@ import { CalendarDays, Clock, Plus, RotateCw, Trash2, X, User, Eye, BookOpen, Pl
 import { supabase } from "../supabaseClient.js";
 import { TP, SearchableSelect } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
+import { dhivehiInputCss } from "./DhivehiInput.jsx";
 import { fetchVerses, BASMALA, SURAH_NAMES_AR } from "./quranText.js";
 import { generateExamQuestions, describeJuzList, describeAyah, questionRange, passageLines, MAX_QUESTIONS, EXAM_TYPES, examTypeLabel, LINES_PER_QUESTION } from "./questions.js";
 
@@ -127,7 +128,7 @@ export const examCss = () => `
     .ex-basmala { font-size: 22px; }
     .ex-q { padding: 10px; }
   }
-`;
+${dhivehiInputCss(TP)}`;
 
 // How the surah-end questions of each exam type work, for help text.
 const typeRule = (type) => `${EXAM_TYPES[type]?.surahEnd ?? 1} question${type === "new_juz" ? "s start" : " starts"} at the ayah nearest the 3rd last line of a surah (student finishes the surah and starts the next one); inside a long surah, the end of a page → next page instead`;

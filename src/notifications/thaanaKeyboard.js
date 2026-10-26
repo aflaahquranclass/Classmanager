@@ -32,7 +32,11 @@ export function thaanaChange(e, prev, setValue, enabled) {
   const converted = toThaana(typed);
   if (converted === typed) { setValue(next); return; }
   const caret = el.selectionStart;
-  setValue(next.slice(0, start) + converted + next.slice(next.length - end));
-  // Each key maps to one character, so the caret stays where it was.
-  requestAnimationFrame(() => { try { el.setSelectionRange(caret, caret); } catch { /* detached */ } });
+  const value = next.slice(0, start) + converted + next.slice(next.length - end);
+  // Each key maps to one character, so the caret stays where it was. The
+  // field is updated here, before React re-renders it with the same value,
+  // so the caret never jumps to the end, however fast the typing.
+  el.value = value;
+  try { el.setSelectionRange(caret, caret); } catch { /* detached */ }
+  setValue(value);
 }

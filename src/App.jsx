@@ -6,6 +6,7 @@ import { examTypeLabel, questionRange } from "./exams/questions.js";
 import { confirmDialog, chooseDialog } from "./ConfirmDialog.jsx";
 import { buildPassageReport, canvasToPagedPdf, hasPassages } from "./exams/examReport.js";
 import { dhivehiRemarks } from "./exams/dhivehiRemarks.js";
+import { useRemarkLanguage, RemarkLanguageSwitch, RemarkInput } from "./exams/DhivehiInput.jsx";
 import { REPORT_LANGUAGES, loadReportOverrides, reportTranslator } from "./exams/reportStrings.js";
 import { AdminReportLanguage } from "./exams/ReportLanguageAdmin.jsx";
 import { AdminNotifications } from "./notifications/NotificationsAdmin.jsx";
@@ -1252,6 +1253,7 @@ export default function App() {
   });
   const [examQuestions, setExamQuestions] = useState([{ id: 1, surah: "", ayah: "", questionType: EXAM_QUESTION_TYPES[0], result: "correct", remark: "" }]);
   const [examComments, setExamComments] = useState("");
+  const [remarksDhivehi, setRemarksDhivehi] = useRemarkLanguage();
   const [examFinalResult, setExamFinalResult] = useState(null); // null | "pass" | "not_passed"
   const [examSubmitting, setExamSubmitting] = useState(false);
   const [examReports, setExamReports] = useState([]);
@@ -4565,6 +4567,7 @@ export default function App() {
                               <div style={{ fontSize: "15px", fontWeight: 700 }}>Questions</div>
                               <div className="ex-mark-progress">{examQuestions.filter((q) => q.result).length} of {examQuestions.length} marked</div>
                             </div>
+                            <RemarkLanguageSwitch dhivehi={remarksDhivehi} onChange={setRemarksDhivehi} />
                             {examQuestions.map((q, i) => {
                               const remarkMissing = q.result === "incorrect" && !q.remark.trim();
                               return (
@@ -4579,11 +4582,13 @@ export default function App() {
                                         <XCircle size={18} aria-hidden="true" />Not correct
                                       </button>
                                     </div>
-                                    <input
+                                    <RemarkInput
+                                      dhivehi={remarksDhivehi}
                                       className={`lc-input ex-mark-remark ${remarkMissing ? "ex-mark-missing" : ""}`}
                                       value={q.remark}
-                                      onChange={(e) => updateExamQuestion(q.id, "remark", e.target.value)}
+                                      onValue={(v) => updateExamQuestion(q.id, "remark", v)}
                                       placeholder={q.result === "incorrect" ? "Required — describe the mistake" : "Remark (optional)"}
+                                      dvPlaceholder={q.result === "incorrect" ? "ކުށް ލިޔުއްވާ (ލާޒިމު)" : "ރިމާކް (ލާޒިމެއް ނޫން)"}
                                       aria-label={`Question ${i + 1} remark`}
                                     />
                                   </div>
@@ -4593,6 +4598,7 @@ export default function App() {
                           </div>
                         ) : (<>
                         <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "12px" }}>Hifz Questions</div>
+                        <RemarkLanguageSwitch dhivehi={remarksDhivehi} onChange={setRemarksDhivehi} />
                         <div className="lc-table-wrap">
                           <table className="tp-exam-table">
                             <thead>
@@ -4641,11 +4647,13 @@ export default function App() {
                                       </select>
                                     </td>
                                     <td style={{ minWidth: "200px" }}>
-                                      <input
+                                      <RemarkInput
+                                        dhivehi={remarksDhivehi}
                                         className="lc-input"
                                         value={q.remark}
-                                        onChange={(e) => updateExamQuestion(q.id, "remark", e.target.value)}
+                                        onValue={(v) => updateExamQuestion(q.id, "remark", v)}
                                         placeholder={remarkRequired ? "Required — describe the mistake" : "Optional remark"}
+                                        dvPlaceholder={remarkRequired ? "ކުށް ލިޔުއްވާ (ލާޒިމު)" : "ރިމާކް (ލާޒިމެއް ނޫން)"}
                                         style={remarkMissing ? { borderColor: C.b, background: C.h } : {}}
                                       />
                                     </td>
@@ -4670,13 +4678,16 @@ export default function App() {
 
                         <div style={{ marginTop: "24px" }}>
                           <label style={{ fontSize: "14px", fontWeight: 700, display: "block", marginBottom: "8px" }}>Recitation comments</label>
-                          <textarea
+                          <RemarkInput
+                            multiline
+                            dhivehi={remarksDhivehi}
                             className="lc-input"
                             rows={4}
                             style={{ resize: "vertical" }}
                             value={examComments}
-                            onChange={(e) => setExamComments(e.target.value)}
+                            onValue={setExamComments}
                             placeholder="Recitation quality, fluency, pronunciation, memorization accuracy, strengths, areas requiring improvement…"
+                            dvPlaceholder="ކިޔެވުމުގެ ފެންވަރު، ތަޖްވީދު، ހިފްޒު، ރަނގަޅު ކަންކަމާއި ހަރުދަނާ ކުރަންޖެހޭ ކަންކަން…"
                           />
                         </div>
 
