@@ -10,7 +10,7 @@ import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT } from "../exams/reportStrings.js";
 import { thaanaChange, hasThaana } from "./thaanaKeyboard.js";
-import { TEMPLATES, PLACEHOLDER_LABELS, fillTemplate, smsParts, reminderSubject } from "./templates.js";
+import { TEMPLATES, PLACEHOLDER_LABELS, DEFAULT_TEMPLATE_BODIES, fillTemplate, smsParts, reminderSubject } from "./templates.js";
 import { loadTemplates, loadDvNames, createNotification, sendWelcome } from "./smsSend.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -45,14 +45,14 @@ function SmsPreview({ text }) {
 }
 
 function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, showToast, onSaved, onSent }) {
-  const [body, setBody] = useState(row?.body || "");
+  const [body, setBody] = useState(row?.body || DEFAULT_TEMPLATE_BODIES[def.key] || "");
   const [autoSend, setAutoSend] = useState(!!row?.auto_send);
-  const [dhivehi, setDhivehi] = useState(hasThaana(row?.body) || !row?.body);
+  const [dhivehi, setDhivehi] = useState(hasThaana(row?.body) || (!row?.body && !DEFAULT_TEMPLATE_BODIES[def.key]));
   const [saving, setSaving] = useState(false);
   const [sendTo, setSendTo] = useState("");
   const [sending, setSending] = useState(false);
   const ref = useRef(null);
-  const changed = body !== (row?.body || "") || autoSend !== !!row?.auto_send;
+  const changed = body !== (row?.body || DEFAULT_TEMPLATE_BODIES[def.key] || "") || autoSend !== !!row?.auto_send;
 
   const insert = (key) => {
     const el = ref.current;
@@ -163,7 +163,8 @@ function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, show
 export function SmsTemplates({ students, teachers, showToast, onSent }) {
   const { templates, setTemplates, dvNames } = useTemplateData();
   const sample = students.find((s) => s.className && s.schedule) || students[0];
-  const ctx = (s) => ({ teacherName: teacherNameOf(teachers, s), monthKey: thisMonth(), dvNames });
+  // Preview only: a made-up one-time password for {password}.
+  const ctx = (s) => ({ teacherName: teacherNameOf(teachers, s), monthKey: thisMonth(), dvNames, password: "Ab7kP2mQ" });
 
   if (!templates) return <div className="lc-loading-row" style={{ marginBottom: "16px" }}><span className="lc-spinner"></span>Loading templates…</div>;
   return TEMPLATES.map((def) => (

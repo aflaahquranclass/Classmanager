@@ -4,7 +4,7 @@
 // automatic welcome message when a student is added.
 
 import { supabase } from "../supabaseClient.js";
-import { fillTemplate, welcomeSubject } from "./templates.js";
+import { fillTemplate, welcomeSubject, DEFAULT_TEMPLATE_BODIES } from "./templates.js";
 
 export async function loadTemplates() {
   const { data } = await supabase.from("sms_templates").select("key, body, auto_send");
@@ -88,6 +88,18 @@ export async function sendWelcome(student, teacherName, templateBody, dvNames) {
   const body = fillTemplate(templateBody, student, { teacherName, dvNames });
   return createNotification({
     title: welcomeSubject(templateBody), body, audience: "welcome", audienceLabel: `Welcome — ${student.name}`,
+    inApp: false, sms: !!student.phone, email: !!student.email,
+    recipients: [{ student_id: student.id, name: student.name, phone: student.phone, email: student.email, body }],
+  });
+}
+
+// Student portal login details (Student ID + one-time password) for one
+// student, by SMS and email if they have them. Returns { ok, message }.
+export async function sendPortalLogin(student, password) {
+  const tpl = (await loadTemplates()).portal_login?.body?.trim() || DEFAULT_TEMPLATE_BODIES.portal_login;
+  const body = fillTemplate(tpl, student, { password, dvNames: await loadDvNames() });
+  return createNotification({
+    title: "Aflaah Student Portal login", body, audience: "portal_login", audienceLabel: `Portal login — ${student.name}`,
     inApp: false, sms: !!student.phone, email: !!student.email,
     recipients: [{ student_id: student.id, name: student.name, phone: student.phone, email: student.email, body }],
   });

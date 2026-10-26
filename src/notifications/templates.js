@@ -19,11 +19,26 @@ export const TEMPLATES = [
     hint: "Sent to students who haven't paid the month's fee.",
     placeholders: ["name", "student_id", "month", "fee", "class"],
   },
+  {
+    key: "portal_login",
+    label: "Student portal login",
+    hint: "Sent from Students → Edit with the student's Student ID and one-time password.",
+    placeholders: ["name", "student_id", "password", "link"],
+  },
 ];
+
+// Where students sign in; filled in as {link}.
+export const STUDENT_PORTAL_LINK = "https://students.aflaahqc.com";
+
+// Used until the admin saves their own wording under Templates.
+export const DEFAULT_TEMPLATE_BODIES = {
+  portal_login: "Assalaamu alaikum {name}. Your Aflaah Student Portal login:\n{link}\nStudent ID: {student_id}\nOne-time password: {password}\nYou will choose your own password when you sign in.",
+};
 
 export const PLACEHOLDER_LABELS = {
   name: "Student name", student_id: "Student ID", class: "Class", teacher: "Teacher",
   days: "Class days", time: "Class time", fee: "Monthly fee", month: "Month",
+  password: "One-time password", link: "Portal link",
 };
 
 // Email subject lines, in the template's language.
@@ -54,7 +69,7 @@ function time12(t) {
 const fmtFee = (n) => (Number(n) || 0).toLocaleString("en-US", { maximumFractionDigits: 2 });
 
 // student: { name, studentCode, className, fee, schedule: { days, startTime, endTime } }
-// ctx: { teacherName, monthKey ("2026-10"), dvNames: { [englishName]: thaana } }
+// ctx: { teacherName, monthKey ("2026-10"), dvNames: { [englishName]: thaana }, password }
 export function fillTemplate(body, student, ctx = {}) {
   const dv = hasThaana(body);
   const sched = student.schedule || {};
@@ -70,6 +85,8 @@ export function fillTemplate(body, student, ctx = {}) {
     time: sched.startTime ? `${time12(sched.startTime)} - ${time12(sched.endTime)}` : "",
     fee: dv ? `${fmtFee(student.fee)} ރުފިޔާ` : `MVR ${fmtFee(student.fee)}`,
     month: m ? (dv ? `${MONTHS_DV[m - 1]} ${y}` : `${MONTHS_EN[m - 1]} ${y}`) : "",
+    password: ctx.password || "",
+    link: STUDENT_PORTAL_LINK,
   };
   return body.replace(/\{(\w+)\}/g, (all, key) => (key in values ? values[key] : all)).replace(/[ \t]{2,}/g, " ").trim();
 }

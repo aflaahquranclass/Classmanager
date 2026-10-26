@@ -28,7 +28,7 @@ test("only the typed key is converted, pastes stay as they are", () => {
   assert.equal(v, "abc");
 });
 
-import { fillTemplate } from "../src/notifications/templates.js";
+import { fillTemplate, DEFAULT_TEMPLATE_BODIES } from "../src/notifications/templates.js";
 
 const student = { name: "Ahmed", studentCode: "AQC-012", className: "Hifz Class", fee: 500, schedule: { days: ["Sun", "Tue"], startTime: "16:00", endTime: "17:30" } };
 
@@ -43,4 +43,12 @@ test("English template fills the student's details", () => {
 test("Dhivehi template gets Dhivehi name, days, month and fee", () => {
   const out = fillTemplate("{name} ގެ {month} ގެ ފީ {fee} - {days}", student, { monthKey: "2026-10", dvNames: { Ahmed: "އަޙްމަދު" } });
   assert.equal(out, "އަޙްމަދު ގެ އޮކްޓޫބަރު 2026 ގެ ފީ 500 ރުފިޔާ - އާދިއްތަ، އަންގާރަ");
+});
+
+test("portal login template fills name, Student ID, password and link", () => {
+  const out = fillTemplate(DEFAULT_TEMPLATE_BODIES.portal_login, { name: "Ahmed", studentCode: "AQC0001" }, { password: "Ab7kP2mQ" });
+  assert.match(out, /Ahmed/);
+  assert.match(out, /Student ID: AQC0001/);
+  assert.match(out, /One-time password: Ab7kP2mQ/);
+  assert.match(out, /https:\/\/students\.aflaahqc\.com/);
 });
