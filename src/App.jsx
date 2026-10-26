@@ -540,6 +540,11 @@ function detectPortal() {
 }
 export const PORTAL = detectPortal();
 
+// The address students sign in at (shared with them from Admin → Students).
+const STUDENT_PORTAL_URL = ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  ? `${window.location.origin}/?portal=student`
+  : "https://students.aflaahqc.com";
+
 // Unified sign-in screen: Teachers Portal and Admin Portal (or just one of
 // them when this address is dedicated to a single portal).
 function LoginScreen({
@@ -1146,7 +1151,7 @@ export default function App() {
     name: s.name, class_id: s.classId || null, class_name: s.className || null,
     fee: Number(s.fee) || 0, phone: s.phone || null, teacher_id: s.teacherId || null,
     teacher_share_percent: Number(s.sharePercent) || 0, schedule: s.schedule || null,
-    joined_month: s.joinedMonth || null,
+    joined_month: s.joinedMonth || null, email: s.email || null,
   });
   const STUDENT_FROM_DB = (r) => ({
     id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, className: r.class_name,
@@ -1296,6 +1301,10 @@ export default function App() {
   const [sPhone, setSPhone] = useState("");
   const [sSharePercent, setSSharePercent] = useState("0");
   const [sJoinedMonth, setSJoinedMonth] = useState("");
+  const [sEmail, setSEmail] = useState("");
+  const [studentLinkError, setStudentLinkError] = useState("");
+  const [studentLinkLoading, setStudentLinkLoading] = useState(false);
+  const [studentOtp, setStudentOtp] = useState(null); // { login, password } just issued
 
   // Teacher form
   const [showTeacherForm, setShowTeacherForm] = useState(false);
@@ -1986,7 +1995,7 @@ export default function App() {
   // ---- Students ----
   const resetStudentForm = () => {
     setSName(""); setSClassId(""); setSFee(""); setSPhone(""); setSSharePercent("0");
-    setSJoinedMonth(month);
+    setSJoinedMonth(month); setSEmail(""); setStudentLinkError(""); setStudentOtp(null);
     setShowStudentForm(false); setEditingStudentId(null);
   };
 
@@ -2011,6 +2020,7 @@ export default function App() {
       sharePercent,
       schedule,
       joinedMonth: sJoinedMonth || month,
+      email: sEmail.trim(),
     };
     if (editingStudentId) {
       saveStudents(students.map((s) => (s.id === editingStudentId ? { ...s, ...payload } : s)));
@@ -2037,7 +2047,37 @@ export default function App() {
     setSPhone(s.phone || "");
     setSSharePercent(s.sharePercent != null ? String(s.sharePercent) : "0");
     setSJoinedMonth(s.joinedMonth || month);
+    setSEmail(s.email || ""); setStudentLinkError(""); setStudentOtp(null);
     setShowStudentForm(true);
+  };
+
+  // Creates the student's portal login (their Student ID) with a one-time
+  // password, or resets it to a new one. The student-login Edge Function does
+  // this, since creating logins needs the service key. The student chooses
+  // their own password the first time they sign in.
+  const issueStudentLogin = async (studentId) => {
+    setStudentLinkLoading(true);
+    setStudentLinkError("");
+    setStudentOtp(null);
+    const { data, error } = await supabase.functions.invoke("student-login", { body: { student_id: studentId } });
+    setStudentLinkLoading(false);
+    const message = data?.error || (error && (await error.context?.json?.().catch(() => null))?.error) || error?.message;
+    if (message || !data?.password) { setStudentLinkError(message || "Couldn't create the login."); return; }
+    setStudentOtp(data);
+    const { data: row } = await supabase.from("students").select("*").eq("id", studentId).maybeSingle();
+    if (row) setStudents((prev) => prev.map((x) => (x.id === studentId ? STUDENT_FROM_DB(row) : x)));
+  };
+
+  const copyStudentLoginDetails = async () => {
+    if (!studentOtp) return;
+    const text = `Aflaah Student Portal\n${STUDENT_PORTAL_URL}\nStudent ID: ${studentOtp.login}\nOne-time password: ${studentOtp.password}\nYou'll choose your own password when you first sign in.`;
+    try { await navigator.clipboard.writeText(text); showToast("Login details copied"); }
+    catch { showToast("Couldn't copy — select the text instead"); }
+  };
+
+  const copyStudentPortalLink = async () => {
+    try { await navigator.clipboard.writeText(STUDENT_PORTAL_URL); showToast("Student portal link copied"); }
+    catch { showToast(STUDENT_PORTAL_URL); }
   };
 
   // Flip whether a student has been added to their class's student group.
@@ -5465,6 +5505,10 @@ export default function App() {
                                   <input className="lc-input" value={sPhone} onChange={(e) => setSPhone(e.target.value)} placeholder="Contact number" />
                                 </div>
                                 <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Email (optional)</label>
+                                  <input className="lc-input" type="email" value={sEmail} onChange={(e) => setSEmail(e.target.value)} placeholder="For notifications" />
+                                </div>
+                                <div>
                                   <label style={{ fontSize: "12px", color: C.a }}>Teacher's share of fee (%)</label>
                                   <input className="lc-input" type="number" min="0" max="100" step="1" value={sSharePercent} onChange={(e) => setSSharePercent(e.target.value)} placeholder="0" />
                                 </div>
@@ -5503,6 +5547,45 @@ export default function App() {
                                   Choose a class above to automatically set this student's teacher and class time.
                                 </div>
                               )}
+
+                              {editingStudentId && (() => {
+                                const linked = students.find((st) => st.id === editingStudentId)?.userId;
+                                return (
+                                  <div className="lc-card" style={{ background: C.g, marginTop: "12px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", marginBottom: "8px" }}>
+                                      <strong style={{ fontSize: "13px", color: TP.navy }}>Student portal</strong>
+                                      <span className={`lc-badge ${linked ? "lc-badge-paid" : "lc-badge-pending"}`} style={{ cursor: "default" }}>{linked ? "Login linked" : "Not linked"}</span>
+                                    </div>
+                                    <div style={{ fontSize: "13px", color: C.w, marginBottom: "8px" }}>
+                                      Login: <strong>{students.find((st) => st.id === editingStudentId)?.studentCode || "—"}</strong> (Student ID)
+                                    </div>
+                                    {studentOtp ? (
+                                      <div style={{ background: "#fff", border: `1px solid ${TP.border}`, borderRadius: "8px", padding: "10px 12px", marginBottom: "8px" }}>
+                                        <div style={{ fontSize: "12px", color: C.a }}>One-time password — share it with the student now; it won't be shown again.</div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "6px" }}>
+                                          <code style={{ fontSize: "18px", fontWeight: 700, letterSpacing: "0.08em", color: TP.navy }}>{studentOtp.password}</code>
+                                          <button className="lc-btn" onClick={copyStudentLoginDetails}>Copy login details</button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <button className="lc-btn" style={{ marginBottom: "8px" }} disabled={studentLinkLoading} onClick={() => issueStudentLogin(editingStudentId)}>
+                                        {studentLinkLoading ? "Creating…" : linked ? "Reset password" : "Create login"}
+                                      </button>
+                                    )}
+                                    {studentLinkError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "6px" }}>{studentLinkError}</div>}
+                                    <div style={{ fontSize: "12px", color: C.a, marginBottom: "10px" }}>
+                                      The student signs in with their Student ID and this one-time password, then sets their own password.
+                                      {linked && " Reset password gives them a new one-time password if they forget theirs."}
+                                    </div>
+                                    <label style={{ fontSize: "12px", color: C.a }}>Portal link</label>
+                                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                                      <code style={{ flex: "1 1 220px", fontSize: "13px", padding: "8px 10px", background: "#fff", border: `1px solid ${TP.border}`, borderRadius: "8px", wordBreak: "break-all" }}>{STUDENT_PORTAL_URL}</code>
+                                      <button className="lc-btn" onClick={copyStudentPortalLink}>Copy link</button>
+                                      <a className="lc-btn" href={STUDENT_PORTAL_URL} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>Open</a>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
                               <div style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
                                 <button className="lc-btn lc-btn-primary" onClick={handleSaveStudent}>{editingStudentId ? "Save changes" : "Add student"}</button>

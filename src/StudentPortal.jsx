@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, Mail, Lock } from "lucide-react";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock } from "lucide-react";
 import { TP } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
 import HifzTracker, { HIFZ_CSS, completedCounts } from "./HifzTracker.jsx";
@@ -120,6 +120,15 @@ function StudentAvatarIcon({ size = 64 }) {
   );
 }
 
+// Students sign in with their Student ID (e.g. AQC0001). Their Supabase login
+// is the hidden address <id>@students.aflaahqc.com (made by the student-login
+// Edge Function); an older login that is a real email still works as typed.
+const STUDENT_LOGIN_DOMAIN = "students.aflaahqc.com";
+export const studentLoginEmail = (id) => {
+  const v = id.trim();
+  return v.includes("@") ? v : `${v.toLowerCase()}@${STUDENT_LOGIN_DOMAIN}`;
+};
+
 function StudentLogin({ error, onSignIn }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -134,15 +143,52 @@ function StudentLogin({ error, onSignIn }) {
     <form className="sp-card sp-login" onSubmit={submit} aria-label="Student sign in">
       <div className="sp-avatar sp-login-avatar"><StudentAvatarIcon /></div>
       <h1>Student Portal</h1>
-      <p className="hz-muted">Sign in with the login your class gave you.</p>
-      <label className="sp-login-field"><Mail size={18} aria-hidden="true" />
-        <input className="hz-input" type="email" autoComplete="email" placeholder="Email" aria-label="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+      <p className="hz-muted">Sign in with your Student ID and password.</p>
+      <label className="sp-login-field"><ContactRound size={18} aria-hidden="true" />
+        <input className="hz-input" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false} placeholder="Student ID (e.g. AQC0001)" aria-label="Student ID" value={email} onChange={(e) => setEmail(e.target.value)} required />
       </label>
       <label className="sp-login-field"><Lock size={18} aria-hidden="true" />
         <input className="hz-input" type="password" autoComplete="current-password" placeholder="Password" aria-label="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </label>
       {error && <div className="hz-error" role="alert">{error}</div>}
       <button className="hz-btn hz-btn-primary" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+      <p className="hz-muted" style={{ fontSize: "13px" }}>Forgot your password? Contact the class admin for a new one-time password.</p>
+    </form>
+  );
+}
+
+// First sign-in with the one-time password from the admin: the student picks
+// their own password, and the must_change_password flag is cleared with it.
+function SetPassword({ studentName, onDone, onCancel }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (password.length < 8) { setError("Use at least 8 characters."); return; }
+    if (password !== confirm) { setError("The two passwords don't match."); return; }
+    setBusy(true);
+    setError("");
+    const { error: err } = await supabase.auth.updateUser({ password, data: { must_change_password: false } });
+    setBusy(false);
+    if (err) { setError(/different from the old/i.test(err.message) ? "Choose a password different from the one-time password." : err.message); return; }
+    onDone();
+  };
+  return (
+    <form className="sp-card sp-login" onSubmit={submit} aria-label="Set your password">
+      <div className="sp-avatar sp-login-avatar"><StudentAvatarIcon /></div>
+      <h1>Set your password</h1>
+      <p className="hz-muted">Assalaamu alaikum{studentName ? ` ${studentName}` : ""}! Choose your own password — you'll use it with your Student ID from now on.</p>
+      <label className="sp-login-field"><Lock size={18} aria-hidden="true" />
+        <input className="hz-input" type="password" autoComplete="new-password" placeholder="New password" aria-label="New password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+      </label>
+      <label className="sp-login-field"><Lock size={18} aria-hidden="true" />
+        <input className="hz-input" type="password" autoComplete="new-password" placeholder="Confirm new password" aria-label="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+      </label>
+      {error && <div className="hz-error" role="alert">{error}</div>}
+      <button className="hz-btn hz-btn-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
+      <button className="hz-btn" type="button" onClick={onCancel}>Sign out</button>
     </form>
   );
 }
@@ -160,16 +206,16 @@ export default function StudentPortal() {
   const [view, setView] = useState("dashboard");
   const [summary, setSummary] = useState(null);
 
-  const routeUser = useCallback(async (userId) => {
+  const routeUser = useCallback(async (user) => {
     try {
-      const student = await loadStudentForUser(userId);
+      const student = await loadStudentForUser(user.id);
       if (!student) {
         await supabase.auth.signOut();
         setLoginError("This login isn't linked to a student yet. Ask the admin to link it.");
         setAuth({ status: "login" });
         return;
       }
-      setAuth({ status: "ready", student });
+      setAuth({ status: user.user_metadata?.must_change_password ? "set-password" : "ready", student });
     } catch (e) {
       setLoginError(e.message);
       setAuth({ status: "login" });
@@ -181,7 +227,7 @@ export default function StudentPortal() {
     let cancelled = false;
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (cancelled) return;
-      if (session) routeUser(session.user.id);
+      if (session) routeUser(session.user);
       else setAuth({ status: "login" });
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -192,9 +238,9 @@ export default function StudentPortal() {
 
   const signIn = async (email, password) => {
     setLoginError("");
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { setLoginError("Incorrect email or password."); return; }
-    await routeUser(data.user.id);
+    const { data, error } = await supabase.auth.signInWithPassword({ email: studentLoginEmail(email), password });
+    if (error) { setLoginError("Incorrect Student ID or password."); return; }
+    await routeUser(data.user);
   };
 
   const student = auth.student;
@@ -376,6 +422,15 @@ export default function StudentPortal() {
       <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-bottom" alt="" aria-hidden="true" />
       {auth.status === "loading" && <main className="sp-wrap"><div className="hz-card hz-muted">Loading…</div></main>}
       {auth.status === "login" && <main className="sp-wrap"><StudentLogin error={loginError} onSignIn={signIn} /></main>}
+      {auth.status === "set-password" && (
+        <main className="sp-wrap">
+          <SetPassword
+            studentName={auth.student?.name}
+            onDone={() => setAuth((a) => ({ ...a, status: "ready" }))}
+            onCancel={() => supabase.auth.signOut()}
+          />
+        </main>
+      )}
       {ready && (
       <main className={`sp-wrap ${view === "hifz" ? "sp-wrap-wide" : ""}`}>
         <section className="sp-card sp-grad sp-header" aria-label="Student profile">
