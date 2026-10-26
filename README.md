@@ -93,6 +93,21 @@ npm run build
 npx wrangler deploy
 ```
 
+### Dhivehi exam reports
+
+When an exam report is downloaded in Dhivehi, its remarks and comments are put
+into correct Dhivehi by Claude through the Worker (`/api/dhivehi`,
+`worker/dhivehi.js`): English is translated, Dhivehi typed in Latin letters is
+written in Thaana, and Thaana is checked for spelling and punctuation. It needs
+an Anthropic API key as a Worker secret:
+
+```bash
+npx wrangler secret put ANTHROPIC_API_KEY
+```
+
+Without the key (or when developing locally) remarks are shown as written,
+with Thaana punctuation tidied.
+
 ### Notifications: SMS and email
 
 Admin → Notifications sends messages in the app, by SMS and by email.

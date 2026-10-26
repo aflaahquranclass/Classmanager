@@ -1,6 +1,8 @@
 // The site's Cloudflare Worker. Static files (dist/) are served by the assets
 // binding; only /api/* runs this code (see run_worker_first in wrangler.jsonc).
 //
+// POST /api/dhivehi — exam remarks in correct Dhivehi (see dhivehi.js).
+//
 // POST /api/email  { action: "status" }                      → is email set up?
 //                  { action: "send", notification_id: uuid } → send its pending emails
 //
@@ -8,6 +10,8 @@
 // binding). The caller must be a signed-in admin: the Worker checks their
 // Supabase login and reads/updates the notification with their own token, so
 // row-level security still applies and no Supabase secret is stored here.
+
+import { handleDhivehi } from "./dhivehi.js";
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -90,6 +94,7 @@ export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
     if (pathname === "/api/email") return handleEmail(request, env);
+    if (pathname === "/api/dhivehi") return handleDhivehi(request, env);
     if (pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
     return env.ASSETS.fetch(request);
   },

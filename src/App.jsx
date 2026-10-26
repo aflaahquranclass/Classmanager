@@ -5,6 +5,7 @@ import { AdminExamScheduler, TeacherScheduledExams, QuestionCard, Passage, examC
 import { examTypeLabel, questionRange } from "./exams/questions.js";
 import { confirmDialog, chooseDialog } from "./ConfirmDialog.jsx";
 import { buildPassageReport, canvasToPagedPdf, hasPassages } from "./exams/examReport.js";
+import { dhivehiRemarks } from "./exams/dhivehiRemarks.js";
 import { REPORT_LANGUAGES, loadReportOverrides, reportTranslator } from "./exams/reportStrings.js";
 import { AdminReportLanguage } from "./exams/ReportLanguageAdmin.jsx";
 import { AdminNotifications } from "./notifications/NotificationsAdmin.jsx";
@@ -3314,7 +3315,14 @@ export default function App() {
     try {
       showToast("Preparing the report…");
       const t = reportTranslator(lang, await loadReportOverrides());
-      const { canvas, width, height, breaks } = await buildPassageReport(await withExamSession(exam), logoImg, { lang, t });
+      let report = await withExamSession(exam);
+      if (lang === "dv") {
+        // Remarks and comments go into the Dhivehi report in Dhivehi too.
+        const { exam: dv, untranslated } = await dhivehiRemarks(report);
+        report = dv;
+        if (untranslated) showToast(`${untranslated} remark${untranslated === 1 ? "" : "s"} couldn't be put into Dhivehi and ${untranslated === 1 ? "is" : "are"} shown as written.`);
+      }
+      const { canvas, width, height, breaks } = await buildPassageReport(report, logoImg, { lang, t });
       const { blob } = canvasToPagedPdf(canvas, width, height, breaks);
       const url = URL.createObjectURL(blob);
       triggerDownload(url, lang === "en" ? filename : filename.replace(/\.pdf$/, `-${lang}.pdf`));

@@ -180,3 +180,9 @@ test("no question starts in Al-Fatihah", () => {
     }
   }
 });
+
+test("Thaana remarks get Dhivehi punctuation and spacing", async () => {
+  const { tidyThaana } = await import("../src/exams/dhivehiRemarks.js");
+  assert.equal(tidyThaana("ރަނގަޅު , ނަމަވެސް  މަދުން?"), "ރަނގަޅު، ނަމަވެސް މަދުން؟");
+  assert.equal(tidyThaana("Good, well done?"), "Good, well done?");
+});
