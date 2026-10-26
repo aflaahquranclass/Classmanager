@@ -36,6 +36,7 @@ export const examCss = () => `
   .ex-q-num { font-weight: 800; color: ${TP.navy}; }
   .ex-q-kind { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #E4F1FC; color: ${TP.blue}; }
   .ex-q-kind-surah_end { background: #FCF1DD; color: #9C6B12; }
+  .ex-q-kind-page_end { background: #EAF5EC; color: #2E7D4F; }
   @font-face { font-family: "UthmanicHafs"; src: url("/fonts/UthmanicHafs1Ver18.woff2") format("woff2"); font-display: swap; }
   .ex-q-range { font-size: 13px; color: ${TP.navy}; margin-top: 8px; }
   .ex-q-range span { color: ${TP.secondaryText}; }
@@ -129,7 +130,10 @@ export const examCss = () => `
 `;
 
 // How the surah-end questions of each exam type work, for help text.
-const typeRule = (type) => `${EXAM_TYPES[type]?.surahEnd ?? 1} question${type === "new_juz" ? "s start" : " starts"} at the ayah nearest the 3rd last line of a surah (student finishes the surah and starts the next one)`;
+const typeRule = (type) => `${EXAM_TYPES[type]?.surahEnd ?? 1} question${type === "new_juz" ? "s start" : " starts"} at the ayah nearest the 3rd last line of a surah (student finishes the surah and starts the next one); inside a long surah, the end of a page → next page instead`;
+
+// Label for a question's kind.
+export const questionKindLabel = (kind, other) => (kind === "surah_end" ? "End of surah → next surah" : kind === "page_end" ? "End of page → next page" : other);
 
 // ---------- small helpers ----------
 
@@ -247,7 +251,7 @@ export function QuestionCard({ q, index, children, marks = [], onMarksChange }) 
     <div className="ex-q">
       <div className="ex-q-head">
         <span className="ex-q-num">Q{index + 1}</span>
-        <span className={`ex-q-kind ex-q-kind-${q.kind}`}>{q.kind === "surah_end" ? "End of surah → next surah" : "Random ayah"}</span>
+        <span className={`ex-q-kind ex-q-kind-${q.kind}`}>{questionKindLabel(q.kind, "Random ayah")}</span>
         <span className="ex-lines">Recite {q.lines || LINES_PER_QUESTION} lines</span>
         <span className="ex-ayah-note">≈ {passageLines(first, last).toFixed(1)} lines</span>
         {onMarksChange && (
@@ -506,7 +510,7 @@ export function AdminExamScheduler({ students, teachers, showToast, tabs }) {
             {Object.entries(EXAM_TYPES).map(([key, t]) => (
               <button key={key} type="button" className="ex-type" aria-pressed={newType === key} onClick={() => setNewType(key)}>
                 {t.label}
-                <small>{t.surahEnd} from end of surah</small>
+                <small>{t.surahEnd} from end of surah (or page)</small>
               </button>
             ))}
           </div>

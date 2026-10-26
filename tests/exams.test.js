@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { generateExamQuestions, juzAyahRange, pageOfAyah, describeAyah, surahEndStart, passageEnd, passageLines, questionRange } from "../src/exams/questions.js";
+import { generateExamQuestions, juzAyahRange, pageOfAyah, describeAyah, surahEndStart, pageEndStart, passageEnd, passageLines, questionRange } from "../src/exams/questions.js";
 import { AYAH_START_LINE, AYAH_END_LINE } from "../src/hifz/ayahLines.js";
 import { SURAH_AYAH_COUNTS } from "../src/hifz/ayahs.js";
 
@@ -115,11 +115,32 @@ test("questions come out in random order and change between runs", () => {
   assert.ok(sets.size > 15, "different exams get different questions");
 });
 
-test("juz with no surah ending gets only continue questions", () => {
+test("juz with no surah ending gets page-end questions instead", () => {
   // Juz 2 is entirely inside Al-Baqarah.
-  const qs = generateExamQuestions({ juz: [2], count: 4, random: seeded(3) });
-  assert.equal(qs.length, 4);
-  assert.ok(qs.every((q) => q.kind === "continue" && q.prompt.surah === 2));
+  for (const [type, want] of [["muraja", 1], ["new_juz", 3]]) {
+    for (let seed = 1; seed < 20; seed++) {
+      const qs = generateExamQuestions({ type, juz: [2], count: 5, random: seeded(seed) });
+      assert.equal(qs.length, 5);
+      assert.ok(qs.every((q) => q.prompt.surah === 2 && q.kind !== "surah_end"));
+      const pages = qs.filter((q) => q.kind === "page_end");
+      assert.equal(pages.length, want);
+      for (const q of pages) {
+        assert.equal(q.prompt.number, pageEndStart(q.prompt.page));
+        assert.ok(q.prompt.line >= 11, "starts near the end of the page");
+        const [, b] = questionRange(q);
+        assert.ok(describeAyah(b).page > q.prompt.page || AYAH_END_LINE[b - 1] >= q.prompt.page * 15, "carries on onto the next page");
+        assert.equal(describeAyah(b).surah, 2);
+      }
+      assert.equal(new Set(qs.map((q) => q.prompt.number)).size, 5);
+    }
+  }
+});
+
+test("juz with too few surah endings tops up with page-end questions", () => {
+  // Juz 3 has one surah ending (Al-Baqarah → Aal-Imran).
+  const qs = generateExamQuestions({ type: "new_juz", juz: [3], count: 5, random: seeded(2) });
+  assert.equal(qs.filter((q) => q.kind === "surah_end").length, 1);
+  assert.equal(qs.filter((q) => q.kind === "page_end").length, 2);
 });
 
 test("surah ending across two selected juz counts; across an unselected one does not", () => {

@@ -4,7 +4,10 @@
 // random order. Every question is "recite 5 lines from here".
 // "Surah end" questions start at the ayah nearest to the 3rd last line of a
 // surah, so the student recites the end of the surah and carries on into the
-// next one. A Muraja'ah exam has 1 of these, a New juz exam has 3. The
+// next one. A Muraja'ah exam has 1 of these, a New juz exam has 3. Inside
+// long surahs a juz may have fewer surah ends than that, so the rest become
+// "page end" questions: they start at the ayah nearest the 3rd last line of a
+// page and carry on onto the next page. The
 // remaining questions start at random ayahs spread across the selected juz. Ayahs are numbered 1–6236 straight through the Quran (see hifz/ayahs.js).
 
 import { SURAH_AYAH_COUNTS, PAGE_FIRST_AYAH, TOTAL_AYAHS, ayahRef } from "../hifz/ayahs.js";
@@ -40,6 +43,17 @@ export function surahEndStart(s) {
     const d = Math.abs(AYAH_START_LINE[n - 1] - target);
     if (d <= Math.abs(AYAH_START_LINE[best - 1] - target)) best = n;
     if (AYAH_START_LINE[n - 1] < target - SURAH_END_LINE) break;
+  }
+  return best;
+}
+
+// The ayah starting on page p nearest to its 3rd last line (on a tie, the
+// earlier one).
+export function pageEndStart(p) {
+  const target = p * LINES_PER_PAGE - SURAH_END_LINE;
+  let best = null;
+  for (let n = PAGE_FIRST_AYAH[p - 1]; n <= TOTAL_AYAHS && AYAH_START_LINE[n - 1] < p * LINES_PER_PAGE; n++) {
+    if (best == null || Math.abs(AYAH_START_LINE[n - 1] - target) < Math.abs(AYAH_START_LINE[best - 1] - target)) best = n;
   }
   return best;
 }
@@ -108,11 +122,12 @@ export function passageEnd(start, lines = LINES_PER_QUESTION) {
 // [first, last] ayah numbers a question asks the student to recite, always
 // worked out from its starting ayah (so questions generated earlier get the
 // current rule too). A surah-end passage always reaches at least the next
-// surah's first ayah.
+// surah's first ayah; a page-end passage always carries on onto the next page.
 export function questionRange(q) {
   const start = q.prompt.number;
   let end = passageEnd(start, q.lines || LINES_PER_QUESTION);
   if (q.kind === "surah_end") end = Math.max(end, (q.nextSurah || q.expected).number);
+  if (q.kind === "page_end") while (end < TOTAL_AYAHS && AYAH_END_LINE[end - 1] < q.prompt.page * LINES_PER_PAGE) end++;
   return [start, Math.min(end, TOTAL_AYAHS)];
 }
 
@@ -155,10 +170,11 @@ export function generateExamQuestions({ type = "muraja", juz, count, random = Ma
   // Where a question starting at ayah n would end, and how many lines it is.
   const passage = (kind) => (n) => {
     const nextSurah = kind === "surah_end" ? { number: surahLast(ayahRef(n).surah) + 1 } : null;
-    const [a, b] = questionRange({ kind, lines: LINES_PER_QUESTION, prompt: { number: n }, nextSurah, expected: { number: n + 1 } });
+    const [a, b] = questionRange({ kind, lines: LINES_PER_QUESTION, prompt: { number: n, page: pageOfAyah(n) }, nextSurah, expected: { number: n + 1 } });
     return { end: b, lines: passageLines(a, b) };
   };
   const endPassage = passage("surah_end");
+  const pagePassage = passage("page_end");
   const randomPassage = passage("continue");
   // The whole passage must be inside the selected juz and a full 5 lines.
   const fits = ({ end, lines }) => inRange(end) && lines >= LINES_PER_QUESTION - 1e-9;
@@ -174,12 +190,29 @@ export function generateExamQuestions({ type = "muraja", juz, count, random = Ma
   starts = preferLength(starts, (n) => endPassage(n).lines, endCount);
   const ends = spreadPick(starts, endCount, random);
 
+  // Not enough surah ends (a long surah): the rest of that quota start near
+  // the end of a page and carry on onto the next page, staying in one surah.
+  const pageEndCount = Math.min(rules.surahEnd, total) - ends.length;
+  let pageStarts = [];
+  if (pageEndCount > 0) {
+    for (let p = 1; p < TOTAL_PAGES; p++) {
+      const start = pageEndStart(p);
+      if (start == null || !inRange(start) || ends.includes(start)) continue;
+      const pp = pagePassage(start);
+      if (!fits(pp) || ayahRef(pp.end).surah !== ayahRef(start).surah || isSurahLast(pp.end)) continue;
+      pageStarts.push(start);
+    }
+  }
+  const pageCount = Math.min(pageEndCount, pageStarts.length);
+  pageStarts = preferLength(pageStarts, (n) => pagePassage(n).lines, pageCount);
+  const pageEnds = spreadPick(pageStarts, pageCount, random);
+
   // Random questions never start on a surah's last ayah (that's a surah-end
-  // question) and never repeat a surah-end start.
-  const taken = new Set(ends);
+  // question) and never repeat a surah-end or page-end start.
+  const taken = new Set([...ends, ...pageEnds]);
   let pool = [];
   for (const [a, b] of ranges) for (let n = a; n < b; n++) if (!isSurahLast(n) && !taken.has(n) && fits(randomPassage(n))) pool.push(n);
-  const randomCount = Math.min(total - ends.length, pool.length);
+  const randomCount = Math.min(total - ends.length - pageEnds.length, pool.length);
   pool = preferLength(pool, (n) => randomPassage(n).lines, randomCount);
   const randoms = spreadPick(pool, randomCount, random);
 
@@ -190,7 +223,7 @@ export function generateExamQuestions({ type = "muraja", juz, count, random = Ma
     expected: describeAyah(n + 1),
     nextSurah: kind === "surah_end" ? describeAyah(surahLast(ayahRef(n).surah) + 1) : null,
   });
-  return shuffle([...ends.map(make("surah_end")), ...randoms.map(make("continue"))], random);
+  return shuffle([...ends.map(make("surah_end")), ...pageEnds.map(make("page_end")), ...randoms.map(make("continue"))], random);
 }
 
 // "Juz 29, 30"
@@ -200,5 +233,6 @@ export const describeJuzList = (juz) => (normalizeJuz(juz).length ? `Juz ${norma
 export function describeQuestion(q) {
   const p = q.prompt;
   if (q.kind === "surah_end") return `End of ${p.surahName} (ayah ${p.ayah}) → into ${q.nextSurah?.surahName || q.expected.surahName}`;
+  if (q.kind === "page_end") return `End of page ${p.page} (${p.surahName} ${p.ayah}) → into page ${p.page + 1}`;
   return `Continue from ${p.surahName} ${p.ayah}`;
 }

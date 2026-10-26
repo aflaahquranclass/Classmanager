@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus, Bell } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
-import { AdminExamScheduler, TeacherScheduledExams, QuestionCard, Passage, examCss } from "./exams/ExamUI.jsx";
+import { AdminExamScheduler, TeacherScheduledExams, QuestionCard, Passage, examCss, questionKindLabel } from "./exams/ExamUI.jsx";
 import { examTypeLabel, questionRange } from "./exams/questions.js";
 import { confirmDialog, chooseDialog } from "./ConfirmDialog.jsx";
 import { buildPassageReport, canvasToPagedPdf, hasPassages } from "./exams/examReport.js";
@@ -1890,7 +1890,7 @@ export default function App() {
         id: i + 1,
         surah: SURAH_NAMES_EN[g.prompt.surah - 1],
         ayah: String(g.prompt.ayah),
-        questionType: g.kind === "surah_end" ? "End of surah → next surah" : "Continue recitation",
+        questionType: questionKindLabel(g.kind, "Continue recitation"),
         result: match?.result || null, // the teacher marks each one after the student recites it
         remark: match?.remark || "",
         mistakes: match?.mistakes || [], // highlighted words, "ayahNumber:wordIndex"
