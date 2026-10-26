@@ -93,6 +93,24 @@ npm run build
 npx wrangler deploy
 ```
 
+### Notifications: SMS and email
+
+Admin → Notifications sends messages in the app, by SMS and by email.
+
+- **SMS** (MessageOwl) goes through the Supabase Edge Function
+  `supabase/functions/send-sms`. Add the secrets `MESSAGEOWL_API_KEY` and
+  `MESSAGEOWL_SENDER_ID` under Supabase → Edge Functions → Secrets.
+- **Email** goes through this site's Worker (`worker/index.js`, route
+  `/api/email`) using Cloudflare Email Service. In the Cloudflare dashboard
+  go to **Compute → Email Service → Email Sending → Onboard Domain** and
+  choose `aflaahqc.com` (it adds the SPF/DKIM DNS records; sending to any
+  address needs the Workers Paid plan). The sender address is `EMAIL_FROM`
+  in `wrangler.jsonc`. Email only works on the deployed site, not on
+  `npm run dev`.
+
+Until a service is set up, messages for it are saved as "pending" and can be
+sent later from the notification's history.
+
 `public/_headers` sets the response headers (no-cache for `sw.js`, the
 manifest content type). Any new address must also be added in Supabase
 under **Authentication → URL Configuration → Redirect URLs**, or password

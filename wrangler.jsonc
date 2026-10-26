@@ -1,12 +1,28 @@
 // Cloudflare Workers config: serves the built Vite app (dist/) as static
 // files on aflaahqc.com and its portal subdomains. Supabase env vars are
 // baked in at build time (VITE_*), so the Worker itself has no secrets.
+// worker/index.js only runs for /api/* (email sending); everything else is
+// served straight from dist/.
 {
   "name": "aflaah-app",
+  "main": "./worker/index.js",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  // Admin → Notifications emails, via Cloudflare Email Service. The sender
+  // domain must be onboarded under Email Service → Email Sending.
+  "send_email": [{ "name": "EMAIL" }],
+  "vars": {
+    "EMAIL_FROM": "noreply@aflaahqc.com",
+    "EMAIL_FROM_NAME": "Aflaah Quran Class",
+    // The public (anon) key — the same one shipped in the app. The Worker
+    // calls Supabase with the signed-in admin's own token.
+    "SUPABASE_URL": "https://iejkdoyugkewgoyzuvad.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imllamtkb3l1Z2tld2dveXp1dmFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODIxNzUsImV4cCI6MjEwMjA1ODE3NX0.Bwyw526xUVbOQwfScF2HJQP4CEBJ3KAmyskqpwnnrxk"
   },
   "routes": [
     { "pattern": "aflaahqc.com", "custom_domain": true },

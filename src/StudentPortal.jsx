@@ -7,6 +7,7 @@ import { loadTracker } from "./hifz/service.js";
 import { createSupabaseRepo, createMemoryRepo, createMemoryStore } from "./hifz/repos.js";
 import { countAyahs, TOTAL_AYAHS } from "./hifz/ayahs.js";
 import { StudentExams } from "./exams/ExamUI.jsx";
+import { NotificationBell } from "./notifications/NotificationBell.jsx";
 
 const TOTAL_SURAHS = 114;
 const TOTAL_JUZ = 30;
@@ -398,6 +399,7 @@ export default function StudentPortal() {
         <nav className="sp-nav" aria-label="Student portal">
           <button aria-current={view === "dashboard" ? "page" : undefined} onClick={() => setView("dashboard")}><LayoutDashboard size={18} aria-hidden="true" />Dashboard</button>
           <button aria-current={view === "hifz" ? "page" : undefined} onClick={() => setView("hifz")}><BookOpenText size={18} aria-hidden="true" />Hifz Tracker</button>
+          {!DEMO && <NotificationBell className="sp-nav-out" />}
           {!DEMO && <button className="sp-nav-out" onClick={() => supabase.auth.signOut()} aria-label="Sign out"><LogOut size={18} aria-hidden="true" /></button>}
         </nav>
 
