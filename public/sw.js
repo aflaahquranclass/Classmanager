@@ -1,7 +1,7 @@
 // Minimal service worker: makes the app installable and lets the app shell
 // open fast / offline. It only ever touches same-origin GET requests, so
 // Supabase (auth + data) and Google Fonts always go straight to the network.
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `aflaah-shell-${VERSION}`;
 const ASSET_CACHE = `aflaah-assets-${VERSION}`;
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/icons/icon-192.png"];
@@ -49,7 +49,10 @@ self.addEventListener("fetch", (event) => {
       caches.match(request).then((cached) => {
         if (cached) return cached;
         return fetch(request).then((response) => {
-          if (response.ok) {
+          // A missing asset comes back as the app's index.html (SPA fallback);
+          // never cache that in place of a script or image.
+          const isHtml = (response.headers.get("Content-Type") || "").includes("text/html");
+          if (response.ok && !isHtml) {
             const copy = response.clone();
             caches.open(ASSET_CACHE).then((cache) => cache.put(request, copy));
           }
