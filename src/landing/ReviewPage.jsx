@@ -3,6 +3,7 @@ import { Star, CheckCircle2, Send, Lock } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { thaanaChange } from "../notifications/thaanaKeyboard.js";
 import { REVIEW_CLASSES as CLASS_OPTIONS } from "./content.js";
+import { FormHeader } from "./parts.jsx";
 
 // Review form (/review?k=…), in English and Dhivehi. It only works through
 // the private link the admin shares in class groups (Admin → Reviews); the
@@ -24,17 +25,6 @@ function Label({ en, dv, required, htmlFor }) {
       <span>{en}:{required && <b aria-hidden="true"> *</b>}</span>
       <span className="ld-dv" lang="dv" dir="rtl">{dv}:</span>
     </label>
-  );
-}
-
-// Same logo, calligraphy and translation as the home page's hero.
-function FormHeader() {
-  return (
-    <div className="ld-rv-banner">
-      <img className="ld-rv-logo" src="/images/logo-full-white.png" alt="Aflaah Quran Class" />
-      <img className="ld-callig" src="/images/calligraphy-khairukum.png" alt="خيركم من تعلم القرآن وعلمه — The best of you are those who learn the Quran and teach it" />
-      <p className="ld-callig-tr">“The best of you are those who learn the Quran and teach it.”</p>
-    </div>
   );
 }
 

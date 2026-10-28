@@ -32,6 +32,7 @@ export const STUDENT_PORTAL_LINK = "https://students.aflaahqc.com";
 
 // Used until the admin saves their own wording under Templates.
 export const DEFAULT_TEMPLATE_BODIES = {
+  welcome: "Assalaamu alaikum {name}. Welcome to Aflaah Quran Class!\nClass: {class}\nDays: {days}\nTime: {time}\nTeacher: {teacher}\nMonthly fee: {fee}\nStudent ID: {student_id}",
   portal_login: "Assalaamu alaikum {name}. Your Aflaah Student Portal login:\n{link}\nStudent ID: {student_id}\nOne-time password: {password}\nYou will choose your own password when you sign in.",
 };
 

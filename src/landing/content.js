@@ -57,12 +57,9 @@ export const REVIEW_CLASSES = [
   { en: "Adults' Tajweed class (Tilawa)", dv: "ބޮޑެތިމީހުންގެ ތަޖްވީދު ކުލާސް (ތިލާވާ ކުލާސް)" },
 ];
 
-export const CLASSES = [ // SAMPLE ages and times
-  { key: "hifz", icon: "book", name: "Hifz", blurb: "Memorise the Quran with a daily plan and revision.", ages: "Ages 7+" },
-  { key: "tajweed", icon: "mic", name: "Tajweed", blurb: "Recite correctly with the rules of tajweed.", ages: "All ages" },
-  { key: "qaida", icon: "baby", name: "Qaida", blurb: "Start from the letters and learn to read.", ages: "Ages 4+" },
-  { key: "adults", icon: "users", name: "Adults", blurb: "Evening and weekend classes for grown-ups.", ages: "18+" },
-];
+// The classes, their times and fees are no longer listed here: the website
+// shows the classes the admin offers under Admin → Classes ("Show on the
+// website").
 
 export const WHY = [
   { icon: "award", title: "Qualified teachers", text: "Trained teachers who know every student by name." },

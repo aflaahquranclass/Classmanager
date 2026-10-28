@@ -1,7 +1,8 @@
 import { ArrowRight, Flame, ListChecks, FileText, UserRound } from "lucide-react";
-import { HERO, CLASSES, WHY, BOOKS, SHOW } from "./content.js";
+import { HERO, WHY, BOOKS, SHOW } from "./content.js";
 import { usePublicReviews } from "./reviews.js";
 import Showcase from "./Showcase.jsx";
+import ClassesSection from "./ClassesSection.jsx";
 import { ICONS, Link, Stars, Marquee, CountOnView, EnrolCta, avatarColor, initials, useReveal } from "./parts.jsx";
 
 export function Hero({ navigate, reviews }) {
@@ -16,7 +17,7 @@ export function Hero({ navigate, reviews }) {
             </h1>
             <p className="ld-callig-tr ld-reveal ld-d1">“The best of you are those who learn the Quran and teach it.”</p>
             <div className="ld-hero-actions ld-reveal ld-d3">
-              <a href="#enrol" className="ld-btn ld-btn-white">Enrol now</a>
+              <Link to="/register" navigate={navigate} className="ld-btn ld-btn-white">Register now</Link>
               <Link to="/#classes" navigate={navigate} className="ld-btn ld-btn-ghost">Explore classes</Link>
               {SHOW.rules && <Link to="/rules" navigate={navigate} className="ld-btn ld-btn-ghost">Rules and regulations</Link>}
             </div>
@@ -102,33 +103,6 @@ function PortalHighlight({ navigate }) {
   );
 }
 
-function Classes() {
-  return (
-    <section className="ld-sec ld-soft" id="classes">
-      <div className="ld-wrap">
-        <div className="ld-center ld-reveal">
-          <p className="ld-tag">Classes offered</p>
-          <h2 className="ld-h2">Find the right class</h2>
-          <p className="ld-lead">For children and adults, from the first letters to full memorisation.</p>
-        </div>
-        <div className="ld-grid ld-grid-4">
-          {CLASSES.map((c, i) => {
-            const Icon = ICONS[c.icon];
-            return (
-              <article key={c.key} className={`ld-card ld-reveal ld-d${i % 4}`}>
-                <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
-                <h3>{c.name}</h3>
-                <p>{c.blurb}</p>
-                <span className="ld-pill">{c.ages}</span>
-              </article>
-            );
-          })}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function Why() {
   return (
     <section className="ld-sec ld-why" id="why">
@@ -193,7 +167,7 @@ export default function HomePage({ navigate }) {
       <Hero navigate={navigate} reviews={reviews} />
       {reviews.length > 0 && <Reviews reviews={reviews} />}
       <PortalHighlight navigate={navigate} />
-      <Classes />
+      <ClassesSection navigate={navigate} />
       <Why />
       <StorePreview navigate={navigate} />
       <div id="enrol">

@@ -453,6 +453,25 @@
 .ld-rv-logo { width: clamp(96px, 16vw, 140px); height: auto; margin-bottom: 14px; }
 .ld-rv-banner .ld-callig { width: min(100%, 460px); margin-bottom: 10px; }
 .ld-rv-banner .ld-callig-tr { margin: 0; font-size: clamp(14px, 2vw, 17px); }
+/* The calligraphy writes itself in from right to left, as Arabic is written,
+   glows, fades away and writes itself again, over and over. The meaning
+   appears each time the calligraphy has finished writing, and fades away
+   with it. */
+.ld-rv-banner .ld-callig { animation: ld-write 8s cubic-bezier(.45, .05, .35, 1) .3s infinite both; }
+.ld-rv-banner .ld-callig-tr { animation: ld-meaning 8s ease-out .3s infinite both; }
+@keyframes ld-write {
+  0% { clip-path: inset(0 0 0 100%); opacity: .2; transform: translateX(8px); filter: drop-shadow(0 0 0 rgba(180, 235, 255, 0)); }
+  30% { clip-path: inset(0 0 0 0); opacity: 1; transform: none; filter: drop-shadow(0 0 0 rgba(180, 235, 255, 0)); }
+  50% { clip-path: inset(0 0 0 0); opacity: 1; filter: drop-shadow(0 0 12px rgba(180, 235, 255, .6)); }
+  75% { clip-path: inset(0 0 0 0); opacity: 1; filter: drop-shadow(0 0 0 rgba(180, 235, 255, 0)); }
+  90% { clip-path: inset(0 0 0 0); opacity: 0; filter: blur(3px); }
+  100% { clip-path: inset(0 0 0 100%); opacity: 0; filter: none; }
+}
+@keyframes ld-meaning {
+  0%, 30% { opacity: 0; transform: translateY(8px); }
+  40%, 75% { opacity: 1; transform: none; }
+  90%, 100% { opacity: 0; transform: none; }
+}
 .ld-rv-head .ld-rv-title { margin: 4px 0 0; font-size: clamp(32px, 5vw, 50px); font-weight: 400; line-height: 1.6; color: var(--navy); }
 .ld-rv-head .ld-lead { font-size: 15px; margin-top: 8px; }
 .ld-dv { font-family: Faruma, Inter, system-ui, sans-serif; }
@@ -496,4 +515,71 @@
 @media (max-width: 560px) {
   .ld-f-row, .ld-rv-classes { grid-template-columns: 1fr; }
   .ld-f-label { flex-wrap: wrap; }
+}
+
+/* Classes section (home) and the step-by-step registration form (/register). */
+.ld-cls-card { display: flex; flex-direction: column; align-items: flex-start; }
+.ld-cls-card h3 { margin-bottom: 2px; }
+.ld-cls-card .ld-dv { font-size: 16px; color: var(--g2); margin-bottom: 8px; }
+.ld-cls-card .ld-link { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--blue); }
+
+.ld-wz-steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.ld-wz-steps li { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-size: 12px; color: var(--muted); position: relative; }
+.ld-wz-steps li:not(:last-child)::after { content: ""; position: absolute; top: 15px; left: calc(50% + 20px); right: calc(-50% + 20px); height: 2px; background: var(--line); }
+.ld-wz-steps li.done:not(:last-child)::after { background: var(--teal); }
+.ld-wz-num { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--line); background: #fff; font-weight: 700; font-size: 14px; }
+.ld-wz-steps li.on { color: var(--navy); font-weight: 600; }
+.ld-wz-steps li.on .ld-wz-num { border-color: var(--blue); background: var(--blue); color: #fff; }
+.ld-wz-steps li.done .ld-wz-num { border-color: var(--teal); background: var(--teal); color: #fff; }
+.ld-wz-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+.ld-wz-pick { border: 1px solid var(--line); background: #EAF3FC; color: var(--navy); border-radius: 999px; padding: 6px 12px; font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; }
+.ld-wz-pick:hover { border-color: var(--blue); }
+.ld-wz-pick-fixed { cursor: default; background: var(--soft); }
+.ld-wz-pick-fixed:hover { border-color: var(--line); }
+.ld-wz-title { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid var(--line); }
+.ld-wz-title h2 { margin: 12px 0 0; font-size: 20px; font-weight: 700; }
+.ld-wz-title .ld-dv { font-family: Aammu, Faruma, Inter, system-ui, sans-serif; font-size: 22px; color: var(--g2); }
+.ld-wz-options { display: flex; flex-direction: column; gap: 12px; }
+.ld-wz-option { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--navy); text-align: left; font: inherit; cursor: pointer; transition: border-color .15s, background .15s, transform .15s; }
+.ld-wz-option:hover { border-color: var(--blue); background: #F5FAFE; transform: translateY(-1px); }
+.ld-wz-option:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ld-wz-option.on { border-color: var(--blue); background: #EAF3FC; box-shadow: 0 0 0 1px var(--blue) inset; }
+.ld-wz-option > svg { flex-shrink: 0; color: var(--blue); }
+.ld-wz-option .ld-icon { flex-shrink: 0; }
+.ld-wz-option-text { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ld-wz-option-text b { display: inline-flex; align-items: center; gap: 8px; font: 700 17px Inter, system-ui, sans-serif; }
+.ld-wz-option-text small { font-size: 13px; color: var(--muted); }
+.ld-wz-option-text .ld-dv { font-size: 16px; color: var(--g2); align-self: flex-start; }
+.ld-wz-time { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; }
+.ld-wz-slot svg { color: var(--teal); }
+.ld-wz-form { display: flex; flex-direction: column; gap: 20px; }
+.ld-wz-nav { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.ld-wz-nav .ld-btn:only-child { margin-right: auto; }
+.ld-wz-nav .ld-btn-primary { flex: 1 1 200px; max-width: 320px; margin-left: auto; min-height: 50px; }
+.ld-wz-nav .ld-btn-primary:disabled { opacity: .7; cursor: wait; }
+.ld-rg-pay .ld-wz-fees { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 4px; }
+.ld-wz-fees div { padding: 12px 14px; border-radius: 12px; background: #fff; border: 1px solid var(--line); }
+.ld-wz-fees dt { font-size: 13px; }
+.ld-rg-pay .ld-wz-fees dd { margin: 2px 0 0; font-size: 20px; font-weight: 700; color: var(--g1); }
+
+.ld-rg-pay { position: relative; display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); }
+.ld-rg-pay-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; color: var(--g1); }
+.ld-rg-pay p { margin: 0; font-size: 14px; color: var(--muted); }
+.ld-rg-pay dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; }
+.ld-rg-pay dt { color: var(--muted); }
+.ld-rg-pay dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.ld-rg-acc { font-family: ui-monospace, Menlo, monospace; font-size: 15px; letter-spacing: .04em; user-select: all; white-space: nowrap; }
+.ld-rg-file { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 12px 14px; border: 1.5px dashed var(--blue); border-radius: 12px; background: #fff; color: var(--blue); font-size: 14px; font-weight: 600; cursor: pointer; overflow-wrap: anywhere; }
+.ld-rg-file.on { border-style: solid; color: var(--navy); }
+.ld-rg-file-input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.ld-f:has(.ld-rg-file-input:focus-visible) .ld-rg-file { outline: 2px solid var(--blue); outline-offset: 2px; }
+select.ld-input { appearance: auto; }
+
+@media (max-width: 560px) {
+  .ld-wz-name { display: none; }
+  .ld-wz-steps li.on .ld-wz-name { display: block; position: absolute; top: 38px; white-space: nowrap; }
+  .ld-wz-steps { margin-bottom: 14px; }
+  .ld-rg-pay dl:not(.ld-wz-fees) { grid-template-columns: 1fr; gap: 0; }
+  .ld-rg-pay dl:not(.ld-wz-fees) dd { margin-bottom: 8px; }
+  .ld-wz-nav .ld-btn-primary { max-width: none; }
 }

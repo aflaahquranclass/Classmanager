@@ -1,7 +1,8 @@
 // Saving a notification with its recipients and sending its SMS (the
 // `send-sms` Edge Function) and emails (the site's Worker at /api/email,
-// Cloudflare Email Service). Shared by Admin → Notifications and the
-// automatic welcome message when a student is added.
+// Cloudflare Email Service). Shared by Admin → Notifications, the automatic
+// welcome message when a student is added, and the welcome sent when a
+// website registration is accepted.
 
 import { supabase } from "../supabaseClient.js";
 import { fillTemplate, welcomeSubject, DEFAULT_TEMPLATE_BODIES } from "./templates.js";
@@ -115,4 +116,23 @@ export async function sendWelcomeOnAdd(student, teacherName) {
   if (!t?.auto_send || !t.body.trim()) return "";
   const { ok, message } = await sendWelcome(student, teacherName, t.body, await loadDvNames());
   return ok ? `Welcome message: ${message}` : "Welcome message couldn't be sent.";
+}
+
+// Welcome for a student accepted from a website registration: the welcome
+// message (class, days, time, teacher, fee, Student ID) followed by their
+// student portal login, as one message — in the app, by SMS and by email,
+// whichever they have. Returns { ok, message }.
+export async function sendRegistrationWelcome(student, teacherName, password) {
+  const [templates, dvNames] = await Promise.all([loadTemplates(), loadDvNames()]);
+  const welcome = templates.welcome?.body?.trim() || DEFAULT_TEMPLATE_BODIES.welcome;
+  const login = templates.portal_login?.body?.trim() || DEFAULT_TEMPLATE_BODIES.portal_login;
+  const body = [
+    fillTemplate(welcome, student, { teacherName, dvNames }),
+    password ? fillTemplate(login, student, { password, dvNames }) : "",
+  ].filter(Boolean).join("\n\n");
+  return createNotification({
+    title: welcomeSubject(welcome), body, audience: "welcome", audienceLabel: `Welcome — ${student.name}`,
+    inApp: !!student.userId, sms: !!student.phone, email: !!student.email,
+    recipients: [{ student_id: student.id, user_id: student.userId, name: student.name, phone: student.phone, email: student.email, body }],
+  });
 }

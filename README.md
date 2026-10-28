@@ -160,6 +160,26 @@ every admin's bell, and the push trigger above sends it to admins' phones. The d
 npx wrangler secret put ALERT_SECRET
 ```
 
+### Class registration
+
+The website's Classes section and its form at `aflaahqc.com/register` offer
+the classes the admin marks **Show on the website** under **Admin → Classes**
+(edit a class: class type Tajweed/Hifz/Foundation, age group, monthly fee,
+registration fee). Each class type also has its own form for posters
+(`/register/tajweed`, `/register/hifz`, `/register/foundation`); the links and
+a switch to open or close each form are under **Admin → Registrations → Form
+links**.
+
+People fill in their details and attach the registration fee slip; the
+registration lands under **Admin → Registrations → Applications** and alerts
+the admins. **Accept** adds the student to the class (with their Student ID),
+records the registration fee as other income in Finance, makes their student
+portal login and sends them the welcome message with their class and login
+(Notifications → Templates: welcome and student portal login).
+
+Database: `supabase/migrations/20261028_class_registrations.sql` and
+`20261029_registration_classes.sql`.
+
 ### Old Vercel addresses
 
 The app used to be on Vercel. `vercel.json` now only forwards the old

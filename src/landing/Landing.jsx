@@ -9,6 +9,8 @@ import StorePage from "./StorePage.jsx";
 import RulesPage from "./RulesPage.jsx";
 import ReviewPage from "./ReviewPage.jsx";
 import InstallPage from "./InstallPage.jsx";
+import RegisterPage from "./RegisterPage.jsx";
+import { lockedCategory, categoryOf } from "../registrations/registrations.js";
 
 // Public website on the main domain: Home, Hifz program, Store and Rules, the
 // phone install guide (/install), plus the review form, which nothing links to (only the admin's private link). The
@@ -19,10 +21,9 @@ const PAGES = {
   "/store": "Book store · Aflaah Quran Class",
   "/review": "Write a review · Aflaah Quran Class",
   "/install": "Install the app · Aflaah Quran Class",
+  "/register": "Register for a class · Aflaah Quran Class",
   ...(SHOW.rules ? { "/rules": "Rules and regulations · Aflaah Quran Class" } : {}),
 };
-// Pages with their own "Enrol" band at the bottom; the rest jump to Home's.
-const HAS_ENROL = ["/", "/hifz"];
 
 const LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const LOGINS = [
@@ -31,20 +32,25 @@ const LOGINS = [
   { label: "Admin", href: LOCAL ? "/?portal=admin" : "https://admin.aflaahqc.com" },
 ];
 
-const pathOf = (loc) => (PAGES[loc.pathname] ? loc.pathname : "/");
+// Each class's own registration form (/register/hifz …) is the register page.
+const pageOf = (pathname) => (lockedCategory(pathname) ? "/register" : PAGES[pathname] ? pathname : "/");
+const pathOf = (loc) => pageOf(loc.pathname);
 
 export default function Landing() {
   const [path, setPath] = useState(() => pathOf(window.location));
   const [menuOpen, setMenuOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
+  // Bumped on every in-site move, so the register form starts afresh.
+  const [visit, setVisit] = useState(0);
 
   // "/store" or "/#classes": switch page, then scroll to the section if any.
   const navigate = useCallback((to) => {
-    const [p, hash] = to.split("#");
-    const target = PAGES[p || "/"] ? (p || "/") : "/";
+    const [pathAndQuery, hash] = to.split("#");
+    const target = pageOf(pathAndQuery.split("?")[0] || "/");
     setMenuOpen(false);
-    if (target !== window.location.pathname || hash) window.history.pushState({}, "", to);
+    if (pathAndQuery !== window.location.pathname + window.location.search || hash) window.history.pushState({}, "", to);
     setPath(target);
+    setVisit((v) => v + 1);
     requestAnimationFrame(() => {
       const el = hash && document.getElementById(hash);
       if (el) el.scrollIntoView({ behavior: "smooth" });
@@ -53,12 +59,15 @@ export default function Landing() {
   }, []);
 
   useEffect(() => {
-    const onPop = () => setPath(pathOf(window.location));
+    const onPop = () => { setPath(pathOf(window.location)); setVisit((v) => v + 1); };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  useEffect(() => { document.title = PAGES[path]; }, [path]);
+  useEffect(() => {
+    const cat = path === "/register" && categoryOf(lockedCategory());
+    document.title = cat ? `Register for ${cat.en} · Aflaah Quran Class` : PAGES[path];
+  }, [path, visit]);
   // Keep the private review form out of search engines.
   useEffect(() => {
     if (path !== "/review") return undefined;
@@ -105,7 +114,7 @@ export default function Landing() {
                 </div>
               )}
             </div>
-            <Link to={HAS_ENROL.includes(path) ? `${path}#enrol` : "/#enrol"} navigate={navigate} className="ld-btn ld-btn-primary ld-btn-sm">Enrol now</Link>
+            <Link to="/register" navigate={navigate} className="ld-btn ld-btn-primary ld-btn-sm">Register</Link>
             <button type="button" className="ld-burger" aria-label={menuOpen ? "Close menu" : "Open menu"} aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
               {menuOpen ? <X size={26} /> : <Menu size={26} />}
             </button>
@@ -120,6 +129,7 @@ export default function Landing() {
         {path === "/rules" && <RulesPage />}
         {path === "/review" && <ReviewPage />}
         {path === "/install" && <InstallPage />}
+        {path === "/register" && <RegisterPage key={visit} />}
       </main>
 
       <footer className="ld-foot" id="contact">
@@ -138,6 +148,7 @@ export default function Landing() {
             <div className="ld-foot-col">
               <b>Explore</b>
               <Link to="/#classes" navigate={navigate}>Classes</Link>
+              <Link to="/register" navigate={navigate}>Register for a class</Link>
               <Link to="/hifz" navigate={navigate}>Hifz program</Link>
               <Link to="/store" navigate={navigate}>Book store</Link>
               {SHOW.rules && <Link to="/rules" navigate={navigate}>Rules and regulations</Link>}
