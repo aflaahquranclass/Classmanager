@@ -118,20 +118,30 @@ export async function sendWelcomeOnAdd(student, teacherName) {
   return ok ? `Welcome message: ${message}` : "Welcome message couldn't be sent.";
 }
 
-// Welcome for a student accepted from a website registration: the welcome
-// message (class, days, time, teacher, fee, Student ID) followed by their
-// student portal login, as one message — in the app, by SMS and by email,
-// whichever they have. Returns { ok, message }.
-export async function sendRegistrationWelcome(student, teacherName, password) {
+// Welcome for a student accepted from a website registration
+// (Notifications → Message templates → Registration welcome, English or
+// Dhivehi): the class they chose and its days, time and fee, and their
+// student portal login if the message has {password}. The Student ID and
+// one-time password only exist
+// once the student is added, so the text keeps {student_id} and {password}
+// for them; the admin can read and change the rest before accepting.
+export const PASSWORD_TAG = "{password}";
+export const STUDENT_ID_TAG = "{student_id}";
+// lang: "en" or "dv" — which of the two Registration welcome templates.
+export async function registrationWelcomeText(student, teacherName, lang = "en") {
+  const key = lang === "dv" ? "registration_welcome_dv" : "registration_welcome";
   const [templates, dvNames] = await Promise.all([loadTemplates(), loadDvNames()]);
-  const welcome = templates.welcome?.body?.trim() || DEFAULT_TEMPLATE_BODIES.welcome;
-  const login = templates.portal_login?.body?.trim() || DEFAULT_TEMPLATE_BODIES.portal_login;
-  const body = [
-    fillTemplate(welcome, student, { teacherName, dvNames }),
-    password ? fillTemplate(login, student, { password, dvNames }) : "",
-  ].filter(Boolean).join("\n\n");
+  const tpl = templates[key]?.body?.trim() || DEFAULT_TEMPLATE_BODIES[key];
+  return fillTemplate(tpl, { ...student, studentCode: STUDENT_ID_TAG }, { teacherName, dvNames, password: PASSWORD_TAG, classType: student.classType });
+}
+
+// Sends the (possibly edited) welcome text to the accepted student — in the
+// app, by SMS and by email, whichever they have. Returns { ok, message }.
+export async function sendRegistrationWelcome(student, text, password) {
+  const body = text.split(STUDENT_ID_TAG).join(student.studentCode || "").split(PASSWORD_TAG).join(password || "(ask the class office)");
+  const title = /[\u0780-\u07BF]/.test(body) ? "އަފްލާޙް ޤުރްއާން ކްލާހަށް މަރުޙަބާ" : "Welcome to Aflaah Quran Class";
   return createNotification({
-    title: welcomeSubject(welcome), body, audience: "welcome", audienceLabel: `Welcome — ${student.name}`,
+    title, body, audience: "welcome", audienceLabel: `Welcome — ${student.name}`,
     inApp: !!student.userId, sms: !!student.phone, email: !!student.email,
     recipients: [{ student_id: student.id, user_id: student.userId, name: student.name, phone: student.phone, email: student.email, body }],
   });

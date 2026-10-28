@@ -3,8 +3,8 @@ import { ArrowRight } from "lucide-react";
 import { ICONS, Link } from "./parts.jsx";
 import { CATEGORIES, loadOpenOfferings } from "../registrations/registrations.js";
 
-// The classes offered on the website (Admin → Classes → "Show on the
-// website"), for the registration form. Empty if they can't be loaded.
+// The class times offered on the website (Admin → Registrations → Website
+// classes), for the registration form. Empty if they can't be loaded.
 export function useOfferings() {
   const [offerings, setOfferings] = useState(null);
   useEffect(() => {

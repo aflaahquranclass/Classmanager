@@ -57,9 +57,8 @@ export const REVIEW_CLASSES = [
   { en: "Adults' Tajweed class (Tilawa)", dv: "ބޮޑެތިމީހުންގެ ތަޖްވީދު ކުލާސް (ތިލާވާ ކުލާސް)" },
 ];
 
-// The classes, their times and fees are no longer listed here: the website
-// shows the classes the admin offers under Admin → Classes ("Show on the
-// website").
+// The classes, their times and fees are no longer listed here: the admin
+// keeps them under Admin → Registrations → Website classes.
 
 export const WHY = [
   { icon: "award", title: "Qualified teachers", text: "Trained teachers who know every student by name." },

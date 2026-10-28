@@ -163,22 +163,24 @@ npx wrangler secret put ALERT_SECRET
 ### Class registration
 
 The website's Classes section and its form at `aflaahqc.com/register` offer
-the classes the admin marks **Show on the website** under **Admin → Classes**
-(edit a class: class type Tajweed/Hifz/Foundation, age group, monthly fee,
-registration fee). Each class type also has its own form for posters
-(`/register/tajweed`, `/register/hifz`, `/register/foundation`); the links and
-a switch to open or close each form are under **Admin → Registrations → Form
-links**.
+the class times listed under **Admin → Registrations → Website classes**
+(class type Tajweed/Hifz/Foundation, age group, days, time, registration fee,
+monthly fee). They are kept apart from the real classes under **Classes**.
+Each class type also has its own form for posters (`/register/tajweed`,
+`/register/hifz`, `/register/foundation`); the links, and a switch to open or
+close each form, are under **Registrations → Form links**.
 
 People fill in their details and attach the registration fee slip; the
-registration lands under **Admin → Registrations → Applications** and alerts
-the admins. **Accept** adds the student to the class (with their Student ID),
-records the registration fee as other income in Finance, makes their student
-portal login and sends them the welcome message with their class and login
-(Notifications → Templates: welcome and student portal login).
+registration lands under **Registrations → Applications** and alerts the
+admins. **Accept** asks which class to put the student in (an ongoing class,
+or a new one made there) and their monthly fee, then adds the student (with
+their Student ID), records the registration fee as other income in Finance,
+makes their student portal login and sends the **Registration welcome**
+message (Notifications → Message templates), which can be changed for that
+student before sending.
 
-Database: `supabase/migrations/20261028_class_registrations.sql` and
-`20261029_registration_classes.sql`.
+Database: `supabase/migrations/20261028_class_registrations.sql`,
+`20261029_registration_classes.sql` and `20261030_web_classes.sql`.
 
 ### Old Vercel addresses
 

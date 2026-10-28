@@ -47,7 +47,7 @@ function SmsPreview({ text }) {
 function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, showToast, onSaved, onSent }) {
   const [body, setBody] = useState(row?.body || DEFAULT_TEMPLATE_BODIES[def.key] || "");
   const [autoSend, setAutoSend] = useState(!!row?.auto_send);
-  const [dhivehi, setDhivehi] = useState(hasThaana(row?.body) || (!row?.body && !DEFAULT_TEMPLATE_BODIES[def.key]));
+  const [dhivehi, setDhivehi] = useState(hasThaana(row?.body || DEFAULT_TEMPLATE_BODIES[def.key]) || (!row?.body && !DEFAULT_TEMPLATE_BODIES[def.key]));
   const [saving, setSaving] = useState(false);
   const [sendTo, setSendTo] = useState("");
   const [sending, setSending] = useState(false);

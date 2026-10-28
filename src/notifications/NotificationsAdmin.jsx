@@ -47,11 +47,12 @@ function ServiceStatus({ status, okText, okDetail, notText, detail }) {
 const TABS = [
   { key: "compose", label: "New message" },
   { key: "reminders", label: "Payment reminders" },
-  { key: "templates", label: "Templates" },
+  { key: "templates", label: "Message templates" },
 ];
 
-export function AdminNotifications({ students = [], teachers = [], classes = [], showToast }) {
-  const [tab, setTab] = useState("compose");
+// initialTab: "compose" | "reminders" | "templates" (e.g. from Registrations → "Change the standard message").
+export function AdminNotifications({ students = [], teachers = [], classes = [], showToast, initialTab = "compose" }) {
+  const [tab, setTab] = useState(initialTab);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [dhivehi, setDhivehi] = useState(false); // typing in Thaana

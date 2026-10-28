@@ -1,7 +1,8 @@
-// Class registration: the classes offered on the website (Admin → Classes →
-// "Show on the website"), and the registrations sent through /register
-// (class_registrations). Database: supabase/migrations/
-// 20261028_class_registrations.sql and 20261029_registration_classes.sql.
+// Class registration: the class times offered on the website (web_classes,
+// Admin → Registrations → Website classes), and the registrations sent
+// through /register (class_registrations). Database: supabase/migrations/
+// 20261028_class_registrations.sql, 20261029_registration_classes.sql and
+// 20261030_web_classes.sql.
 
 import { supabase } from "../supabaseClient.js";
 
@@ -57,7 +58,7 @@ export async function isFormOpen(form) {
   return error || !data ? null : data.is_open;
 }
 
-// The classes offered on the website, sorted by start time:
+// The class times offered on the website, sorted by start time:
 // [{ id, category, age_group, days, start_time, end_time, registration_fee, monthly_fee, note }]
 export async function loadOpenOfferings() {
   const { data, error } = await supabase.rpc("public_class_times");

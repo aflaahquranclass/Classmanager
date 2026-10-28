@@ -42,7 +42,31 @@ test("English template fills the student's details", () => {
 
 test("Dhivehi template gets Dhivehi name, days, month and fee", () => {
   const out = fillTemplate("{name} ގެ {month} ގެ ފީ {fee} - {days}", student, { monthKey: "2026-10", dvNames: { Ahmed: "އަޙްމަދު" } });
-  assert.equal(out, "އަޙްމަދު ގެ އޮކްޓޫބަރު 2026 ގެ ފީ 500 ރުފިޔާ - އާދިއްތަ، އަންގާރަ");
+  assert.equal(out, "އަޙްމަދު ގެ އޮކްޓޫބަރު 2026 ގެ ފީ -/500 ރުފިޔާ - އާދިއްތަ އަދި އަންގާރަ");
+});
+
+test("Dhivehi days list three with އަދި, time says the time of day", () => {
+  const s = { ...student, schedule: { days: ["Sun", "Tue", "Thu"], startTime: "20:15", endTime: "21:00" } };
+  assert.equal(fillTemplate("ދުވަސް: {days}", s, {}), "ދުވަސް: އާދިއްތަ، އަންގާރަ އަދި ބުރާސްފަތި");
+  assert.equal(fillTemplate("ގަޑި: {time}", s, {}), "ގަޑި: ރޭގަނޑު 8:15 އިން 9:00 އަށް");
+  const morning = { ...s, schedule: { days: ["Sat"], startTime: "06:00", endTime: "07:00" } };
+  assert.equal(fillTemplate("ގަޑި: {time}", morning, {}), "ގަޑި: ހެނދުނު 6:00 އިން 7:00 އަށް");
+});
+
+test("class type is the class and age group chosen on the website", () => {
+  const ctx = { classType: { category: "hifz", ageGroup: "adults" } };
+  assert.equal(fillTemplate("ކްލާސް: {class_type}", student, ctx), "ކްލާސް: ބޮޑެތި މީހުންގެ ޙިފްޡު ކްލާސް");
+  assert.equal(fillTemplate("Class: {class_type}", student, { classType: { category: "tajweed", ageGroup: "children" } }), "Class: Children's Tajweed (Tilawa) class");
+});
+
+test("default Dhivehi registration welcome fills the class details", () => {
+  const s = { ...student, fee: 175, schedule: { days: ["Sun", "Tue", "Thu"], startTime: "20:15", endTime: "21:00" } };
+  const out = fillTemplate(DEFAULT_TEMPLATE_BODIES.registration_welcome_dv, s, { classType: { category: "hifz", ageGroup: "adults" } });
+  assert.match(out, /• ކްލާސް: ބޮޑެތި މީހުންގެ ޙިފްޡު ކްލާސް/);
+  assert.match(out, /• ކިޔަވައިދޭ ދުވަސްތައް: އާދިއްތަ، އަންގާރަ އަދި ބުރާސްފަތި/);
+  assert.match(out, /• ގަޑި: ރޭގަނޑު 8:15 އިން 9:00 އަށް/);
+  assert.match(out, /• މަހު ފީ: -\/175 ރުފިޔާ/);
+  assert.doesNotMatch(out, /\{\w+\}/);
 });
 
 test("portal login template fills name, Student ID, password and link", () => {
