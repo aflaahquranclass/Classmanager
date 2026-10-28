@@ -33,7 +33,9 @@ const STEPS = {
 
 export default function InstallPage() {
   const [os, setOs] = useState(isIos ? "ios" : "android");
-  const [portal, setPortal] = useState(PORTALS[0]);
+  // ?for=teacher|student|admin opens that portal's steps (the links sent to
+  // teachers and parents); the phone type is picked from the device.
+  const [portal, setPortal] = useState(() => PORTALS.find((p) => p.key === new URLSearchParams(window.location.search).get("for")) || PORTALS[0]);
   const steps = STEPS[os](portal);
 
   return (
