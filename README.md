@@ -126,6 +126,44 @@ Admin → Notifications sends messages in the app, by SMS and by email.
 Until a service is set up, messages for it are saved as "pending" and can be
 sent later from the notification's history.
 
+### Phone notifications (push)
+
+Every in-app notification is also pushed to the phones of teachers and
+students who turned on **phone notifications** (bell → Turn on). The Worker
+sends them (`/api/push`, `worker/push.js`) using Web Push. It needs the
+`push_subscriptions` table (`supabase/migrations/20261028_push_subscriptions.sql`)
+and the VAPID private key as a Worker secret; the key is in `.dev.vars`
+(never committed):
+
+```bash
+npx wrangler secret put VAPID_PRIVATE_JWK
+```
+
+The public half is `VAPID_PUBLIC_KEY` in `wrangler.jsonc` and in
+`src/notifications/push.js` — if you ever make a new key pair, change all
+three, and everyone has to turn notifications on again.
+
+On iPhone, notifications only work once the portal is added to the Home
+Screen (iOS 16.4+). The install guide for Android and iPhone is at
+`aflaahqc.com/install`.
+
+### Admin alerts
+
+When a student uploads a payment slip or someone sends a review, a database
+trigger (`supabase/migrations/20261028_admin_alerts.sql`) puts an alert in
+every admin's bell and calls the Worker (`/api/admin-alert`) to push it to
+admins' phones. The database and Worker share a secret: Vault secret
+`admin_alert_secret` in Supabase, `ALERT_SECRET` in the Worker:
+
+```bash
+npx wrangler secret put ALERT_SECRET
+```
+
+### Old Vercel addresses
+
+The app used to be on Vercel. `vercel.json` now only forwards the old
+`*.vercel.app` addresses to the new ones on `aflaahqc.com`.
+
 `public/_headers` sets the response headers (no-cache for `sw.js`, the
 manifest content type). Any new address must also be added in Supabase
 under **Authentication → URL Configuration → Redirect URLs**, or password

@@ -7,13 +7,18 @@ import HomePage from "./HomePage.jsx";
 import HifzPage from "./HifzPage.jsx";
 import StorePage from "./StorePage.jsx";
 import RulesPage from "./RulesPage.jsx";
+import ReviewPage from "./ReviewPage.jsx";
+import InstallPage from "./InstallPage.jsx";
 
-// Public website on the main domain: Home, Hifz program, Store and Rules. The
+// Public website on the main domain: Home, Hifz program, Store and Rules, the
+// phone install guide (/install), plus the review form, which nothing links to (only the admin's private link). The
 // staff sign-in that used to live at "/" is now at "/login" (see main.jsx).
 const PAGES = {
   "/": "Aflaah Quran Class",
   "/hifz": "Hifz program · Aflaah Quran Class",
   "/store": "Book store · Aflaah Quran Class",
+  "/review": "Write a review · Aflaah Quran Class",
+  "/install": "Install the app · Aflaah Quran Class",
   ...(SHOW.rules ? { "/rules": "Rules and regulations · Aflaah Quran Class" } : {}),
 };
 // Pages with their own "Enrol" band at the bottom; the rest jump to Home's.
@@ -54,6 +59,13 @@ export default function Landing() {
   }, []);
 
   useEffect(() => { document.title = PAGES[path]; }, [path]);
+  // Keep the private review form out of search engines.
+  useEffect(() => {
+    if (path !== "/review") return undefined;
+    const meta = Object.assign(document.createElement("meta"), { name: "robots", content: "noindex, nofollow" });
+    document.head.appendChild(meta);
+    return () => meta.remove();
+  }, [path]);
   useEffect(() => {
     if (!loginOpen) return undefined;
     const close = () => setLoginOpen(false);
@@ -106,6 +118,8 @@ export default function Landing() {
         {path === "/hifz" && <HifzPage navigate={navigate} />}
         {path === "/store" && <StorePage />}
         {path === "/rules" && <RulesPage />}
+        {path === "/review" && <ReviewPage />}
+        {path === "/install" && <InstallPage />}
       </main>
 
       <footer className="ld-foot" id="contact">
@@ -131,6 +145,7 @@ export default function Landing() {
             <div className="ld-foot-col">
               <b>Sign in</b>
               {LOGINS.map((l) => <a key={l.label} href={l.href}>{l.label}</a>)}
+              <Link to="/install" navigate={navigate}>Install the app</Link>
             </div>
           </div>
           <div className="ld-copy"><span>© {new Date().getFullYear()} Aflaah Quran Class. All rights reserved.</span><span>{CONTACT.location}</span></div>

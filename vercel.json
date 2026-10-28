@@ -1,12 +1,9 @@
 {
-  "headers": [
-    {
-      "source": "/sw.js",
-      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
-    },
-    {
-      "source": "/(.*).webmanifest",
-      "headers": [{ "key": "Content-Type", "value": "application/manifest+json" }]
-    }
+  "$comment": "The app moved to Cloudflare (wrangler.jsonc). Vercel only forwards the old addresses to the new ones.",
+  "redirects": [
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "aqc-teachers.vercel.app" }], "destination": "https://teachers.aflaahqc.com/", "permanent": true },
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "aqc-admin.vercel.app" }], "destination": "https://admin.aflaahqc.com/", "permanent": true },
+    { "source": "/(.*)", "has": [{ "type": "host", "value": "aqc-students.vercel.app" }], "destination": "https://students.aflaahqc.com/", "permanent": true },
+    { "source": "/(.*)", "destination": "https://aflaahqc.com/login", "permanent": true }
   ]
 }

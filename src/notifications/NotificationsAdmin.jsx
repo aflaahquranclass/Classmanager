@@ -116,6 +116,7 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
     const { data, error } = await supabase
       .from("notifications")
       .select("*, notification_recipients(id, name, phone, email, email_status, email_error, body, user_id, read_at, sms_status, sms_error, student_id, teacher_id)")
+      .neq("audience", "admin_alert") // new slip / review alerts sent to admins (they live in the bell)
       .order("created_at", { ascending: false })
       .limit(100);
     setLoadError(!!error);

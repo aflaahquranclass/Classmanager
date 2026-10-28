@@ -1,13 +1,23 @@
 // In-app inbox for teachers and students: a bell with an unread count that
-// opens the notifications the admin sent them (Admin → Notifications).
+// opens the notifications the admin sent them (Admin → Notifications), and
+// the switch for getting them as phone notifications (push.js).
 // Row-level security only returns the signed-in user's own rows.
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Bell, X } from "lucide-react";
+import { Bell, X, Smartphone } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { hasThaana } from "./thaanaKeyboard.js";
+import { pushState, enablePush, disablePush, refreshPush, clearAppBadge, INSTALL_GUIDE_URL } from "./push.js";
+
+const PUSH_TEXT = {
+  off: "Get these on your phone, even when the app is closed.",
+  on: "Phone notifications are on for this device.",
+  blocked: "Notifications are blocked. Allow them for this site in your phone's settings, then reopen the app.",
+  install: "On iPhone, add this app to your Home Screen first, then turn on notifications here.",
+  unsupported: "This browser can't show phone notifications. Install the app to get them.",
+};
 
 const REFRESH_MS = 2 * 60 * 1000;
 
@@ -42,6 +52,23 @@ export function NotificationBell({ className = "", onDark = false }) {
     setItems(data || []);
   }, []);
 
+  const [push, setPush] = useState(null); // see PUSH_TEXT; null while checking
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    pushState().then(setPush).catch(() => setPush("unsupported"));
+    refreshPush();
+    // Tapping a phone notification while the app is open: show the inbox.
+    const onMsg = (e) => { if (e.data?.type === "notification-open") { load(); clearAppBadge(); } };
+    navigator.serviceWorker?.addEventListener("message", onMsg);
+    return () => navigator.serviceWorker?.removeEventListener("message", onMsg);
+  }, [load]);
+
+  const togglePush = async () => {
+    setPushBusy(true);
+    try { setPush(await (push === "on" ? disablePush() : enablePush())); } catch { setPush(await pushState().catch(() => "unsupported")); }
+    setPushBusy(false);
+  };
+
   useEffect(() => {
     loadThaanaFont();
     load();
@@ -72,6 +99,7 @@ export function NotificationBell({ className = "", onDark = false }) {
       setPos({ top: r.bottom + 8, left: Math.max(16, Math.min(r.left, window.innerWidth - width - 16)) });
     }
     setOpen(next);
+    if (next) clearAppBadge();
     if (next && unread) {
       // Still highlighted as new while open; marked read in the database now.
       const ids = items.filter((i) => !i.read_at).map((i) => i.id);
@@ -102,6 +130,13 @@ export function NotificationBell({ className = "", onDark = false }) {
         .nb-dot { width: 8px; height: 8px; border-radius: 50%; background: ${TP.blue}; flex: none; }
         .nb-item-body { font-size: 14px; color: #33475B; white-space: pre-wrap; margin-top: 2px; line-height: 1.45; overflow-wrap: anywhere; }
         .nb-item-when { font-size: 12px; color: ${TP.secondaryText}; margin-top: 4px; }
+        .nb-push { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #F3F9FD; border-bottom: 1px solid #E3EEF8; font-size: 13px; color: #33475B; line-height: 1.4; }
+        .nb-push svg { flex: none; color: ${TP.blue}; }
+        .nb-push span { flex: 1; }
+        .nb-push-btn { flex: none; border: none; border-radius: 8px; padding: 7px 12px; font: inherit; font-weight: 600; cursor: pointer; background: ${TP.blue}; color: #FFFFFF; text-decoration: none; white-space: nowrap; }
+        .nb-push-btn.nb-push-off { background: #FFFFFF; color: ${TP.navy}; border: 1px solid ${TP.border}; }
+        .nb-push-btn:disabled { opacity: .6; cursor: default; }
+        .nb-push-btn:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
         .nb-empty { padding: 28px 16px; text-align: center; color: ${TP.secondaryText}; font-size: 14px; }
       `}</style>
       <button
@@ -121,6 +156,20 @@ export function NotificationBell({ className = "", onDark = false }) {
             Notifications
             <button type="button" className="nb-close" aria-label="Close notifications" onClick={() => setOpen(false)}><X size={18} aria-hidden="true" /></button>
           </div>
+          {push && (
+            <div className="nb-push">
+              <Smartphone size={18} aria-hidden="true" />
+              <span>{PUSH_TEXT[push]}</span>
+              {(push === "off" || push === "on") && (
+                <button type="button" className={`nb-push-btn ${push === "on" ? "nb-push-off" : ""}`} disabled={pushBusy} onClick={togglePush}>
+                  {push === "on" ? "Turn off" : "Turn on"}
+                </button>
+              )}
+              {(push === "install" || push === "unsupported" || push === "blocked") && (
+                <a className="nb-push-btn" href={INSTALL_GUIDE_URL} target="_blank" rel="noreferrer">How to</a>
+              )}
+            </div>
+          )}
           <div className="nb-list">
             {!items.length ? <div className="nb-empty">No notifications yet.</div> : items.map((i) => {
               const isNew = !i.read_at || i.wasUnread;

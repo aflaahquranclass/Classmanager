@@ -8,3 +8,4 @@ dist/
 .claude
 
 .wrangler
+.dev.vars

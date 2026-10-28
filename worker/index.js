@@ -3,6 +3,9 @@
 //
 // POST /api/dhivehi — exam remarks in correct Dhivehi (see dhivehi.js).
 //
+// POST /api/push   { action: "send", notification_id: uuid } → phone notifications (see push.js)
+// POST /api/admin-alert — from the database: new slip / review → admins' phones (see push.js)
+//
 // POST /api/email  { action: "status" }                      → is email set up?
 //                  { action: "send", notification_id: uuid } → send its pending emails
 //
@@ -12,6 +15,7 @@
 // row-level security still applies and no Supabase secret is stored here.
 
 import { handleDhivehi } from "./dhivehi.js";
+import { handlePush, handleAdminAlert } from "./push.js";
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -35,12 +39,13 @@ ${subject ? `<div style="font-size:${dv ? 20 : 18}px;font-weight:700;color:#123B
 </table></body></html>`;
 }
 
-async function handleEmail(request, env) {
+// Runs `handler(request, env, { json, sb })` only for a signed-in admin; sb()
+// makes Supabase REST calls as that admin.
+async function asAdmin(request, env, handler) {
   if (request.method !== "POST") return json({ error: "POST only" }, 405);
   const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "Not signed in" }, 401);
 
-  // Supabase REST calls as the signed-in user.
   const sb = (path, init = {}) => fetch(`${env.SUPABASE_URL}${path}`, {
     ...init,
     headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init.headers || {}) },
@@ -51,7 +56,10 @@ async function handleEmail(request, env) {
   const user = await userRes.json();
   const [profile] = await (await sb(`/rest/v1/profiles?id=eq.${user.id}&select=role`)).json();
   if (profile?.role !== "admin") return json({ error: "Admins only" }, 403);
+  return handler(request, env, { json, sb });
+}
 
+async function handleEmail(request, env, { sb }) {
   const { action, notification_id } = await request.json().catch(() => ({}));
   const configured = Boolean(env.EMAIL && env.EMAIL_FROM);
   if (action === "status") return json({ configured, from: env.EMAIL_FROM || null });
@@ -93,7 +101,9 @@ async function handleEmail(request, env) {
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
-    if (pathname === "/api/email") return handleEmail(request, env);
+    if (pathname === "/api/email") return asAdmin(request, env, handleEmail);
+    if (pathname === "/api/push") return asAdmin(request, env, handlePush);
+    if (pathname === "/api/admin-alert") return handleAdminAlert(request, env, json);
     if (pathname === "/api/dhivehi") return handleDhivehi(request, env);
     if (pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
     return env.ASSETS.fetch(request);

@@ -1,10 +1,11 @@
 // Saving a notification with its recipients and sending its SMS (the
-// `send-sms` Edge Function) and emails (the site's Worker at /api/email,
+// `send-sms` Edge Function), phone notifications (push.js) and emails (the site's Worker at /api/email,
 // Cloudflare Email Service). Shared by Admin → Notifications and the
 // automatic welcome message when a student is added.
 
 import { supabase } from "../supabaseClient.js";
 import { fillTemplate, welcomeSubject, DEFAULT_TEMPLATE_BODIES } from "./templates.js";
+import { sendPush } from "./push.js";
 
 export async function loadTemplates() {
   const { data } = await supabase.from("sms_templates").select("key, body, auto_send");
@@ -78,8 +79,10 @@ export async function createNotification({ title = "", body, audience, audienceL
     await supabase.from("notifications").delete().eq("id", note.id);
     return { ok: false, message: "Couldn't send. Please try again." };
   }
-  const [smsMsg, emailMsg] = await Promise.all([sms ? sendPendingSms(note.id) : "", email ? sendPendingEmail(note.id) : ""]);
-  return { ok: true, message: [smsMsg, emailMsg].filter(Boolean).join(" ") };
+  const [smsMsg, emailMsg, pushMsg] = await Promise.all([
+    sms ? sendPendingSms(note.id) : "", email ? sendPendingEmail(note.id) : "", inApp ? sendPush(note.id) : "",
+  ]);
+  return { ok: true, message: [smsMsg, emailMsg, pushMsg].filter(Boolean).join(" ") };
 }
 
 // Welcome message for one student: SMS to their phone and email to their

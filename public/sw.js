@@ -1,7 +1,7 @@
-// Minimal service worker: makes the app installable and lets the app shell
-// open fast / offline. It only ever touches same-origin GET requests, so
+// Service worker: makes the app installable, lets the app shell open fast /
+// offline, and shows phone notifications sent by the Worker (/api/push). It only ever touches same-origin GET requests, so
 // Supabase (auth + data) and Google Fonts always go straight to the network.
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `aflaah-shell-${VERSION}`;
 const ASSET_CACHE = `aflaah-assets-${VERSION}`;
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/icons/icon-192.png"];
@@ -61,4 +61,38 @@ self.addEventListener("fetch", (event) => {
       })
     );
   }
+});
+
+// Phone notifications: shown in the notification center even when the app is
+// closed. Payload: { title, body, tag, url } (worker/push.js).
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = { body: event.data && event.data.text() }; }
+  const portal = self.location.hostname.split(".")[0];
+  const icon = portal === "admin" ? "/icons/admin-icon-192.png" : "/icons/icon-192.png";
+  event.waitUntil(Promise.all([
+    self.registration.showNotification(data.title || "Aflaah Quran Class", {
+      body: data.body || "",
+      icon,
+      badge: "/icons/badge-96.png",
+      tag: data.tag,
+      dir: "auto",
+      data: { url: data.url || "/" },
+    }),
+    // Red dot / count on the home-screen icon, where the phone supports it.
+    self.navigator && self.navigator.setAppBadge ? self.navigator.setAppBadge().catch(() => {}) : null,
+  ]));
+});
+
+// Tapping a notification opens the app (or brings it to the front).
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      const win = wins.find((w) => w.url.startsWith(self.location.origin));
+      if (win) return win.focus().then((w) => (w && w.postMessage({ type: "notification-open" }), w));
+      return self.clients.openWindow(url);
+    })
+  );
 });

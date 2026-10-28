@@ -1,9 +1,10 @@
 import { ArrowRight, Flame, ListChecks, FileText, UserRound } from "lucide-react";
-import { HERO, REVIEWS, CLASSES, WHY, BOOKS, SHOW } from "./content.js";
+import { HERO, CLASSES, WHY, BOOKS, SHOW } from "./content.js";
+import { usePublicReviews } from "./reviews.js";
 import Showcase from "./Showcase.jsx";
-import { ICONS, Link, Stars, Marquee, CountOnView, EnrolCta, avatarColor, initials } from "./parts.jsx";
+import { ICONS, Link, Stars, Marquee, CountOnView, EnrolCta, avatarColor, initials, useReveal } from "./parts.jsx";
 
-export function Hero({ navigate }) {
+export function Hero({ navigate, reviews }) {
   return (
     <section className="ld-hero">
       <div className="ld-wrap ld-hero-in">
@@ -19,15 +20,15 @@ export function Hero({ navigate }) {
               <Link to="/#classes" navigate={navigate} className="ld-btn ld-btn-ghost">Explore classes</Link>
               {SHOW.rules && <Link to="/rules" navigate={navigate} className="ld-btn ld-btn-ghost">Rules and regulations</Link>}
             </div>
-            {SHOW.reviews && <div className="ld-rating ld-reveal ld-d3"><Stars /> Loved by parents and students</div>}
+            {reviews.length > 0 && <div className="ld-rating ld-reveal ld-d3"><Stars /> Loved by parents and students</div>}
           </div>
         </div>
         <div className="ld-hero-art ld-reveal ld-d2">
           <div className="ld-arch"><Showcase navigate={navigate} /></div>
           <div className="ld-badge ld-badge-students">
             <div className="ld-avatars" aria-hidden="true">
-              {SHOW.reviews
-                ? REVIEWS.slice(0, 3).map((r, i) => <span key={r.name} style={{ background: avatarColor(i) }}>{initials(r.name)}</span>)
+              {reviews.length >= 3
+                ? reviews.slice(0, 3).map((r, i) => <span key={r.name} style={{ background: avatarColor(i) }}>{initials(r.name)}</span>)
                 : [0, 1, 2].map((i) => <span key={i} style={{ background: avatarColor(i) }}><UserRound size={16} /></span>)}
             </div>
             <div><b><CountOnView value={HERO.studentCount} />+</b><span className="ld-badge-label">{HERO.studentLabel}</span></div>
@@ -38,23 +39,28 @@ export function Hero({ navigate }) {
   );
 }
 
-export function Reviews() {
+export function Reviews({ reviews }) {
   return (
     <section className="ld-sec ld-soft" id="reviews">
       <div className="ld-wrap ld-center ld-reveal">
-        <p className="ld-tag">Student reviews</p>
-        <h2 className="ld-h2">What our students and parents say</h2>
+        <p className="ld-tag">Reviews</p>
+        <h2 className="ld-h2">Kind words from our students and parents</h2>
+        <p className="ld-lead">Honest reviews of our classes, shared by the people who learn with us.</p>
       </div>
       <div className="ld-reviews">
         <Marquee
-          items={REVIEWS}
+          items={reviews}
           render={(r, i, copy) => (
             <figure key={`${copy}-${i}`} className="ld-review" aria-hidden={copy || undefined} style={{ margin: 0 }}>
-              <div className="ld-review-top"><span className="ld-quote" aria-hidden="true">“</span><Stars size={14} /></div>
-              <p>{r.text}</p>
+              <div className="ld-review-top"><span className="ld-quote" aria-hidden="true">“</span><Stars size={14} rating={r.rating ?? 5} /></div>
+              <p dir="auto">{r.text}</p>
               <figcaption className="ld-person">
                 <span className="ld-av" style={{ background: avatarColor(i) }}>{initials(r.name)}</span>
-                <span><b>{r.name}</b><small>{r.role}</small></span>
+                <span className="ld-person-who">
+                  <b dir="auto">{r.name}</b>
+                  <small dir="auto">{r.role}</small>
+                  {r.roleDv && <small className="ld-dv" lang="dv" dir="rtl">{r.roleDv}</small>}
+                </span>
               </figcaption>
             </figure>
           )}
@@ -179,10 +185,13 @@ export function BookCard({ book, delay = 0 }) {
 }
 
 export default function HomePage({ navigate }) {
+  const reviews = usePublicReviews();
+  // Reviews arrive after the page's first reveal pass, so fade them in too.
+  useReveal(reviews.length);
   return (
     <>
-      <Hero navigate={navigate} />
-      {SHOW.reviews && <Reviews />}
+      <Hero navigate={navigate} reviews={reviews} />
+      {reviews.length > 0 && <Reviews reviews={reviews} />}
       <PortalHighlight navigate={navigate} />
       <Classes />
       <Why />

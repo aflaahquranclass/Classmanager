@@ -2,6 +2,10 @@
    leaks into the portals. Colours and gradients are the portal's own: TP in
    App.jsx, .sp-grad / .sp-bar-fill in StudentPortal.jsx. */
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap");
+/* Dhivehi (Thaana letters only) on the website: Faruma for text, MV Aammu FK
+   for headings (.ld-dvh, the form title and field labels). */
+@font-face { font-family: "Aammu"; src: url("/fonts/MV_AammuFK_Regular.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
+@font-face { font-family: "Faruma"; src: url("/fonts/Faruma.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
 
 .ld {
   --navy: #123B67; --blue: #176FD1; --teal: #18A9BD; --muted: #567493; --line: #C7DDF4; --soft: #EEF6FA;
@@ -16,7 +20,7 @@
   --nav-h: clamp(62px, 5.6vw, 88px);
   --gutter: clamp(16px, 4vw, 40px);
   --sec-y: clamp(56px, 8vw, 128px);
-  font-family: Inter, system-ui, sans-serif; color: var(--navy); background: #fff; min-height: 100vh;
+  font-family: Faruma, Inter, system-ui, sans-serif; color: var(--navy); background: #fff; min-height: 100vh;
 }
 .ld *, .ld *::before, .ld *::after { box-sizing: border-box; }
 :where(.ld) a { color: inherit; text-decoration: none; }
@@ -84,6 +88,7 @@
 .ld-hero-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .ld-rating { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #D3E9F7; margin-top: 12px; }
 .ld-stars { display: inline-flex; gap: 2px; color: var(--gold); }
+.ld-stars .ld-star-off { color: #D5E2EE; }
 .ld-avatars { display: flex; justify-content: center; margin-top: 20px; }
 .ld-avatars span { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--g2); margin-left: -10px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #fff; }
 .ld-avatars span:first-child { margin-left: 0; }
@@ -169,8 +174,10 @@
 .ld-person { border-top: 1px solid var(--line); padding-top: 14px; }
 .ld-person { display: flex; align-items: center; gap: 10px; }
 .ld-av { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 14px; flex-shrink: 0; }
-.ld-person b { display: block; font-size: 14px; }
-.ld-person small { color: var(--muted); font-size: 12px; }
+.ld-person-who { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.ld-person b { display: block; font-size: 14px; text-align: left; }
+.ld-person small { display: block; color: var(--muted); font-size: 12px; text-align: left; }
+.ld-person small.ld-dv { font-size: 14px; line-height: 1.6; color: var(--g2); }
 
 /* Cards */
 .ld-grid { display: grid; gap: 20px; margin-top: 48px; }
@@ -258,6 +265,31 @@
 .ld-rule li::marker { color: var(--teal); font-weight: 600; }
 .ld-rules-note { margin: 28px 0 0; text-align: center; color: var(--muted); font-size: 15px; }
 .ld-rules-note a { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-weight: 600; }
+
+/* Install guide (/install) */
+.ld-install { max-width: 760px; }
+.ld-install-pick { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.ld-seg { display: inline-flex; padding: 4px; gap: 4px; background: #fff; border: 1px solid var(--line); border-radius: 12px; max-width: 100%; }
+.ld-seg button { border: 0; background: transparent; border-radius: 9px; padding: 9px 14px; font: 600 14px/1 Inter, system-ui, sans-serif; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.ld-seg button[aria-pressed="true"] { background: var(--grad-btn); color: #fff; }
+.ld-seg button:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ld-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.ld-step { display: flex; gap: 16px; align-items: flex-start; padding: 20px; }
+.ld-step-n { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--grad-btn); color: #fff; font-weight: 700; display: grid; place-items: center; }
+.ld-step h2 { display: flex; align-items: center; gap: 8px; margin: 4px 0 6px; font-size: 17px; color: var(--navy); }
+.ld-step h2 svg { color: var(--teal); flex: none; }
+.ld-step p { margin: 0; font-size: 15px; line-height: 1.6; color: var(--navy); }
+.ld-step a, .ld-install-help a { color: var(--blue); font-weight: 600; overflow-wrap: anywhere; }
+.ld-install-go { margin: 24px 0; text-align: center; }
+.ld-install-help h2 { margin: 0 0 10px; font-size: 17px; color: var(--navy); }
+.ld-install-help ul { margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.65; color: var(--navy); }
+.ld-install-help li + li { margin-top: 6px; }
+@media (max-width: 560px) {
+  .ld-install-pick { flex-direction: column; }
+  .ld-seg { display: flex; }
+  .ld-seg button { flex: 1; padding: 10px 8px; }
+  .ld-step { padding: 16px; gap: 12px; }
+}
 
 /* Call to action + footer */
 /* Enrol band: text on the left, phone form on the right. */
@@ -412,4 +444,56 @@
   .ld-reveal { opacity: 1; transform: none; }
   .ld-track { flex-wrap: wrap; width: auto; justify-content: center; }
   .ld-track [aria-hidden="true"] { display: none; }
+}
+
+/* Review form (/review) */
+.ld-rv { min-height: calc(100vh - var(--nav-h)); }
+.ld-rv-card { --rv-pad: clamp(22px, 4vw, 44px); max-width: 680px; margin: 0 auto; background: #fff; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; padding: var(--rv-pad); display: flex; flex-direction: column; gap: 20px; box-shadow: 0 10px 30px rgba(18, 59, 103, .08); }
+.ld-rv-banner { margin: calc(-1 * var(--rv-pad)) calc(-1 * var(--rv-pad)) 4px; padding: clamp(24px, 4vw, 40px) var(--rv-pad) clamp(14px, 2vw, 22px); background: var(--grad-card); color: #fff; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.ld-rv-logo { width: clamp(96px, 16vw, 140px); height: auto; margin-bottom: 14px; }
+.ld-rv-banner .ld-callig { width: min(100%, 460px); margin-bottom: 10px; }
+.ld-rv-banner .ld-callig-tr { margin: 0; font-size: clamp(14px, 2vw, 17px); }
+.ld-rv-head .ld-rv-title { margin: 4px 0 0; font-size: clamp(32px, 5vw, 50px); font-weight: 400; line-height: 1.6; color: var(--navy); }
+.ld-rv-head .ld-lead { font-size: 15px; margin-top: 8px; }
+.ld-dv { font-family: Faruma, Inter, system-ui, sans-serif; }
+.ld-dvh, .ld-rv-title, .ld-f-label .ld-dv { font-family: Aammu, Faruma, Inter, system-ui, sans-serif; }
+.ld-rv-big { margin: 0; font-size: clamp(22px, 2.6vw, 28px); color: var(--g2); line-height: 1.8; }
+.ld-rv-kbd { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border-radius: 12px; background: var(--soft); font-size: 13px; color: var(--muted); }
+.ld-rv-toggle { border: 1px solid var(--line); background: #fff; color: var(--navy); border-radius: 999px; padding: 6px 14px; font: 600 13px Faruma, Inter, system-ui, sans-serif; cursor: pointer; }
+.ld-rv-toggle.on { background: var(--blue); border-color: var(--blue); color: #fff; }
+.ld-f { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ld-f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.ld-f-label { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 14px; font-weight: 600; }
+.ld-f-label b { color: var(--coral); }
+.ld-f-label .ld-dv { font-size: 19px; font-weight: 400; color: var(--g2); }
+.ld-input { width: 100%; min-height: 48px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; font: 16px/1.6 Faruma, Inter, system-ui, sans-serif; color: var(--navy); background: #fff; resize: vertical; }
+.ld-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23, 111, 209, .15); }
+.ld-f-note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+.ld-f-note .ld-dv { font-size: 14px; }
+.ld-rv-classes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.ld-rv-class { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+.ld-rv-class input { position: absolute; opacity: 0; pointer-events: none; }
+.ld-rv-class .ld-dv { font-size: 16px; line-height: 1.7; text-align: right; }
+.ld-rv-class small { font-size: 12px; color: var(--muted); align-self: flex-start; }
+.ld-rv-class:hover { border-color: var(--blue); }
+.ld-rv-class.on { border-color: var(--blue); background: #EAF3FC; box-shadow: 0 0 0 1px var(--blue) inset; }
+.ld-rv-class:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ld-rv-stars { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ld-rv-stars button { background: none; border: 0; padding: 4px; cursor: pointer; color: #D5E2EE; border-radius: 8px; transition: transform .15s, color .15s; }
+.ld-rv-stars button.on { color: var(--gold); }
+.ld-rv-stars button:hover { transform: scale(1.12); }
+.ld-rv-stars button:focus-visible { outline: 2px solid var(--blue); }
+.ld-rv-word { margin-left: 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.ld-rv-word .ld-dv { font-size: 16px; font-weight: 400; color: var(--g2); }
+.ld-rv-error { margin: 0; padding: 10px 14px; border-radius: 10px; background: #FDECEA; color: #A5432C; font-size: 14px; }
+.ld-rv-submit { width: 100%; min-height: 52px; }
+.ld-rv-submit span { font-family: Faruma, Inter, system-ui, sans-serif; }
+.ld-rv-submit:disabled { opacity: .7; cursor: wait; }
+.ld-rv-done { align-items: center; text-align: center; }
+.ld-rv-done > svg { color: var(--teal); }
+.ld-rv-done .ld-h2 { margin: 0; }
+.ld-rv-done p { margin: 0; }
+@media (max-width: 560px) {
+  .ld-f-row, .ld-rv-classes { grid-template-columns: 1fr; }
+  .ld-f-label { flex-wrap: wrap; }
 }

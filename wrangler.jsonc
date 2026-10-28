@@ -21,6 +21,11 @@
     "EMAIL_FROM_NAME": "Aflaah Quran Class",
     // The public (anon) key — the same one shipped in the app. The Worker
     // calls Supabase with the signed-in admin's own token.
+    // Phone notifications (Web Push). The private half is the secret
+    // VAPID_PRIVATE_JWK: npx wrangler secret put VAPID_PRIVATE_JWK
+    // Admin alerts also need ALERT_SECRET (the Vault secret
+    // 'admin_alert_secret', see 20261028_admin_alerts.sql).
+    "VAPID_PUBLIC_KEY": "BCoYQ_A_boa81YQbEYA4-pUbCqgnbDdzOY_ssrT4N83WYW0RUNECvfjD2sowEvlwSQadCwbEE3Fn8nMFI0I4rCM",
     "SUPABASE_URL": "https://iejkdoyugkewgoyzuvad.supabase.co",
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imllamtkb3l1Z2tld2dveXp1dmFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0ODIxNzUsImV4cCI6MjEwMjA1ODE3NX0.Bwyw526xUVbOQwfScF2HJQP4CEBJ3KAmyskqpwnnrxk"
   },

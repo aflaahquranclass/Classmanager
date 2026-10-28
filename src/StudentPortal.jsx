@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock } from "lucide-react";
-import { TP } from "./App.jsx";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X } from "lucide-react";
+import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
 import HifzTracker, { HIFZ_CSS, completedCounts } from "./HifzTracker.jsx";
 import { loadTracker } from "./hifz/service.js";
@@ -8,6 +8,7 @@ import { createSupabaseRepo, createMemoryRepo, createMemoryStore } from "./hifz/
 import { countAyahs, TOTAL_AYAHS } from "./hifz/ayahs.js";
 import { StudentExams } from "./exams/ExamUI.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
+import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
 
 const TOTAL_SURAHS = 114;
 const TOTAL_JUZ = 30;
@@ -195,16 +196,31 @@ function SetPassword({ studentName, onDone, onCancel }) {
 
 // Signed-in student → their students row (row-level security only returns their own).
 async function loadStudentForUser(userId) {
-  const { data, error } = await supabase.from("students").select("id, name, student_code").eq("user_id", userId).maybeSingle();
+  const { data, error } = await supabase.from("students").select("id, name, student_code, class_name, fee, joined_month").eq("user_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
   return data;
 }
 
+const NAV = [
+  { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
+  { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText },
+  { key: "attendance", label: "Attendance", Icon: CalendarCheck },
+  { key: "finance", label: "Finance", Icon: Wallet },
+];
+
 export default function StudentPortal() {
-  const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode" } } : { status: "loading" });
+  const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode", class_name: "Demo class", fee: 375, joined_month: "2026-08" } } : { status: "loading" });
   const [loginError, setLoginError] = useState("");
   const [view, setView] = useState("dashboard");
   const [summary, setSummary] = useState(null);
+  const [navOpen, setNavOpen] = useState(false);
+
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const onKeyDown = (e) => { if (e.key === "Escape") setNavOpen(false); };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [navOpen]);
 
   const routeUser = useCallback(async (user) => {
     try {
@@ -255,6 +271,7 @@ export default function StudentPortal() {
   }, [repo]);
 
   const ready = auth.status === "ready";
+  const records = useStudentRecords(ready ? student : null, DEMO);
   const hasPlan = summary && !summary.needsSetup;
   // Dashboard progress is measured in ayahs (out of 6236), not pages.
   const ayahsMemorized = hasPlan ? countAyahs(summary.stats.memorizedRanges) : 0;
@@ -267,7 +284,7 @@ export default function StudentPortal() {
   ];
 
   return (
-    <div className="sp-page">
+    <div className={`sp-page ${ready ? "sp-page-shell" : ""}`}>
       <style>{`
         .sp-page { position: relative; overflow: hidden; min-height: 100vh; box-sizing: border-box; padding: 24px 16px 40px; font-family: Inter, system-ui, sans-serif; color: ${TP.navy};
           background: radial-gradient(circle at 15% 0%, #FFFFFF 0%, transparent 45%), linear-gradient(180deg, #E4F1FC 0%, ${TP.bg} 45%, #F5FAFD 100%); }
@@ -276,9 +293,26 @@ export default function StudentPortal() {
         .sp-page-pattern-bottom { bottom: 0; left: 0; transform: rotate(180deg); }
         .sp-blue-pattern { position: absolute; height: auto; opacity: 0.24; pointer-events: none; user-select: none; z-index: 0; }
         .sp-header .sp-blue-pattern { right: 0; bottom: 0; width: 340px; transform: scaleX(-1); }
-        .sp-stat .sp-blue-pattern { left: 0; bottom: 0; width: 170px; }
         .sp-header > *:not(.sp-blue-pattern), .sp-stat > *:not(.sp-blue-pattern) { position: relative; z-index: 1; }
         .sp-wrap { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+
+        /* Signed in: Teacher/Admin-style shell (sidebar on desktop, drawer on
+           phones) with the page using the full width of the screen. */
+        .sp-page-shell { padding: 0; overflow: visible; }
+        .sp-shell { min-height: 100vh; font-family: Inter, system-ui, sans-serif; }
+        .sp-content { padding: clamp(16px, 3vw, 36px); box-sizing: border-box; }
+        .sp-content .sp-wrap { max-width: 1280px; width: 100%; }
+        @media (min-width: 1100px) {
+          .sp-content .sp-name { font-size: 28px; }
+          .sp-content .sp-id, .sp-content .sp-tracker-foot { font-size: 18px; }
+          .sp-content .sp-stat-label { font-size: 17px; }
+          .sp-content .sp-stat-value { font-size: 28px; }
+        }
+        @media (min-width: 901px) {
+          .sp-shell .tp-sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+        }
+        .sp-shell .tp-avatar svg { width: 30px; height: 30px; }
+        ${RECORDS_CSS}
         .sp-card { position: relative; background: rgba(255,255,255,0.92); border: 1px solid #DCEBF8; border-radius: 18px; box-shadow: 0 10px 30px rgba(18,59,103,0.08); }
         .sp-grad { background: linear-gradient(120deg, ${TP.gradStart} 0%, ${TP.blue} 55%, ${TP.gradEnd} 100%); color: #FFFFFF; border: none; box-shadow: 0 12px 28px rgba(13,79,133,0.25); }
 
@@ -325,12 +359,6 @@ export default function StudentPortal() {
         .sp-hadith p { margin: 0; text-align: center; font-size: clamp(14px, 3.4vw, 18px); line-height: 1.6; color: #0F2F8A; }
         .sp-hadith .sp-hadith-src { margin-top: 12px; font-weight: 700; }
 
-        .sp-wrap-wide { max-width: 920px; }
-        .sp-nav { display: flex; gap: 8px; background: rgba(255,255,255,0.85); border: 1px solid #DCEBF8; border-radius: 16px; padding: 6px; box-shadow: 0 6px 18px rgba(18,59,103,0.06); }
-        .sp-nav button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: none; border-radius: 12px; background: transparent; color: ${TP.navy}; font: inherit; font-weight: 600; font-size: 15px; cursor: pointer; }
-        .sp-nav button[aria-current="page"] { background: linear-gradient(90deg, ${TP.blue}, ${TP.teal}); color: #FFFFFF; box-shadow: 0 6px 14px rgba(23,111,209,0.25); }
-        .sp-nav .sp-nav-out { flex: 0 0 auto; padding: 0 12px; color: ${TP.secondaryText}; }
-        .sp-nav button:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
         .sp-setup-btn { margin-top: 14px; width: 100%; }
         .sp-login { max-width: 420px; width: 100%; margin: 8vh auto 0; padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; text-align: center; box-sizing: border-box; }
         .sp-login h1 { margin: 0; font-size: 26px; color: #0F2F8A; }
@@ -418,8 +446,10 @@ export default function StudentPortal() {
         }
       `}</style>
 
-      <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-top" alt="" aria-hidden="true" />
-      <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-bottom" alt="" aria-hidden="true" />
+      {!ready && <>
+        <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-top" alt="" aria-hidden="true" />
+        <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-bottom" alt="" aria-hidden="true" />
+      </>}
       {auth.status === "loading" && <main className="sp-wrap"><div className="hz-card hz-muted">Loading…</div></main>}
       {auth.status === "login" && <main className="sp-wrap"><StudentLogin error={loginError} onSignIn={signIn} /></main>}
       {auth.status === "set-password" && (
@@ -432,7 +462,62 @@ export default function StudentPortal() {
         </main>
       )}
       {ready && (
-      <main className={`sp-wrap ${view === "hifz" ? "sp-wrap-wide" : ""}`}>
+      <div className="tp-shell sp-shell">
+        <style>{TP_SHARED_STYLES}</style>
+        <div className="tp-mobile-bar">
+          <span className="tp-mobile-bar-brand">
+            <img src={LOGO_WHITE_DATA_URI} alt="" />
+            Student Portal
+          </span>
+          <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {!DEMO && <NotificationBell onDark />}
+            <button type="button" className="tp-mobile-toggle" aria-label={navOpen ? "Close menu" : "Open menu"} aria-expanded={navOpen} onClick={() => setNavOpen((v) => !v)}>
+              {navOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+            </button>
+          </span>
+        </div>
+        {navOpen && <div className="tp-backdrop" onClick={() => setNavOpen(false)} />}
+        <div className={`tp-sidebar-wrap ${navOpen ? "tp-sidebar-wrap-open" : ""}`}>
+          <nav className="tp-sidebar" aria-label="Student portal navigation">
+            <img src={PATTERN_ON_BLUE_URL} className="tp-sidebar-pattern" alt="" aria-hidden="true" />
+            <div className="tp-sidebar-logo"><img src={LOGO_WHITE_DATA_URI} alt="" /></div>
+            <div className="tp-sidebar-brand">Aflaah Quran Class</div>
+            <div className="tp-sidebar-role">Student Portal</div>
+            <div className="tp-avatar-row">
+              <span className="tp-avatar" aria-hidden="true"><StudentAvatarIcon size={30} /></span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="tp-avatar-name">{student.name}</div>
+                <div className="tp-avatar-role">{student.student_code}</div>
+              </div>
+              {!DEMO && <span className="tp-bell-desktop"><NotificationBell onDark /></span>}
+            </div>
+            <div className="tp-nav">
+              {NAV.map(({ key, label, Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`tp-nav-item ${view === key ? "tp-nav-item-active" : ""}`}
+                  aria-current={view === key ? "page" : undefined}
+                  onClick={() => { setView(key); setNavOpen(false); }}
+                >
+                  <Icon size={18} aria-hidden="true" />
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="tp-sidebar-spacer" />
+            {!DEMO && (
+              <button type="button" className="tp-logout" onClick={() => supabase.auth.signOut()}>
+                <LogOut size={16} aria-hidden="true" />
+                Log out
+              </button>
+            )}
+          </nav>
+        </div>
+
+      <div className="tp-content sp-content">
+      <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-top" alt="" aria-hidden="true" />
+      <main key={view} className="sp-wrap">
         <section className="sp-card sp-grad sp-header" aria-label="Student profile">
           <img src={PATTERN_ON_BLUE_URL} className="sp-blue-pattern" alt="" aria-hidden="true" />
           <div className="sp-avatar"><StudentAvatarIcon /></div>
@@ -451,14 +536,9 @@ export default function StudentPortal() {
           </div>
         </section>
 
-        <nav className="sp-nav" aria-label="Student portal">
-          <button aria-current={view === "dashboard" ? "page" : undefined} onClick={() => setView("dashboard")}><LayoutDashboard size={18} aria-hidden="true" />Dashboard</button>
-          <button aria-current={view === "hifz" ? "page" : undefined} onClick={() => setView("hifz")}><BookOpenText size={18} aria-hidden="true" />Hifz Tracker</button>
-          {!DEMO && <NotificationBell className="sp-nav-out" />}
-          {!DEMO && <button className="sp-nav-out" onClick={() => supabase.auth.signOut()} aria-label="Sign out"><LogOut size={18} aria-hidden="true" /></button>}
-        </nav>
-
         {view === "hifz" && <HifzTracker repo={repo} onSummary={setSummary} />}
+        {view === "attendance" && <StudentAttendance records={records} />}
+        {view === "finance" && <StudentFinance student={student} records={records} demo={DEMO} />}
 
         {view === "dashboard" && <>
         <section className="sp-card sp-tracker" aria-label="Hifz progress">
@@ -485,8 +565,6 @@ export default function StudentPortal() {
           )}
         </section>
 
-        {!DEMO && <StudentExams />}
-
         <section className="sp-card sp-motivation" aria-label="My motivation">
           <span className="sp-accent" aria-hidden="true" />
           <p>{MOTIVATION}</p>
@@ -495,7 +573,6 @@ export default function StudentPortal() {
         <section className="sp-stats" aria-label="Progress summary">
           {stats.map(({ label, Icon, value }) => (
             <div key={label} className="sp-grad sp-stat">
-              <img src={PATTERN_ON_BLUE_URL} className="sp-blue-pattern" alt="" aria-hidden="true" />
               <div className="sp-stat-label">{label}</div>
               <div className="sp-stat-value">
                 <Icon strokeWidth={1.8} aria-hidden="true" />
@@ -505,6 +582,8 @@ export default function StudentPortal() {
           ))}
         </section>
 
+        {!DEMO && <div><StudentExams /></div>}
+
         <section className="sp-card sp-hadith" aria-label="Hadith">
           <span className="sp-accent" aria-hidden="true" />
           <h3>Hadith</h3>
@@ -513,6 +592,8 @@ export default function StudentPortal() {
         </section>
         </>}
       </main>
+      </div>
+      </div>
       )}
     </div>
   );

@@ -6,7 +6,11 @@ export const ICONS = { flame: Flame, star: Star, book: BookOpen, users: Users, m
 
 const AVATAR_COLORS = ["#176FD1", "#18A9BD", "#123B67", "#0A94B1"];
 export const avatarColor = (i) => AVATAR_COLORS[i % AVATAR_COLORS.length];
-export const initials = (name) => name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+// Thaana names keep the first letter with its vowel sign ("ސާ"); a bare
+// letter or a lone vowel sign doesn't read as an initial.
+export const initials = (name) => (/[\u0780-\u07BF]/.test(name)
+  ? [...name.trim()].slice(0, 2).join("")
+  : name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase());
 
 // Client-side navigation between the site's pages, so moving from Home to
 // Store doesn't reload the app. Plain clicks only; new-tab clicks fall through.
@@ -19,10 +23,10 @@ export function Link({ to, navigate, className, children, ...rest }) {
   return <a href={to} className={className} onClick={onClick} {...rest}>{children}</a>;
 }
 
-export function Stars({ size = 16 }) {
+export function Stars({ size = 16, rating = 5 }) {
   return (
-    <span className="ld-stars" aria-label="5 stars">
-      {[0, 1, 2, 3, 4].map((i) => <Star key={i} size={size} fill="currentColor" strokeWidth={0} />)}
+    <span className="ld-stars" aria-label={`${rating} out of 5 stars`}>
+      {[0, 1, 2, 3, 4].map((i) => <Star key={i} size={size} fill="currentColor" strokeWidth={0} className={i < rating ? undefined : "ld-star-off"} />)}
     </span>
   );
 }

@@ -12,9 +12,10 @@
 const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
 export const SHOW = {
-  // Sample reviews show on the local preview only; set to true for the live
-  // site once REVIEWS holds real ones (with each person's OK).
-  reviews: LOCAL_PREVIEW, // REVIEWS + the hero's star rating
+  // Sample REVIEWS show on the local preview while no real review has been
+  // approved yet. Real ones come from the /review form (Admin → Reviews) and
+  // show on the live site as soon as the first is approved.
+  reviews: LOCAL_PREVIEW,
   classUpdates: false, // CLASS_UPDATES on the hifz page
   rules: false, // RULES page, its links and buttons
   prices: false, // book prices in the store
@@ -45,6 +46,15 @@ export const REVIEWS = [ // SAMPLE
   { name: "Ahmed M.", role: "Parent · Tajweed", text: "I can see his progress on the portal every day. It keeps me involved." },
   { name: "Mariyam S.", role: "Student · Adults", text: "As an adult beginner I felt welcome from day one. My recitation has improved a lot." },
   { name: "Aishath R.", role: "Parent · Qaida", text: "My daughter started from the letters and now reads on her own. Alhamdulillah." },
+];
+
+// Class choices on the review form (/review). The English name is what's
+// saved; the website shows the Dhivehi name with it on each review.
+export const REVIEW_CLASSES = [
+  { en: "Children's Hifz class", dv: "ދަރިވަރުންގެ ހިތުދަސްކުރާ ކުލާސް" },
+  { en: "Adults' Hifz class", dv: "ބޮޑެތިމީހުންގެ ހިތުދަސްކުރާ ކުލާސް" },
+  { en: "Children's Tajweed class (Tilawa)", dv: "ދަރިވަރުންގެ ތަޖްވީދު ކުލާސް (ތިލާވާ ކުލާސް)" },
+  { en: "Adults' Tajweed class (Tilawa)", dv: "ބޮޑެތިމީހުންގެ ތަޖްވީދު ކުލާސް (ތިލާވާ ކުލާސް)" },
 ];
 
 export const CLASSES = [ // SAMPLE ages and times
