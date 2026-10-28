@@ -1,11 +1,13 @@
-// POST /api/push { notification_id } — pushes an in-app notification to its
-// recipients' phones (Web Push, RFC 8291 aes128gcm + VAPID, RFC 8292), so it
-// shows in the phone's notification center even when the app is closed.
+// POST /api/push-out — sends phone notifications (Web Push, RFC 8291
+// aes128gcm + VAPID, RFC 8292), so they show in the phone's notification
+// center even when the app is closed.
 //
-// Like /api/email, the caller must be a signed-in admin and Supabase is
-// called with their own token. The VAPID private key is the Worker secret
-// VAPID_PRIVATE_JWK; its public half is VAPID_PUBLIC_KEY in wrangler.jsonc
-// and src/notifications/push.js.
+// Only the database calls it: whenever in-app notifications are saved (from
+// any screen, or an admin alert for a new slip / review), the trigger
+// public.push_new_notifications posts the ready messages here via pg_net with
+// the shared secret ALERT_SECRET (Vault 'admin_alert_secret'). The VAPID
+// private key is the Worker secret VAPID_PRIVATE_JWK; its public half is
+// VAPID_PUBLIC_KEY in wrangler.jsonc and src/notifications/push.js.
 
 const enc = new TextEncoder();
 const b64u = (bytes) => btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -73,25 +75,6 @@ async function pushTo(sub, payload, env) {
   return res.status;
 }
 
-export async function handlePush(request, env, { json, sb }) {
-  const configured = Boolean(env.VAPID_PRIVATE_JWK && env.VAPID_PUBLIC_KEY);
-  const { action, notification_id } = await request.json().catch(() => ({}));
-  if (action === "status") return json({ configured });
-  if (action !== "send" || !/^[0-9a-f-]{36}$/.test(notification_id || "")) return json({ error: "Unknown action" }, 400);
-  if (!configured) return json({ configured: false, sent: 0, devices: 0 });
-
-  const [note] = await (await sb(`/rest/v1/notifications?id=eq.${notification_id}&select=title,body,send_in_app`)).json();
-  if (!note?.send_in_app) return json({ configured: true, sent: 0, devices: 0 });
-  const recipients = await (await sb(`/rest/v1/notification_recipients?notification_id=eq.${notification_id}&user_id=not.is.null&select=user_id,body`)).json();
-  const bodyFor = new Map(recipients.map((r) => [r.user_id, r.body || note.body]));
-  if (!bodyFor.size) return json({ configured: true, sent: 0, devices: 0 });
-
-  const subs = await (await sb(`/rest/v1/push_subscriptions?user_id=in.(${[...bodyFor.keys()].join(",")})&select=id,user_id,endpoint,p256dh,auth`)).json();
-  const { sent, gone } = await pushAll(subs, (s) => ({ title: note.title || "Aflaah Quran Class", body: bodyFor.get(s.user_id), tag: notification_id }), env);
-  if (gone.length) await sb(`/rest/v1/push_subscriptions?id=in.(${gone.map((s) => s.id).join(",")})`, { method: "DELETE" });
-  return json({ configured: true, sent, devices: subs.length });
-}
-
 // Sends message(sub) to every device; { sent, gone } where gone are devices
 // the push service no longer knows (the app was removed or blocked).
 async function pushAll(subs, message, env) {
@@ -113,22 +96,23 @@ async function pushAll(subs, message, env) {
 const sameSecret = (a, b) => typeof a === "string" && typeof b === "string" && a.length === b.length
   && [...a].reduce((d, c, i) => d | (c.charCodeAt(0) ^ b.charCodeAt(i)), 0) === 0;
 
-// POST /api/admin-alert — called by the database (public.alert_admins, via
-// pg_net) when a payment slip or review comes in. Body: { title, body, tag,
-// url, subs: [{ endpoint, p256dh, auth }] }, header X-Alert-Secret.
-export async function handleAdminAlert(request, env, json) {
+// Body: { messages: [{ endpoint, p256dh, auth, title, body, tag, url? }] },
+// header X-Alert-Secret.
+export async function handlePushOut(request, env, json) {
   if (request.method !== "POST") return json({ error: "POST only" }, 405);
   if (!env.ALERT_SECRET || !sameSecret(request.headers.get("X-Alert-Secret"), env.ALERT_SECRET)) return json({ error: "Not allowed" }, 403);
   if (!env.VAPID_PRIVATE_JWK) return json({ configured: false, sent: 0 });
-  const { title, body, tag, url, subs } = await request.json().catch(() => ({}));
-  if (!Array.isArray(subs)) return json({ error: "No devices" }, 400);
-  const { sent, gone } = await pushAll(subs.slice(0, 50), () => ({ title: title || "Aflaah Quran Class", body, tag, url }), env);
+  const { messages } = await request.json().catch(() => ({}));
+  if (!Array.isArray(messages)) return json({ error: "No messages" }, 400);
+  const { sent, gone } = await pushAll(messages.slice(0, 500), (m) => ({
+    title: m.title || "Aflaah Quran Class", body: m.body, tag: m.tag, ...(m.url ? { url: m.url } : {}),
+  }), env);
   if (gone.length) {
     await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/forget_push_endpoints`, {
       method: "POST",
       headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${env.SUPABASE_ANON_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ p_secret: env.ALERT_SECRET, p_endpoints: gone.map((s) => s.endpoint) }),
+      body: JSON.stringify({ p_secret: env.ALERT_SECRET, p_endpoints: [...new Set(gone.map((s) => s.endpoint))] }),
     }).catch(() => {});
   }
-  return json({ configured: true, sent });
+  return json({ configured: true, sent, devices: messages.length });
 }

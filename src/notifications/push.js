@@ -1,6 +1,6 @@
 // Phone notifications (Web Push). A teacher or student turns them on from the
-// bell; the device is saved in push_subscriptions and the Worker (/api/push)
-// pushes each in-app notification the admin sends to it.
+// bell; the device is saved in push_subscriptions, and each in-app
+// notification saved for them is pushed to it (database trigger → Worker).
 //
 // iPhone/iPad only allow this once the portal is added to the Home Screen
 // (iOS 16.4+), so there we point to the install guide instead.
@@ -65,24 +65,6 @@ export async function refreshPush() {
 
 export function clearAppBadge() {
   navigator.clearAppBadge?.().catch(() => {});
-}
-
-// Called after an in-app notification is saved: pushes it to recipients'
-// phones. Returns a toast line ("" when nobody had phone notifications on).
-export async function sendPush(notificationId) {
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch("/api/push", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token || ""}` },
-      body: JSON.stringify({ action: "send", notification_id: notificationId }),
-    });
-    if (!res.ok || !(res.headers.get("Content-Type") || "").includes("json")) return "";
-    const data = await res.json();
-    return data.sent ? `${data.sent} phone notification${data.sent === 1 ? "" : "s"} sent.` : "";
-  } catch {
-    return "";
-  }
 }
 
 // Where the install guide lives (the public website), for this address.

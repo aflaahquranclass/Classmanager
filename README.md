@@ -128,9 +128,11 @@ sent later from the notification's history.
 
 ### Phone notifications (push)
 
-Every in-app notification is also pushed to the phones of teachers and
-students who turned on **phone notifications** (bell → Turn on). The Worker
-sends them (`/api/push`, `worker/push.js`) using Web Push. It needs the
+Every in-app notification is also pushed to the phones of teachers, students
+and admins who turned on **phone notifications** (bell → Turn on). The
+database sends them: a trigger on `notification_recipients`
+(`supabase/migrations/20261028_push_on_insert.sql`) posts each message to the
+Worker (`/api/push-out`, `worker/push.js`), which delivers it with Web Push. It needs the
 `push_subscriptions` table (`supabase/migrations/20261028_push_subscriptions.sql`)
 and the VAPID private key as a Worker secret; the key is in `.dev.vars`
 (never committed):
@@ -151,8 +153,7 @@ Screen (iOS 16.4+). The install guide for Android and iPhone is at
 
 When a student uploads a payment slip or someone sends a review, a database
 trigger (`supabase/migrations/20261028_admin_alerts.sql`) puts an alert in
-every admin's bell and calls the Worker (`/api/admin-alert`) to push it to
-admins' phones. The database and Worker share a secret: Vault secret
+every admin's bell, and the push trigger above sends it to admins' phones. The database and Worker share a secret: Vault secret
 `admin_alert_secret` in Supabase, `ALERT_SECRET` in the Worker:
 
 ```bash

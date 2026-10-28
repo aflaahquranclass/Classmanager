@@ -3,8 +3,8 @@
 //
 // POST /api/dhivehi — exam remarks in correct Dhivehi (see dhivehi.js).
 //
-// POST /api/push   { action: "send", notification_id: uuid } → phone notifications (see push.js)
-// POST /api/admin-alert — from the database: new slip / review → admins' phones (see push.js)
+// POST /api/push-out — from the database: phone notifications for new in-app
+//                     notifications and admin alerts (see push.js)
 //
 // POST /api/email  { action: "status" }                      → is email set up?
 //                  { action: "send", notification_id: uuid } → send its pending emails
@@ -15,7 +15,7 @@
 // row-level security still applies and no Supabase secret is stored here.
 
 import { handleDhivehi } from "./dhivehi.js";
-import { handlePush, handleAdminAlert } from "./push.js";
+import { handlePushOut } from "./push.js";
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -102,8 +102,7 @@ export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
     if (pathname === "/api/email") return asAdmin(request, env, handleEmail);
-    if (pathname === "/api/push") return asAdmin(request, env, handlePush);
-    if (pathname === "/api/admin-alert") return handleAdminAlert(request, env, json);
+    if (pathname === "/api/push-out") return handlePushOut(request, env, json);
     if (pathname === "/api/dhivehi") return handleDhivehi(request, env);
     if (pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
     return env.ASSETS.fetch(request);

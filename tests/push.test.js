@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { encrypt, vapidAuth, handleAdminAlert } from "../worker/push.js";
+import { encrypt, vapidAuth, handlePushOut } from "../worker/push.js";
 
 const { subtle } = globalThis.crypto;
 const b64u = (b) => Buffer.from(b).toString("base64url");
@@ -44,7 +44,7 @@ test("VAPID header is a valid ES256 token for the push service", async () => {
   assert.ok(await subtle.verify({ name: "ECDSA", hash: "SHA-256" }, keys.publicKey, Buffer.from(s, "base64url"), Buffer.from(`${h}.${c}`)));
 });
 
-test("admin alerts need the shared secret and reach admins' devices", async () => {
+test("database pushes need the shared secret and reach each device", async () => {
   const json = (data, status = 200) => new Response(JSON.stringify(data), { status });
   const vapid = await subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]);
   const env = {
@@ -55,19 +55,20 @@ test("admin alerts need the shared secret and reach admins' devices", async () =
   const uaKeys = await subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
   const p256dh = b64u(await subtle.exportKey("raw", uaKeys.publicKey));
   const auth = b64u(globalThis.crypto.getRandomValues(new Uint8Array(16)));
-  const req = (secret) => new Request("https://aflaahqc.com/api/admin-alert", {
+  const req = (secret) => new Request("https://aflaahqc.com/api/push-out", {
     method: "POST", headers: { "X-Alert-Secret": secret },
-    body: JSON.stringify({ title: "New review", body: "5 stars", subs: [
-      { endpoint: "https://push.test/live", p256dh, auth }, { endpoint: "https://push.test/gone", p256dh, auth }] }),
+    body: JSON.stringify({ messages: [
+      { endpoint: "https://push.test/live", p256dh, auth, title: "New review", body: "5 stars" },
+      { endpoint: "https://push.test/gone", p256dh, auth, title: "New review", body: "5 stars" }] }),
   });
 
   const calls = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (url, init) => { calls.push({ url: String(url), body: init.body }); return new Response(null, { status: String(url).endsWith("/gone") ? 410 : 201 }); };
   try {
-    assert.equal((await handleAdminAlert(req("wrong"), env, json)).status, 403);
+    assert.equal((await handlePushOut(req("wrong"), env, json)).status, 403);
     assert.equal(calls.length, 0);
-    const res = await (await handleAdminAlert(req("s3cret"), env, json)).json();
+    const res = await (await handlePushOut(req("s3cret"), env, json)).json();
     assert.equal(res.sent, 1);
     const forget = calls.find((c) => c.url.endsWith("/rpc/forget_push_endpoints"));
     assert.deepEqual(JSON.parse(forget.body).p_endpoints, ["https://push.test/gone"]);
