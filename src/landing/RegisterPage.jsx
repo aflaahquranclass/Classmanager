@@ -116,7 +116,11 @@ export default function RegisterPage() {
         ? "Registration for this class time has just closed. Please go back and choose another time."
         : err.message === "slip"
           ? "Couldn’t upload the slip. Please check the file and try again."
-          : "Couldn’t send your registration. Please try again.");
+          : err.message === "waiting"
+            ? "A registration with this ID card number is already waiting to be checked. We’ll contact you on Viber."
+            : err.message === "busy"
+              ? "We’re getting a lot of registrations right now. Please try again in an hour."
+              : "Couldn’t send your registration. Please try again.");
     } finally {
       setBusy(false);
     }

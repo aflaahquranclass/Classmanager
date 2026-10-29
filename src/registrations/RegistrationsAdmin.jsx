@@ -334,6 +334,8 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
 
   const target = mode === "existing" ? classes.find((c) => c.id === classId) : { ...draft, name: draft.name.trim() };
   const studentCount = (id) => students.filter((s) => s.classId === id).length;
+  // A student already has this ID card number: they can't be added again.
+  const duplicate = students.find((s) => s.nic && s.nic.trim().toUpperCase() === (reg.nic || "").trim().toUpperCase());
 
   // The welcome text follows the chosen class and fee until the admin edits it.
   useEffect(() => {
@@ -351,6 +353,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
 
   const accept = async () => {
     const monthlyFee = Number(fee);
+    if (duplicate) { setProblem(`ID card ${reg.nic} is already on ${duplicate.studentCode} ${duplicate.name}.`); return; }
     if (mode === "existing" && !target) { setProblem("Choose the class to add the student to."); return; }
     if (mode === "new") {
       if (!target.name) { setProblem("Give the new class a name."); return; }
@@ -367,12 +370,18 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
         days: target.days, start_time: target.startTime, end_time: target.endTime,
       }).select().single();
       if (error) { setBusy(false); setProblem(`Couldn’t make the class: ${error.message}`); return; }
-      onClassCreated?.(data);
-      cls = { id: data.id, name: data.name, teacherId: data.teacher_id };
+      cls = { id: data.id, name: data.name, teacherId: data.teacher_id, row: data };
     }
 
     const { data: studentId, error: err } = await supabase.rpc("accept_registration", { p_id: reg.id, p_class_id: cls.id, p_monthly_fee: monthlyFee });
-    if (err) { setBusy(false); setProblem(`Couldn’t accept: ${err.message}`); return; }
+    if (err) {
+      // Don't leave behind an empty class made just for this student.
+      if (cls.row) await supabase.from("classes").delete().eq("id", cls.id);
+      setBusy(false);
+      setProblem(`Couldn’t accept: ${err.message}`);
+      return;
+    }
+    if (cls.row) onClassCreated?.(cls.row);
     const now = new Date();
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     // A portal login is made only when the message gives its password.
@@ -400,10 +409,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
         <span>{reg.class_label.split(" · ").slice(1).join(" · ")}</span>
       </div>
 
-      {(() => {
-        const same = students.find((s) => s.nic && s.nic.trim().toUpperCase() === (reg.nic || "").trim().toUpperCase());
-        return same ? <div className="rg-problem">ID card {reg.nic} is already on <b>{same.studentCode} {same.name}</b> ({same.className || "no class"}). This person is already a student, so they can’t be added again.</div> : null;
-      })()}
+      {duplicate && <div className="rg-problem">ID card {reg.nic} is already on <b>{duplicate.studentCode} {duplicate.name}</b> ({duplicate.className || "no class"}). This person is already a student, so they can’t be added again.</div>}
 
       <fieldset className="rg-step">
         <legend>1. Add {reg.name.split(" ")[0]} to</legend>
@@ -485,7 +491,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
       {problem && <div className="rg-problem" role="alert">{problem}</div>}
       <div className="rg-actions">
         <button type="button" className="tp-btn-outline" onClick={onBack} disabled={busy}><ArrowLeft size={16} aria-hidden="true" /> Back</button>
-        <button type="button" className="tp-btn-gradient" onClick={accept} disabled={busy}><CheckCircle2 size={17} aria-hidden="true" /> {busy ? "Accepting…" : sendWelcome ? "Accept & send welcome" : "Accept"}</button>
+        <button type="button" className="tp-btn-gradient" onClick={accept} disabled={busy || !!duplicate}><CheckCircle2 size={17} aria-hidden="true" /> {busy ? "Accepting…" : sendWelcome ? "Accept & send welcome" : "Accept"}</button>
       </div>
     </div>
   );

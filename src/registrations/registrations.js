@@ -77,7 +77,11 @@ export async function submitRegistration({ form, classId, name, nic, age, atollI
     p_form: form, p_class_id: classId, p_name: name, p_nic: nic, p_age: age,
     p_atoll_island: atollIsland, p_viber: viber, p_slip_path: path,
   });
-  if (error) throw new Error(error.message.includes("form is closed") ? "form-closed" : error.message.includes("not open") ? "closed" : "save");
+  if (error) {
+    const m = error.message;
+    throw new Error(m.includes("form is closed") ? "form-closed" : m.includes("not open") ? "closed"
+      : m.includes("already waiting") ? "waiting" : m.includes("too many") ? "busy" : "save");
+  }
 }
 
 // Short-lived link for the admin to view a slip.
