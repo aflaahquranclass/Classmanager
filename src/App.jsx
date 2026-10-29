@@ -14,6 +14,7 @@ import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { AdminPaymentSlips, usePendingSlipCount } from "./payments/PaymentSlipsAdmin.jsx";
 import { AdminReviews, usePendingReviewCount } from "./reviews/ReviewsAdmin.jsx";
 import { AdminRegistrations, usePendingRegistrationCount } from "./registrations/RegistrationsAdmin.jsx";
+import { usePendingInfoCount } from "./registrations/InfoUpdatesAdmin.jsx";
 import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
 
 const LOGO_DATA_URI = "data:image/png;base64,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";
@@ -1160,13 +1161,13 @@ export default function App() {
     name: s.name, class_id: s.classId || null, class_name: s.className || null,
     fee: Number(s.fee) || 0, phone: s.phone || null, teacher_id: s.teacherId || null,
     teacher_share_percent: Number(s.sharePercent) || 0, schedule: s.schedule || null,
-    joined_month: s.joinedMonth || null, email: s.email || null,
+    joined_month: s.joinedMonth || null, email: s.email || null, nic: s.nic?.trim().toUpperCase() || null, atoll_island: s.atollIsland?.trim() || null,
   });
   const STUDENT_FROM_DB = (r) => ({
     id: r.id, userId: r.user_id, name: r.name, classId: r.class_id, className: r.class_name,
     fee: r.fee, phone: r.phone, teacherId: r.teacher_id,
     sharePercent: r.teacher_share_percent, schedule: r.schedule, joinedMonth: r.joined_month,
-    email: r.email, studentCode: r.student_code || "", inGroup: !!r.in_group,
+    email: r.email, studentCode: r.student_code || "", inGroup: !!r.in_group, nic: r.nic || "", atollIsland: r.atoll_island || "",
   });
   const TEACHER_TO_DB = (t) => ({
     name: t.name, subject: t.subject || null, phone: t.phone || null, email: t.email || null,
@@ -1312,6 +1313,8 @@ export default function App() {
   const [sSharePercent, setSSharePercent] = useState("0");
   const [sJoinedMonth, setSJoinedMonth] = useState("");
   const [sEmail, setSEmail] = useState("");
+  const [sNic, setSNic] = useState("");
+  const [sAtollIsland, setSAtollIsland] = useState("");
   const [studentLinkError, setStudentLinkError] = useState("");
   const [studentLinkLoading, setStudentLinkLoading] = useState(false);
   const [studentOtp, setStudentOtp] = useState(null); // { login, password } just issued
@@ -1442,6 +1445,7 @@ export default function App() {
   const [pendingSlips, reloadPendingSlips] = usePendingSlipCount(authView === "app" && role === "admin");
   const [pendingReviews, reloadPendingReviews] = usePendingReviewCount(authView === "app" && role === "admin");
   const [pendingRegistrations, reloadPendingRegistrations] = usePendingRegistrationCount(authView === "app" && role === "admin");
+  const [pendingInfo, reloadPendingInfo] = usePendingInfoCount(authView === "app" && role === "admin");
   // Which Notifications tab opens next (Registrations links to its templates).
   const [notificationsTab, setNotificationsTab] = useState("compose");
 
@@ -2024,7 +2028,7 @@ export default function App() {
   // ---- Students ----
   const resetStudentForm = () => {
     setSName(""); setSClassId(""); setSFee(""); setSPhone(""); setSSharePercent("0");
-    setSJoinedMonth(month); setSEmail(""); setStudentLinkError(""); setStudentOtp(null);
+    setSJoinedMonth(month); setSEmail(""); setSNic(""); setSAtollIsland(""); setStudentLinkError(""); setStudentOtp(null);
     setShowStudentForm(false); setEditingStudentId(null);
   };
 
@@ -2050,6 +2054,8 @@ export default function App() {
       schedule,
       joinedMonth: sJoinedMonth || month,
       email: sEmail.trim(),
+      nic: sNic.trim().toUpperCase(),
+      atollIsland: sAtollIsland.trim(),
     };
     if (editingStudentId) {
       saveStudents(students.map((s) => (s.id === editingStudentId ? { ...s, ...payload } : s)));
@@ -2076,7 +2082,7 @@ export default function App() {
     setSPhone(s.phone || "");
     setSSharePercent(s.sharePercent != null ? String(s.sharePercent) : "0");
     setSJoinedMonth(s.joinedMonth || month);
-    setSEmail(s.email || ""); setStudentLinkError(""); setStudentOtp(null);
+    setSEmail(s.email || ""); setSNic(s.nic || ""); setSAtollIsland(s.atollIsland || ""); setStudentLinkError(""); setStudentOtp(null);
     setShowStudentForm(true);
   };
 
@@ -4884,7 +4890,7 @@ export default function App() {
           { key: "timetable", label: "Timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
           { key: "finance", label: "Finance", icon: Wallet, onClick: () => setSection("finance") },
           { key: "notifications", label: "Notifications", icon: Bell, onClick: () => { setNotificationsTab("compose"); setSection("notifications"); } },
-          { key: "registrations", label: pendingRegistrations > 0 ? `Registrations (${pendingRegistrations})` : "Registrations", icon: UserPlus, onClick: () => setSection("registrations") },
+          { key: "registrations", label: pendingRegistrations + pendingInfo > 0 ? `Registrations (${pendingRegistrations + pendingInfo})` : "Registrations", icon: UserPlus, onClick: () => setSection("registrations") },
           { key: "reviews", label: pendingReviews > 0 ? `Reviews (${pendingReviews})` : "Reviews", icon: Star, onClick: () => setSection("reviews") },
           { key: "language", label: "Language", icon: Languages, onClick: () => setSection("language") },
           { key: "data", label: "Data", icon: Trash2, onClick: () => setSection("data") },
@@ -5564,6 +5570,19 @@ export default function App() {
                                 <div>
                                   <label style={{ fontSize: "12px", color: C.a }}>Phone (optional)</label>
                                   <input className="lc-input" value={sPhone} onChange={(e) => setSPhone(e.target.value)} placeholder="Contact number" />
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>ID card number</label>
+                                  <input className="lc-input" value={sNic} onChange={(e) => setSNic(e.target.value)} placeholder="A123456" maxLength={20} style={{ textTransform: "uppercase" }} />
+                                  {(() => {
+                                    const n = sNic.trim().toUpperCase();
+                                    const other = n && students.find((x) => x.id !== editingStudentId && (x.nic || "").toUpperCase() === n);
+                                    return other ? <div style={{ fontSize: "12px", color: C.b, marginTop: "4px" }}>Already on {other.studentCode} {other.name}</div> : null;
+                                  })()}
+                                </div>
+                                <div>
+                                  <label style={{ fontSize: "12px", color: C.a }}>Atoll and island</label>
+                                  <input className="lc-input" value={sAtollIsland} onChange={(e) => setSAtollIsland(e.target.value)} placeholder="e.g. K. Malé" maxLength={80} />
                                 </div>
                                 <div>
                                   <label style={{ fontSize: "12px", color: C.a }}>Email (optional)</label>
@@ -6683,6 +6702,9 @@ export default function App() {
                 onClassCreated={(row) => setClasses((prev) => (prev.some((c) => c.id === row.id) ? prev : [...prev, CLASS_FROM_DB(row)]))}
                 onAccepted={registrationAccepted}
                 onEditWelcome={() => { setNotificationsTab("templates"); setSection("notifications"); }}
+                infoCount={pendingInfo}
+                onInfoCountChange={reloadPendingInfo}
+                onStudentUpdated={(row) => setStudents((prev) => prev.map((x) => (x.id === row.id ? STUDENT_FROM_DB(row) : x)))}
               />}
 
               {section === "reviews" && role === "admin" && <AdminReviews showToast={showToast} onCountChange={reloadPendingReviews} />}

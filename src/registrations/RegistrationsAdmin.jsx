@@ -11,19 +11,23 @@
 //   apart from the real classes under Classes.
 // - Form links: the main form and one per class type (for posters), each
 //   with its link to copy and its own open/close switch.
+// - Info updates: the student information update form for current students
+//   (ID card number, Viber, email) and its responses (InfoUpdatesAdmin.jsx).
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, FileText, Copy, Link2, Lock, LockOpen, ExternalLink, Inbox, MessageCircle, X, ChevronRight, ArrowLeft, Plus, Pencil, Eye, EyeOff, CalendarClock, PenLine } from "lucide-react";
+import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, FileText, Copy, Link2, Lock, LockOpen, ExternalLink, Inbox, MessageCircle, X, ChevronRight, ArrowLeft, Plus, Pencil, Eye, EyeOff, CalendarClock, PenLine, Contact } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { registrationWelcomeText, sendRegistrationWelcome } from "../notifications/smsSend.js";
+import { InfoUpdates, infoCss } from "./InfoUpdatesAdmin.jsx";
 import { CATEGORIES, AGE_GROUPS, DAYS, FORMS, REG_BUCKET, categoryOf, ageGroupOf, formUrl, fmtTime, fmtDays, fmtMvr } from "./registrations.js";
 
 const SECTIONS = [
   { key: "applications", label: "Applications", icon: Inbox, help: "Registrations sent from the website. Check the payment slip, then accept or reject." },
   { key: "web", label: "Website classes", icon: CalendarClock, help: "The class times and fees students choose from on the website. They don’t change your classes under Classes." },
   { key: "links", label: "Form links", icon: Link2, help: "Copy a link to share or put on a poster. Close a form to stop new registrations." },
+  { key: "info", label: "Info updates", icon: Contact, help: "Current students send their ID card number, atoll and island, Viber number and email. Match each one to the student and save it." },
 ];
 const FILTERS = [
   { key: "pending", label: "Waiting" },
@@ -62,12 +66,13 @@ export function usePendingRegistrationCount(enabled) {
 // onClassCreated(classRow): a class was made from the Accept box.
 // onAccepted(studentRow, monthKey): a registration became a student.
 // onEditWelcome(): open Notifications → Templates.
-export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0, classes = [], teachers = [], students = [], onClassCreated, onAccepted, onEditWelcome }) {
+// onStudentUpdated(studentRow): an info update was saved onto a student.
+export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0, infoCount = 0, onInfoCountChange, classes = [], teachers = [], students = [], onClassCreated, onAccepted, onEditWelcome, onStudentUpdated }) {
   const [view, setView] = useState("applications");
   const section = SECTIONS.find((s) => s.key === view);
   return (
     <div className="rg-wrap">
-      <style>{rgCss()}</style>
+      <style>{rgCss() + infoCss(TP)}</style>
       <div className="rg-sections" role="tablist" aria-label="Registrations">
         {SECTIONS.map((s) => {
           const Icon = s.icon;
@@ -76,6 +81,7 @@ export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0,
               <Icon size={20} aria-hidden="true" />
               <span>{s.label}</span>
               {s.key === "applications" && pendingCount > 0 && <span className="rg-count">{pendingCount}</span>}
+              {s.key === "info" && infoCount > 0 && <span className="rg-count">{infoCount}</span>}
             </button>
           );
         })}
@@ -89,6 +95,7 @@ export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0,
       )}
       {view === "web" && <WebClasses showToast={showToast} />}
       {view === "links" && <FormLinks showToast={showToast} />}
+      {view === "info" && <InfoUpdates showToast={showToast} students={students} onStudentUpdated={onStudentUpdated} onCountChange={onInfoCountChange} />}
     </div>
   );
 }
@@ -393,6 +400,11 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
         <span>{reg.class_label.split(" · ").slice(1).join(" · ")}</span>
       </div>
 
+      {(() => {
+        const same = students.find((s) => s.nic && s.nic.trim().toUpperCase() === (reg.nic || "").trim().toUpperCase());
+        return same ? <div className="rg-problem">ID card {reg.nic} is already on <b>{same.studentCode} {same.name}</b> ({same.className || "no class"}). This person is already a student, so they can’t be added again.</div> : null;
+      })()}
+
       <fieldset className="rg-step">
         <legend>1. Add {reg.name.split(" ")[0]} to</legend>
         <div className="rg-choice">
@@ -657,7 +669,7 @@ function FormLinks({ showToast }) {
 
 const rgCss = () => `
   .rg-wrap { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 16px; }
-  .rg-sections { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .rg-sections { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
   .rg-section { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 14px 12px; border-radius: 14px; border: 1px solid ${TP.border}; background: #FFFFFF; color: ${TP.navy}; font-weight: 700; font-size: 15px; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
   .rg-section:hover { border-color: ${TP.blue}; }
   .rg-section.on { background: linear-gradient(90deg, ${TP.gradStart}, ${TP.blue}); border-color: transparent; color: #FFFFFF; box-shadow: 0 6px 16px rgba(13,79,133,.2); }
@@ -728,7 +740,8 @@ const rgCss = () => `
   .rg-newclass .rg-wide { grid-column: 1 / -1; }
   .rg-accept label, .rg-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: ${TP.navy}; }
   .rg-accept label.rg-check, .rg-form label.rg-check { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; }
-  .rg-check input { width: 18px; height: 18px; accent-color: ${TP.blue}; }
+  label.rg-check { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; color: ${TP.navy}; cursor: pointer; }
+  .rg-check input { width: 18px; height: 18px; flex-shrink: 0; accent-color: ${TP.blue}; }
   .rg-fee { max-width: 220px; }
   .rg-label { display: block; font-size: 13px; font-weight: 600; color: ${TP.navy}; margin-bottom: 6px; }
   .rg-days { display: flex; flex-wrap: wrap; gap: 6px; }

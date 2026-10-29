@@ -182,6 +182,19 @@ student before sending.
 Database: `supabase/migrations/20261028_class_registrations.sql`,
 `20261029_registration_classes.sql` and `20261030_web_classes.sql`.
 
+### Student info update form
+
+Current students send their ID card number, atoll and island, Viber number
+and email through a
+private link (`aflaahqc.com/update?k=…`), shared in class groups. The link,
+and switches to close it or make a new one, are under **Admin → Registrations
+→ Info updates**, with the responses. Each response lists the students it may
+be (same Viber number, same Student ID, similar name); **Save here** puts the
+ID card number, atoll and island and email on that student. An ID card number can only be on
+one student, and accepting a website registration with a number that is
+already on a student is refused, so nobody is added twice. Database:
+`supabase/migrations/20261031_student_info_form.sql`.
+
 ### Old Vercel addresses
 
 The app used to be on Vercel. `vercel.json` now only forwards the old

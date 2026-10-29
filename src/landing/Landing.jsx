@@ -10,6 +10,7 @@ import RulesPage from "./RulesPage.jsx";
 import ReviewPage from "./ReviewPage.jsx";
 import InstallPage from "./InstallPage.jsx";
 import RegisterPage from "./RegisterPage.jsx";
+import UpdatePage from "./UpdatePage.jsx";
 import { lockedCategory, categoryOf } from "../registrations/registrations.js";
 
 // Public website on the main domain: Home, Hifz program, Store and Rules, the
@@ -22,6 +23,7 @@ const PAGES = {
   "/review": "Write a review · Aflaah Quran Class",
   "/install": "Install the app · Aflaah Quran Class",
   "/register": "Register for a class · Aflaah Quran Class",
+  "/update": "Update student details · Aflaah Quran Class",
   ...(SHOW.rules ? { "/rules": "Rules and regulations · Aflaah Quran Class" } : {}),
 };
 
@@ -68,9 +70,9 @@ export default function Landing() {
     const cat = path === "/register" && categoryOf(lockedCategory());
     document.title = cat ? `Register for ${cat.en} · Aflaah Quran Class` : PAGES[path];
   }, [path, visit]);
-  // Keep the private review form out of search engines.
+  // Keep the private review and info update forms out of search engines.
   useEffect(() => {
-    if (path !== "/review") return undefined;
+    if (path !== "/review" && path !== "/update") return undefined;
     const meta = Object.assign(document.createElement("meta"), { name: "robots", content: "noindex, nofollow" });
     document.head.appendChild(meta);
     return () => meta.remove();
@@ -130,6 +132,7 @@ export default function Landing() {
         {path === "/review" && <ReviewPage />}
         {path === "/install" && <InstallPage />}
         {path === "/register" && <RegisterPage key={visit} />}
+        {path === "/update" && <UpdatePage />}
       </main>
 
       <footer className="ld-foot" id="contact">
