@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, Highlighter, ArrowRight, Search, Flame, Target, X, Undo2, Check, History } from "lucide-react";
+import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
@@ -78,6 +79,28 @@ const teacherCss = `
   .ht-markbar span { flex: 1; min-width: 120px; font-size: 13px; }
   .ht-markbar .hz-btn { min-height: 40px; }
   .ht-markbar .hz-btn-outline { background: transparent; color: #FFFFFF; border-color: rgba(255,255,255,0.5); }
+
+  /* Listen & mark: the Mushaf full screen, then the next task to confirm. */
+  .ht-full { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #F4F8FC; color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  .ht-full-top { flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); color: #FFFFFF;
+    background: linear-gradient(90deg, #0D4F85 0%, #176FD1 55%, #0A94B1 100%); box-shadow: 0 4px 16px rgba(13,40,70,0.18); }
+  .ht-full-top .hz-btn { background: rgba(255,255,255,0.16); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.4); min-height: 40px; }
+  .ht-full-top .hz-btn:hover { background: rgba(255,255,255,0.26); }
+  .ht-full-title { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; line-height: 1.25; }
+  .ht-full-title small { display: block; font-weight: 400; font-size: 13px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ht-full-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .ht-full-inner { max-width: 860px; margin: 0 auto; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+  .ht-full-foot { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom));
+    background: #FFFFFF; border-top: 1px solid #DCEBF8; box-shadow: 0 -6px 20px rgba(18,59,103,0.08); }
+  .ht-full-foot .hz-btn { min-height: 48px; padding: 0 22px; font-size: 15px; }
+  .ht-full .ht-markbar { bottom: 8px; }
+  .ht-confirm { background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 16px; padding: 16px; }
+  .ht-steps { display: flex; gap: 6px; font-size: 12px; font-weight: 600; color: #8FADC0; }
+  .ht-steps b { color: #FFFFFF; }
+  @media (max-width: 640px) {
+    .ht-full-inner { padding: 10px 6px 20px; }
+    .ht-full-top .hz-btn span { display: none; }
+  }
   .ht-ranges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
   .ht-ranges span { display: inline-flex; align-items: center; gap: 6px; background: #E4F1FC; color: #1D5FA8; border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 600; }
   .ht-ranges button { border: none; background: transparent; color: inherit; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
@@ -216,7 +239,7 @@ function ProfileEditor({ profile, onSave, onCancel, busy }) {
   );
 }
 
-function EditTask({ task, onSave, onCancel, busy, saveLabel = "Save changes" }) {
+function EditTask({ task, onSave, onCancel, busy, saveLabel = "Save changes", cancelLabel = "Cancel" }) {
   const [draft, setDraft] = useState({ taskDate: task.taskDate, start: task.start, end: task.end, notes: task.notes });
   return (
     <div>
@@ -231,7 +254,7 @@ function EditTask({ task, onSave, onCancel, busy, saveLabel = "Save changes" }) 
         <input id={`ht-edit-notes-${task.id}`} className="hz-input" maxLength={1000} value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} />
       </div>
       <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 12 }}>
-        <button className="hz-btn hz-btn-outline" onClick={onCancel}>Cancel</button>
+        <button className="hz-btn hz-btn-outline" onClick={onCancel}>{cancelLabel}</button>
         <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave(draft)}>{saveLabel}</button>
       </div>
     </div>
@@ -293,6 +316,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
   const [selectedKey, setSelectedKey] = useState(null);
   const [drafts, setDrafts] = useState({}); // activity → the teacher's confirmed next task
   const [nextOpen, setNextOpen] = useState(null); // task whose next task is being looked at
+  const [markStep, setMarkStep] = useState("mark"); // full screen: "mark" the Mushaf, then "next" to confirm
   const generating = useRef(false);
 
   const run = async (fn) => {
@@ -316,10 +340,21 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
       .finally(() => { generating.current = false; });
   }, [data, planReady]);
 
+  useEffect(() => {
+    if (!markingId) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e) => { if (e.key === "Escape") { if (markStep === "next") setMarkStep("mark"); else closeMarking(); } };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [markingId, markStep]);
+
   if (!data) return <div className="ht">{error ? <div className="hz-error" role="alert">{error}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
 
   const { stats, streak, todayTasks, overdue, upcoming, today, mistakes, openMistakes, memorized, tasks } = data;
   const marking = tasks.find((t) => t.id === markingId) || null;
+  const openMarking = (t) => { setSelectedKey(null); setMarkStep("mark"); setMarkingId(t.id); };
+  function closeMarking() { setMarkingId(null); setSelectedKey(null); setMarkStep("mark"); }
   const selected = openMistakes.find((m) => `${m.verseKey}:${m.position}` === selectedKey) || null;
   const needsProfile = !data.hasProfile || data.profile?.fromLegacy;
 
@@ -327,8 +362,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
   const nextOf = (t) => drafts[t.activity] || previewNext(t, ctx);
   // Done: the next class day's task for the same activity is set (with the
   // teacher's confirmed changes, if any) and the student is notified.
-  const markDone = (t) => {
-    const next = nextOf(t);
+  const markDone = (t, chosen = null) => {
+    const next = chosen || nextOf(t);
     const stillOpen = tasks.some((x) => x.activity === t.activity && !x.completedAt && x.id !== t.id);
     generating.current = true;
     return run(async () => {
@@ -336,7 +371,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
       if (next && !stillOpen) await repo.addTasks([{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "" }]);
       setDrafts((d) => { const n = { ...d }; delete n[t.activity]; return n; });
       setNextOpen(null);
-      if (markingId === t.id) { setMarkingId(null); setSelectedKey(null); }
+      if (markingId === t.id) closeMarking();
     }).finally(() => { generating.current = false; });
   };
   const nextBox = (t) => {
@@ -363,6 +398,86 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
     if (await confirmDialog({ title: `Delete this ${what}?`, message: "This can't be undone.", confirmLabel: "Delete" })) run(fn);
   };
 
+  // Listen & mark, full screen: 1) the task's pages in the Mushaf, tap words
+  // to mark mistakes; Continue → 2) the next class day's task, change it if
+  // needed and Confirm: this task is marked done, the next one is set and
+  // the student is notified.
+  const listenAndMark = () => {
+    const { title, Icon } = ACTIVITY_INFO[marking.activity];
+    const count = mistakesForTask(marking, mistakes).length;
+    const next = nextOf(marking);
+    const alreadySet = tasks.find((x) => x.activity === marking.activity && !x.completedAt && x.id !== marking.id) || null;
+    const onNext = markStep === "next";
+    // On the page body, so nothing in the portal layout can cover or clip it.
+    return createPortal(
+      <div className="ht-full" role="dialog" aria-modal="true" aria-label={`Listen and mark · ${title}`}>
+        <div className="ht-full-top">
+          <button className="hz-btn" onClick={() => (onNext ? setMarkStep("mark") : closeMarking())}>
+            <ChevronLeft size={18} aria-hidden="true" /><span>{onNext ? "Back to Mushaf" : "Back"}</span>
+          </button>
+          <div className="ht-full-title">
+            {onNext ? "Confirm the next task" : <>{title} · {student.name}</>}
+            <small>{onNext ? `${title} · ${student.name}` : `${fmtDay(marking.taskDate)} · ${portionSummary(marking)}`}</small>
+          </div>
+          <div className="ht-steps" aria-hidden="true">{onNext ? <>1 · <b>2</b></> : <><b>1</b> · 2</>}</div>
+        </div>
+
+        <div className="ht-full-body">
+          <div className="ht-full-inner">
+            {!onNext ? (
+              <>
+                <div className="hz-legend">
+                  <span>Tap a word the student gets wrong to highlight it. Tap a highlighted word to clear it.</span>
+                  <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
+                  <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
+                </div>
+                {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
+                <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected />
+                {selected && (
+                  <div className="ht-markbar" role="region" aria-label="Selected mistake">
+                    <b className="hz-ar" lang="ar">{selected.wordText}</b>
+                    <span>Page {selected.page} · Ayah {selected.verseKey}</span>
+                    <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}><Check size={16} aria-hidden="true" />Corrected</button>
+                    <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))}>Remove</button>
+                    <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="ht-confirm">
+                <div className="ht-next-head"><Icon size={18} aria-hidden="true" />Next {title}{next && !alreadySet ? ` · ${fmtDay(next.taskDate)}` : ""}</div>
+                {alreadySet ? (
+                  <p className="hz-muted" style={{ margin: 0 }}>The next {title} is already set for {fmtDay(alreadySet.taskDate)}: {portionSummary(alreadySet)}. Finish to mark this one done.</p>
+                ) : !next ? (
+                  <p className="hz-muted" style={{ margin: 0 }}>Nothing comes next on the plan. Finish to mark this one done.</p>
+                ) : (
+                  <>
+                    <EditTask key={`${marking.id}-${next.taskDate}-${next.start}-${next.end}`} task={{ ...next, id: `next-${marking.id}`, notes: next.notes || "" }} busy={busy}
+                      saveLabel="Confirm & finish" onCancel={() => setMarkStep("mark")} cancelLabel="Back"
+                      onSave={(d) => markDone(marking, d)} />
+                    <p className="hz-muted" style={{ margin: "8px 0 0" }}>Confirm marks today's {title} done, sets this one and notifies the student.</p>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {(!onNext || alreadySet || !next) && (
+          <div className="ht-full-foot">
+            <span className="hz-muted">{count} mistake{count === 1 ? "" : "s"} marked on these pages</span>
+            {marking.completedAt
+              ? <button className="hz-btn hz-btn-primary" onClick={closeMarking}>Close</button>
+              : onNext
+                ? <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => markDone(marking)}><CheckCircle2 size={18} aria-hidden="true" />Finish</button>
+                : <button className="hz-btn hz-btn-primary" onClick={() => { setSelectedKey(null); setMarkStep("next"); }}>Continue<ArrowRight size={18} aria-hidden="true" /></button>}
+          </div>
+        )}
+      </div>,
+      document.body,
+    );
+  };
+
   const taskRow = (t) => {
     const { title, Icon } = ACTIVITY_INFO[t.activity];
     const confirmed = drafts[t.activity];
@@ -387,8 +502,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         <PortionText task={t} />
         {t.notes && <div className="hz-task-notes">{t.notes}</div>}
         <div className="ht-row-actions">
-          <button className="hz-btn hz-btn-primary" onClick={() => { setSelectedKey(null); setMarkingId(markingId === t.id ? null : t.id); setTimeout(() => document.getElementById("ht-mushaf")?.scrollIntoView({ behavior: "smooth" }), 50); }}>
-            <Highlighter size={15} aria-hidden="true" />{markingId === t.id ? "Close Mushaf" : "Listen & mark"}
+          <button className="hz-btn hz-btn-primary" onClick={() => openMarking(t)}>
+            <Highlighter size={15} aria-hidden="true" />Listen & mark
           </button>
           <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => (t.completedAt ? run(() => repo.setTaskDone(t.id, false)) : markDone(t))}>
             {t.completedAt ? <><Undo2 size={15} aria-hidden="true" />Not done</> : <><CheckCircle2 size={15} aria-hidden="true" />Done</>}
@@ -466,37 +581,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
 
       <HistorySection tasks={tasks} mistakes={mistakes} />
 
-      {marking && (
-        <section className="hz-card hz-reader-card" aria-label="Listen and mark mistakes" id="ht-mushaf">
-          <div className="hz-row" style={{ marginBottom: 8 }}>
-            <h2 className="hz-h2" style={{ margin: 0 }}><Highlighter size={22} aria-hidden="true" />Listen & mark · {ACTIVITY_INFO[marking.activity].title}</h2>
-            <button className="hz-btn hz-btn-ghost" onClick={() => { setMarkingId(null); setSelectedKey(null); }} aria-label="Close Mushaf"><X size={18} aria-hidden="true" /></button>
-          </div>
-          <div className="hz-legend" style={{ marginBottom: 10 }}>
-            <span>Tap a word the student gets wrong to highlight it. Tap a highlighted word to clear it.</span>
-            <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
-            <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
-          </div>
-          <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected />
-          {selected && (
-            <div className="ht-markbar" role="region" aria-label="Selected mistake">
-              <b className="hz-ar" lang="ar">{selected.wordText}</b>
-              <span>Page {selected.page} · Ayah {selected.verseKey}</span>
-              <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}><Check size={16} aria-hidden="true" />Corrected</button>
-              <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))}>Remove</button>
-              <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
-            </div>
-          )}
-          <div className="hz-wiz-nav" style={{ marginTop: 12 }}>
-            <span className="hz-muted">{mistakesForTask(marking, mistakes).length} mistake(s) to fix on these pages</span>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="hz-btn hz-btn-outline" aria-expanded={nextOpen === marking.id} onClick={() => setNextOpen(nextOpen === marking.id ? null : marking.id)}><ArrowRight size={17} aria-hidden="true" />Next task</button>
-              {!marking.completedAt && <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => markDone(marking)}><CheckCircle2 size={17} aria-hidden="true" />Mark task done</button>}
-            </div>
-          </div>
-          {nextOpen === marking.id && nextBox(marking)}
-        </section>
-      )}
+      {marking && listenAndMark()}
 
     </div>
   );
