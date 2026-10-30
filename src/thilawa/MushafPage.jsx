@@ -15,6 +15,27 @@ import { buildLines } from "./mushafLines.js";
 
 export { buildLines };
 
+// Page turning like a printed Mushaf: swiping the page to the right (finger
+// moving left to right) goes to the next page, to the left goes back. Spread
+// the returned handlers on the element around the page. A short or mostly
+// vertical movement is a tap or a scroll and is ignored.
+export function useMushafSwipe(onNext, onPrev) {
+  const start = useRef(null);
+  return {
+    onTouchStart: (e) => { const t = e.touches[0]; start.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null; },
+    onTouchEnd: (e) => {
+      const from = start.current;
+      start.current = null;
+      if (!from) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - from.x;
+      const dy = t.clientY - from.y;
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      if (dx > 0) onNext?.(); else onPrev?.();
+    },
+  };
+}
+
 // The endpoint quran.com's own site uses. (The older /api/v4/verses/by_page
 // files some ayahs that cross a page under the wrong page, e.g. 70:40.)
 const API = "https://api.qurancdn.com/api/qdc/verses/by_page";

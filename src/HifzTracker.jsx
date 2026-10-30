@@ -15,7 +15,7 @@ import { nearestAyahs } from "./hifz/ayahs.js";
 import { ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs } from "./hifz/tasks.js";
 import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
-import MushafPage from "./thilawa/MushafPage.jsx";
+import MushafPage, { useMushafSwipe } from "./thilawa/MushafPage.jsx";
 
 export const ACTIVITY_INFO = {
   new: { title: ACTIVITY_TITLES.new, Icon: BookOpenText },
@@ -193,6 +193,11 @@ export const HIFZ_CSS = `
   .hz-list li > div { flex: 1; min-width: 160px; }
   .hz-list small { display: block; color: ${TP.secondaryText}; font-size: 12px; margin-top: 2px; }
   .hz-ar { font-family: "UthmanicHafs", serif; font-size: 24px; line-height: 1.5; color: #9B1C0A; direction: rtl; }
+  /* The word as it is marked on the Mushaf. */
+  .hz-mark { background: #FBD5CC; box-shadow: 0 0 0 1px #F2A595; border-radius: 6px; padding: 0 8px; }
+  .hz-tick { flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; border: 2px solid #BBDCF0; background: #FFFFFF; color: #8FADC0; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease; }
+  .hz-tick:hover:not(:disabled) { border-color: #1E8A5A; color: #1E8A5A; background: #EAF7F0; }
+  .hz-tick:disabled { opacity: 0.5; cursor: wait; }
   .hz-date { font-weight: 700; color: ${TP.navy}; min-width: 92px; }
   /* Position: Surah → Ayah → Page → Line, each kept in step with the others */
   .hz-pos { display: grid; grid-template-columns: 52px minmax(150px, 2.2fr) minmax(64px, 0.8fr) minmax(70px, 0.9fr) minmax(64px, 0.8fr) auto; align-items: end; gap: 8px; }
@@ -318,6 +323,10 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
   useEffect(() => { setPage(clamp(focus)); }, [task?.id, task?.start, task?.end, focus]);
   const shown = clamp(page);
   const open = mistakes.filter((m) => !m.correctedAt && m.page === shown).length;
+  // Like a printed Mushaf: the next page is to the left.
+  const next = () => setPage(Math.min(last, shown + 1));
+  const prev = () => setPage(Math.max(first, shown - 1));
+  const swipe = useMushafSwipe(next, prev);
   const title = (
     <div className="hz-reader-title">Page {shown} · {surahsOnPages(shown, shown).map((s) => s.name).join(", ")}
       <small>{pages.length > 1 ? `Page ${shown - first + 1} of ${pages.length}` : `Juz ${JUZ_START_PAGES.filter((p) => p <= shown).length}`}{open ? ` · ${open} mistake${open === 1 ? "" : "s"} here` : ""}</small>
@@ -327,12 +336,12 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
     <div className="hz-reader">
       {pages.length > 1 ? (
         <div className="hz-reader-nav">
-          <button className="hz-btn hz-btn-outline" disabled={shown <= first} onClick={() => setPage(shown - 1)} aria-label="Previous page"><ChevronLeft size={18} aria-hidden="true" /><span>Previous</span></button>
+          <button className="hz-btn hz-btn-outline" disabled={shown >= last} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
           {title}
-          <button className="hz-btn hz-btn-outline" disabled={shown >= last} onClick={() => setPage(shown + 1)} aria-label="Next page"><span>Next</span><ChevronRight size={18} aria-hidden="true" /></button>
+          <button className="hz-btn hz-btn-outline" disabled={shown <= first} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
         </div>
       ) : <div className="hz-reader-nav">{title}</div>}
-      <MushafPage page={shown} range={task ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} />
+      <div {...(pages.length > 1 ? swipe : {})}><MushafPage page={shown} range={task ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} /></div>
     </div>
   );
 }
@@ -499,7 +508,13 @@ export default function HifzTracker({ repo, onSummary }) {
   const lessonTasks = done.filter((t) => t.taskDate === lessonDay);
   const lessonIds = new Set(lessonTasks.map((t) => t.id));
   const lessonTaskOf = (m) => lessonTasks.find((t) => t.id === m.taskId) || lessonTasks.find((t) => mistakeInTask(m, t));
-  const lessonMistakes = mistakes.filter((m) => !m.correctedAt && (lessonIds.has(m.taskId) || (!m.taskId && lessonTaskOf(m))));
+  // A mistake the student ticks off leaves their list (the teacher's mark stays
+  // on the Mushaf until the teacher clears it).
+  const lessonMistakes = mistakes.filter((m) => !m.correctedAt && !m.tickedAt && (lessonIds.has(m.taskId) || (!m.taskId && lessonTaskOf(m))));
+  const tickMistake = async (m) => {
+    setBusy(true);
+    try { await repo.setMistakeTicked(m.id, true); await refresh(); } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
   const counts = completedCounts(state.memorized);
   const card = (t) => (
     <StudentTaskCard key={t.id} task={t} today={today} mistakes={mistakes} busy={busy} open={openId === t.id}
@@ -562,15 +577,15 @@ export default function HifzTracker({ repo, onSummary }) {
       {lessonDay && (
         <section className="hz-card" aria-label="Mistakes from your last lesson">
           <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Mistakes from your last lesson <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDay(lessonDay)}</span></h2>
-          {lessonMistakes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No mistakes marked in your last lesson. MashaAllah!</p> : (
+          {lessonMistakes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No mistakes left from your last lesson. MashaAllah!</p> : (
             <ul className="hz-list">
               {lessonMistakes.map((m) => {
                 const t = lessonTaskOf(m);
                 return (
                   <li key={m.id}>
-                    <span className="hz-ar" lang="ar">{m.wordText || "—"}</span>
+                    <span className="hz-ar hz-mark" lang="ar">{m.wordText || "—"}</span>
                     <div>{ACTIVITY_INFO[t.activity].title} · Page {m.page} · Ayah {m.verseKey}{m.note && <small>{m.note}</small>}</div>
-                    <button className="hz-btn hz-btn-outline" onClick={() => openTask(t.id, m.page)}>Show</button>
+                    <button className="hz-tick" disabled={busy} onClick={() => tickMistake(m)} aria-label={`Tick off ${m.wordText || "this mistake"} as fixed`} title="Fixed it"><CheckCircle2 size={22} aria-hidden="true" /></button>
                   </li>
                 );
               })}

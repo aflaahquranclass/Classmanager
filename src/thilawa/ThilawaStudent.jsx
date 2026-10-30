@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { BookOpenCheck, Target, AudioLines, Gauge, Flame, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Pencil, X, AlertTriangle, Trophy, ArrowRight, Circle, CalendarDays } from "lucide-react";
-import MushafPage from "./MushafPage.jsx";
+import MushafPage, { useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
 import { addDays } from "../hifz/engine.js";
 import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel } from "./engine.js";
@@ -238,15 +238,19 @@ export function ThilawaTracker({ repo, data, refresh, onGo }) {
 // With onTick/onUntick each page can be ticked as read today.
 function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer }) {
   const read = readToday?.has(page);
+  // Like a printed Mushaf: the next page is to the left.
+  const next = () => { if (page < to) onPage(page + 1); };
+  const prev = () => { if (page > from) onPage(page - 1); };
+  const swipe = useMushafSwipe(next, prev);
   useEffect(() => { window.scrollTo?.({ top: 0, behavior: "smooth" }); }, [page]);
   return (
     <div className="th-reader">
       <div className="th-reader-nav">
-        <button className="hz-btn hz-btn-outline" disabled={page <= from} onClick={() => onPage(page - 1)} aria-label="Previous page"><ChevronLeft size={18} aria-hidden="true" /><span>Previous</span></button>
+        <button className="hz-btn hz-btn-outline" disabled={page >= to} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
         <div className="th-reader-title">{pageLabel(page)}{to > from && <small>Page {page - from + 1} of {to - from + 1}</small>}</div>
-        <button className="hz-btn hz-btn-outline" disabled={page >= to} onClick={() => onPage(page + 1)} aria-label="Next page"><span>Next</span><ChevronRight size={18} aria-hidden="true" /></button>
+        <button className="hz-btn hz-btn-outline" disabled={page <= from} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
-      <MushafPage page={page} />
+      <div {...swipe}><MushafPage page={page} /></div>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
         : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => onTick(page)}><Circle size={18} aria-hidden="true" />I've read this page</button>)}

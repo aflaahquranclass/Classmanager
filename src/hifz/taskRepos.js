@@ -1,7 +1,7 @@
 // Storage for teacher-planned Hifz (see tasks.js and the migration
 // 20261105_hifz_teacher_tasks.sql). One repo = one student's data, opened by
 // the student (portal) or their teacher. Row-level security decides who may
-// write what: students can only tick tasks; everything else is the teacher's.
+// write what: students can only tick tasks and mistakes; everything else is the teacher's.
 //
 // Interface:
 //   getProfile() → profile | null          saveProfile(plan)   (see tasks.js: profile)
@@ -11,6 +11,7 @@
 //   updateTask(id, patch)                  deleteTask(id)          setTaskDone(id, done)
 //   listMistakes() → mistakes              addMistake({ page, line, verseKey, position, wordText, taskId })
 //   setMistakeCorrected(id, corrected)     deleteMistake(id)
+//   setMistakeTicked(id, ticked)           (the student's own tick)
 //   subscribe(onChange) → unsubscribe       (live updates)
 
 import { createSupabaseRepo } from "./repos.js";
@@ -22,7 +23,7 @@ const taskFromDb = (r) => ({
 });
 const mistakeFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, taskId: r.task_id, page: r.page, line: r.word_line, verseKey: r.verse_key, position: r.word_position,
-  wordText: r.word_text || "", note: r.note || "", correctedAt: r.corrected_at, createdAt: r.created_at,
+  wordText: r.word_text || "", note: r.note || "", correctedAt: r.corrected_at, tickedAt: r.student_ticked_at || null, createdAt: r.created_at,
 });
 const taskPatchToDb = (p) => {
   const map = { taskDate: "task_date", activity: "activity", start: "start_unit", end: "end_unit", notes: "notes" };
@@ -92,6 +93,9 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
     async setMistakeCorrected(id, corrected) {
       check(await supabase.from("hifz_mistakes").update({ corrected_at: corrected ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
     },
+    async setMistakeTicked(id, ticked) {
+      check(await supabase.from("hifz_mistakes").update({ student_ticked_at: ticked ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
+    },
     async deleteMistake(id) { check(await supabase.from("hifz_mistakes").delete().eq("id", id).eq("student_id", studentId)); },
     subscribe(onChange) {
       const channel = supabase.channel(`hifz-${studentId}-${Math.random().toString(36).slice(2)}`);
@@ -111,7 +115,7 @@ export function createHifzMemoryStore() {
 }
 
 // asStudent: like row-level security for a signed-in student — read only,
-// except ticking tasks done.
+// except ticking tasks done and ticking off mistakes.
 export function createMemoryHifzRepo(store, studentId, { asStudent = false, teacherId = null } = {}) {
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const own = (r) => r.studentId === studentId;
@@ -153,6 +157,7 @@ export function createMemoryHifzRepo(store, studentId, { asStudent = false, teac
       changed();
     },
     async setMistakeCorrected(id, corrected) { teacherOnly(); find("mistakes", id).correctedAt = corrected ? stamp() : null; changed(); },
+    async setMistakeTicked(id, ticked) { find("mistakes", id).tickedAt = ticked ? stamp() : null; changed(); },
     async deleteMistake(id) { teacherOnly(); find("mistakes", id); store.mistakes = store.mistakes.filter((m) => m.id !== id); changed(); },
     subscribe(onChange) { store.listeners.add(onChange); return () => store.listeners.delete(onChange); },
   };
