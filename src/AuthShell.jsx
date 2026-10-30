@@ -46,13 +46,6 @@ const AUTH_CSS = `
   .auth-help { margin: 22px 0 0; font-size: 13px; color: ${BRAND.muted}; text-align: center; line-height: 1.5; }
   @keyframes auth-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 
-  /* Portal choice (Teachers / Admin) */
-  .login-segment { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 5px; margin-bottom: 24px; border-radius: 14px; background: #F1F6FC; border: 1px solid #E1ECF8; }
-  .login-segment-btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; border: none; border-radius: 10px; background: transparent; color: ${BRAND.muted}; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
-  .login-segment-btn:hover { color: ${BRAND.navy}; }
-  .login-segment-btn-active { background: #FFFFFF; color: ${BRAND.blue}; box-shadow: 0 2px 8px rgba(18,59,103,0.12); }
-  .login-segment-btn:focus-visible { outline: 2px solid ${BRAND.blue}; outline-offset: 2px; }
-  .login-segment-btn svg { width: 18px; height: 18px; }
 
   /* Fields */
   .login-field { margin-bottom: 18px; }

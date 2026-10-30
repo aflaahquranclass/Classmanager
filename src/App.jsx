@@ -538,11 +538,10 @@ const STUDENT_PORTAL_URL = ["localhost", "127.0.0.1"].includes(window.location.h
   ? `${window.location.origin}/?portal=student`
   : "https://students.aflaahqc.com";
 
-// Unified sign-in screen: Teachers Portal and Admin Portal (or just one of
-// them when this address is dedicated to a single portal).
+// Sign-in screen for the Teachers Portal or the Admin Portal. Each has its own
+// address (teachers.aflaahqc.com / admin.aflaahqc.com); there is no combined
+// staff sign-in.
 function LoginScreen({
-  accountType,
-  onAccountTypeChange,
   fields,
   showPassword,
   onToggleShowPassword,
@@ -552,22 +551,17 @@ function LoginScreen({
   onForgotPassword,
   forgotPasswordStatus,
 }) {
-  const segments = [
-    { key: "teacher", label: "Teachers Portal", Icon: BookOpen },
-    { key: "admin", label: "Admin Portal", Icon: Shield },
-  ].filter((s) => !PORTAL || s.key === PORTAL);
-  const single = segments.length === 1 ? segments[0] : null;
-  const intro = {
-    teacher: {
-      tagline: "Plan and follow each student's Quran journey, all in one place.",
-      features: ["Your timetable and attendance", "Hifz and Thilawa plans for every student", "Exams, reports and notifications"],
-    },
-    admin: {
+  const portal = PORTAL === "admin"
+    ? {
+      label: "Admin Portal",
       tagline: "Run the class: students, teachers, fees and more.",
       features: ["Students, teachers and classes", "Fees, payments and finance", "Registrations, exams and notifications"],
-    },
-  };
-  const info = single ? intro[single.key] : { tagline: "Sign in to the Teachers Portal or the Admin Portal.", features: [...intro.teacher.features.slice(0, 2), intro.admin.features[1]] };
+    }
+    : {
+      label: "Teachers Portal",
+      tagline: "Plan and follow each student's Quran journey, all in one place.",
+      features: ["Your timetable and attendance", "Hifz and Thilawa plans for every student", "Exams, reports and notifications"],
+    };
 
   // Focus ring is driven by explicit state (not just the :focus pseudo-class)
   // so it's guaranteed visible and testable across environments.
@@ -575,29 +569,12 @@ function LoginScreen({
 
   return (
     <AuthShell
-      portal={single ? single.label : "Staff Portal"}
-      tagline={info.tagline}
-      features={info.features}
+      portal={portal.label}
+      tagline={portal.tagline}
+      features={portal.features}
       title="Welcome back"
-      subtitle={single ? `Sign in to the ${single.label} with your email and password.` : "Choose your portal and sign in."}
+      subtitle={`Sign in to the ${portal.label} with your email and password.`}
     >
-      {segments.length > 1 && (
-        <div className="login-segment" role="group" aria-label="Portal">
-          {segments.map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              type="button"
-              aria-pressed={accountType === key}
-              className={`login-segment-btn ${accountType === key ? "login-segment-btn-active" : ""}`}
-              onClick={() => onAccountTypeChange(key)}
-            >
-              <Icon aria-hidden="true" />
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
       <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
         <div className="login-field">
           <label htmlFor="login-email">Email address</label>
@@ -1040,11 +1017,6 @@ export default function App() {
   const accountTypeFields = {
     admin: { email: adminEmailInput, setEmail: setAdminEmailInput, password: adminPasswordInput, setPassword: setAdminPasswordInput, error: adminLoginError, loading: adminLoginLoading },
     teacher: { email: loginEmail, setEmail: setLoginEmail, password: loginPassword, setPassword: setLoginPassword, error: loginError, loading: teacherLoginLoading },
-  };
-
-  const handleAccountTypeChange = (type) => {
-    setAccountType(type);
-    setAdminLoginError(""); setLoginError(""); setForgotPasswordStatus("");
   };
 
   const handleUnifiedSignIn = () => {
@@ -3476,8 +3448,6 @@ export default function App() {
         </div>
       ) : authView === "login" ? (
         <LoginScreen
-          accountType={accountType}
-          onAccountTypeChange={handleAccountTypeChange}
           fields={accountTypeFields[accountType]}
           showPassword={showLoginPassword}
           onToggleShowPassword={() => setShowLoginPassword((v) => !v)}
