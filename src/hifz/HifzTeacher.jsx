@@ -5,7 +5,7 @@
 // The student's portal updates live and they get a phone notification.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, Highlighter, ArrowRight, Search, Flame, Target, X, Undo2, Check } from "lucide-react";
+import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, Highlighter, ArrowRight, Search, Flame, Target, X, Undo2, Check, History } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
@@ -58,6 +58,12 @@ const teacherCss = `
   .ht-sum { font-size: 13px; color: #1452A8; margin-top: 8px; }
   .ht-next { border: 1px dashed #9FC3EA; border-radius: 12px; background: #F6FAFE; padding: 12px; }
   .ht-next-head { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #123B67; margin-bottom: 10px; }
+  .ht-hist-day + .ht-hist-day { margin-top: 14px; }
+  .ht-hist { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .ht-hist li { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border-radius: 10px; background: #F7FAFD; border: 1px solid #E8F0F8; font-size: 14px; color: #123B67; }
+  .ht-hist li > div { min-width: 0; }
+  .ht-hist small { display: block; color: #567493; font-size: 12px; margin-top: 2px; }
+  .ht-hist-icon { flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #DDF5E9; color: #156B45; }
   .ht-rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
   .ht-row { border: 1px solid #E1EDF8; border-radius: 14px; background: #F7FAFD; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
   .ht-row-done { background: linear-gradient(160deg, #ECFAF4, #FFFFFF 60%); border-color: #9FD9BE; }
@@ -229,6 +235,50 @@ function EditTask({ task, onSave, onCancel, busy, saveLabel = "Save changes" }) 
         <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave(draft)}>{saveLabel}</button>
       </div>
     </div>
+  );
+}
+
+// ---------- history ----------
+// The student's done tasks, newest first, grouped by day (the student sees
+// the same history in their portal).
+function HistorySection({ tasks, mistakes }) {
+  const [shown, setShown] = useState(20);
+  const done = tasks.filter((t) => t.completedAt).sort((a, b) => (a.taskDate < b.taskDate ? 1 : a.taskDate > b.taskDate ? -1 : a.completedAt < b.completedAt ? 1 : -1));
+  const days = [];
+  for (const t of done.slice(0, shown)) {
+    if (!days.length || days[days.length - 1].date !== t.taskDate) days.push({ date: t.taskDate, list: [] });
+    days[days.length - 1].list.push(t);
+  }
+  return (
+    <section className="hz-card" aria-label="History">
+      <h2 className="hz-h2"><History size={22} aria-hidden="true" />History <span className="hz-muted" style={{ fontWeight: 400 }}>· {done.length} done</span></h2>
+      {done.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>Nothing done yet.</p> : (
+        <>
+          {days.map((d) => (
+            <div key={d.date} className="ht-hist-day">
+              <div className="ht-group" style={{ marginTop: 0 }}>{fmtDay(d.date)}</div>
+              <ul className="ht-hist">
+                {d.list.map((t) => {
+                  const { title, Icon } = ACTIVITY_INFO[t.activity];
+                  const marks = mistakes.filter((m) => m.taskId === t.id).length;
+                  const late = t.completedAt.slice(0, 10) > t.taskDate;
+                  return (
+                    <li key={t.id}>
+                      <span className="ht-hist-icon"><Icon size={15} aria-hidden="true" /></span>
+                      <div>
+                        <b>{title}</b> · {portionSummary(t)}
+                        <small>Done {fmtDate(t.completedAt.slice(0, 10))}{late ? " (later than set)" : ""}{marks ? ` · ${marks} word${marks === 1 ? "" : "s"} marked` : ""}{t.notes ? ` · “${t.notes}”` : ""}</small>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+          {done.length > shown && <button className="hz-btn hz-btn-ghost" onClick={() => setShown((n) => n + 20)}>Show older</button>}
+        </>
+      )}
+    </section>
   );
 }
 
@@ -408,11 +458,13 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
               {group(`Today · ${fmtDate(today)}`, open(todayTasks))}
               {group("Not finished from earlier days", overdue)}
               {group("Coming up", open(upcoming))}
-              {doneCount > 0 && <p className="hz-muted" style={{ margin: "14px 0 0" }}>{doneCount} done task{doneCount === 1 ? "" : "s"} moved to the student's history.</p>}
+              {doneCount > 0 && <p className="hz-muted" style={{ margin: "14px 0 0" }}>{doneCount} done task{doneCount === 1 ? "" : "s"} below in History.</p>}
             </>
           );
         })()}
       </section>
+
+      <HistorySection tasks={tasks} mistakes={mistakes} />
 
       {marking && (
         <section className="hz-card hz-reader-card" aria-label="Listen and mark mistakes" id="ht-mushaf">

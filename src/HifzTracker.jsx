@@ -7,7 +7,7 @@
 // HIFZ_CSS and PositionPicker are shared with the teacher's screens.
 
 import { useState, useEffect, useCallback } from "react";
-import { BookOpenText, RotateCw, History, Flame, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock } from "lucide-react";
+import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock } from "lucide-react";
 import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { unitsOf, intersect } from "./hifz/engine.js";
@@ -422,6 +422,42 @@ export function GoalYearDialog({ initial = null, required = false, onSave, onClo
   );
 }
 
+// ---------- history ----------
+// Done tasks, newest first, grouped by the day they were set for.
+function StudentHistory({ done, today, onOpen }) {
+  const [shown, setShown] = useState(15);
+  const byDay = [...done].sort((a, b) => (a.taskDate < b.taskDate ? 1 : a.taskDate > b.taskDate ? -1 : 0));
+  const days = [];
+  for (const t of byDay.slice(0, shown)) {
+    if (!days.length || days[days.length - 1].date !== t.taskDate) days.push({ date: t.taskDate, list: [] });
+    days[days.length - 1].list.push(t);
+  }
+  return (
+    <section className="hz-card" aria-label="History">
+      <h2 className="hz-h2"><History size={22} aria-hidden="true" />History <span className="hz-muted" style={{ fontWeight: 400 }}>· {done.length} done</span></h2>
+      {done.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>Your finished tasks will show here.</p> : (
+        <>
+          {days.map((d) => (
+            <div key={d.date} style={{ marginTop: 10 }}>
+              <div className="hz-sub" style={{ color: TP.navy, margin: "0 0 6px" }}>{d.date === today ? "Today" : fmtDay(d.date)}</div>
+              <ul className="hz-list">
+                {d.list.map((t) => (
+                  <li key={t.id}>
+                    <CheckCircle2 size={18} color="#1E8A5A" aria-hidden="true" />
+                    <div><b>{ACTIVITY_INFO[t.activity].title}</b> · {describeRange([t.start, t.end])}<small>{describeAyahs([t.start, t.end])} · done {fmtDate(t.completedAt.slice(0, 10))}</small></div>
+                    <button className="hz-btn hz-btn-ghost" onClick={() => onOpen(t.id)}>Open</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {done.length > shown && <button className="hz-btn hz-btn-ghost" onClick={() => setShown((n) => n + 15)}>Show older</button>}
+        </>
+      )}
+    </section>
+  );
+}
+
 // ---------- student tracker ----------
 
 export default function HifzTracker({ repo, onSummary }) {
@@ -434,22 +470,36 @@ export default function HifzTracker({ repo, onSummary }) {
   if (error && !state) return <div className="hz"><div className="hz-error" role="alert">{error}</div></div>;
   if (!state) return <div className="hz"><div className="hz-card hz-muted">Loading your Hifz…</div></div>;
 
-  const { stats, streak, todayTasks, overdue, upcoming, recentDone, today, mistakes, openMistakes } = state;
+  const { stats, today, mistakes, tasks } = state;
   const toggle = async (task, done) => {
     setBusy(true);
     try { await repo.setTaskDone(task.id, done); await refresh(); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
-  const allOpen = [...todayTasks, ...overdue, ...upcoming, ...recentDone];
-  const opened = allOpen.find((t) => t.id === openId) || null;
+  const opened = tasks.find((t) => t.id === openId) || null;
   const toReader = () => setTimeout(() => document.getElementById("hz-reader")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   const openTask = (id, page = null) => { setOpenId(id); setFocusPage(page); toReader(); };
-  // The task a mistake belongs to: one covering its page, Muraja'ah first,
-  // today's before unfinished and coming ones.
-  const taskFor = (m) => {
-    const covering = [...todayTasks, ...overdue, ...upcoming].filter((t) => mistakeInTask(m, t));
-    return covering.find((t) => t.activity !== "new") || covering[0] || null;
-  };
-  const whenOf = (t) => (t.taskDate === today ? "today's" : t.taskDate < today ? "unfinished" : `${fmtDay(t.taskDate)}`);
+
+  // The main card: what's waiting for today (and anything not finished from
+  // before) or, when today is all done, the next class day's tasks — named by
+  // that day until it comes. Done tasks move to History.
+  const actOrder = (t) => ["new", "short", "long"].indexOf(t.activity);
+  const waiting = tasks.filter((t) => !t.completedAt);
+  const due = waiting.filter((t) => t.taskDate <= today).sort((a, b) => (a.taskDate < b.taskDate ? -1 : a.taskDate > b.taskDate ? 1 : actOrder(a) - actOrder(b)));
+  const future = waiting.filter((t) => t.taskDate > today).sort((a, b) => (a.taskDate < b.taskDate ? -1 : a.taskDate > b.taskDate ? 1 : actOrder(a) - actOrder(b)));
+  const mainDate = due.length ? today : future[0]?.taskDate || null;
+  const main = due.length ? due : future.filter((t) => t.taskDate === mainDate);
+  const comingUp = future.filter((t) => !main.includes(t));
+  const dayName = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
+  const mainTitle = !mainDate || mainDate === today ? "Today's Hifz" : `${dayName(mainDate)}'s Hifz`;
+
+  // Mistakes from the last lesson: words the teacher marked in the most
+  // recently finished day's tasks, until corrected. The next lesson replaces them.
+  const done = tasks.filter((t) => t.completedAt).sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1));
+  const lessonDay = done[0]?.taskDate || null;
+  const lessonTasks = done.filter((t) => t.taskDate === lessonDay);
+  const lessonIds = new Set(lessonTasks.map((t) => t.id));
+  const lessonTaskOf = (m) => lessonTasks.find((t) => t.id === m.taskId) || lessonTasks.find((t) => mistakeInTask(m, t));
+  const lessonMistakes = mistakes.filter((m) => !m.correctedAt && (lessonIds.has(m.taskId) || (!m.taskId && lessonTaskOf(m))));
   const counts = completedCounts(state.memorized);
   const card = (t) => (
     <StudentTaskCard key={t.id} task={t} today={today} mistakes={mistakes} busy={busy} open={openId === t.id}
@@ -500,74 +550,51 @@ export default function HifzTracker({ repo, onSummary }) {
         )}
       </section>
 
-      <section className="hz-card" aria-label="Today's Hifz">
-        <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />Today's Hifz <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDate(today)}</span></h2>
-        {todayTasks.length === 0 && overdue.length === 0
-          ? <p className="hz-muted" style={{ margin: 0 }}>{upcoming.length ? `Nothing set for today. Your next task is on ${fmtDay(upcoming[0].taskDate)}.` : "Nothing set for today yet."}</p>
-          : <div className="hz-tasks">{todayTasks.map(card)}</div>}
-        {overdue.length > 0 && (
-          <>
-            <div className="hz-sub"><AlertTriangle size={16} aria-hidden="true" />Not finished from earlier days</div>
-            <div className="hz-tasks">{overdue.map(card)}</div>
-          </>
-        )}
+      <section className="hz-card" aria-label={mainTitle}>
+        <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />{mainTitle} {mainDate && <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDate(mainDate)}</span>}</h2>
+        {main.length === 0
+          ? <p className="hz-muted" style={{ margin: 0 }}>{done.length ? "All done. Your next tasks show here as soon as your teacher sets them." : "Nothing set yet."}</p>
+          : <div className="hz-tasks">{main.map(card)}</div>}
       </section>
 
       {reader}
 
-      <section className="hz-card" aria-label="Mistakes to fix">
-        <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Mistakes to fix</h2>
-        {openMistakes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No mistakes to fix. MashaAllah!</p> : (
-          <>
-            <p className="hz-muted" style={{ marginTop: 0 }}>Your teacher highlighted these words. Practise them; your teacher clears each one when you read it correctly.</p>
+      {lessonDay && (
+        <section className="hz-card" aria-label="Mistakes from your last lesson">
+          <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Mistakes from your last lesson <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDay(lessonDay)}</span></h2>
+          {lessonMistakes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No mistakes marked in your last lesson. MashaAllah!</p> : (
             <ul className="hz-list">
-              {openMistakes.map((m) => {
-                const t = taskFor(m);
+              {lessonMistakes.map((m) => {
+                const t = lessonTaskOf(m);
                 return (
                   <li key={m.id}>
                     <span className="hz-ar" lang="ar">{m.wordText || "—"}</span>
-                    <div>Page {m.page} · Ayah {m.verseKey}
-                      <small>{t ? `In ${whenOf(t)} ${ACTIVITY_INFO[t.activity].title}` : "Not in a task yet: it shows when your teacher sets this page"}</small>
-                      {m.note && <small>{m.note}</small>}
-                    </div>
-                    {t && <button className="hz-btn hz-btn-outline" onClick={() => openTask(t.id, m.page)}>Show</button>}
+                    <div>{ACTIVITY_INFO[t.activity].title} · Page {m.page} · Ayah {m.verseKey}{m.note && <small>{m.note}</small>}</div>
+                    <button className="hz-btn hz-btn-outline" onClick={() => openTask(t.id, m.page)}>Show</button>
                   </li>
                 );
               })}
             </ul>
-          </>
-        )}
-      </section>
+          )}
+        </section>
+      )}
 
-      <section className="hz-card" aria-label="Coming up">
-        <h2 className="hz-h2"><Clock size={22} aria-hidden="true" />Coming Up</h2>
-        {upcoming.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>Nothing set for the coming days yet.</p> : (
+      {comingUp.length > 0 && (
+        <section className="hz-card" aria-label="Coming up">
+          <h2 className="hz-h2"><Clock size={22} aria-hidden="true" />Coming Up</h2>
           <ul className="hz-list">
-            {upcoming.map((t) => (
+            {comingUp.map((t) => (
               <li key={t.id}>
                 <span className="hz-date">{fmtDay(t.taskDate)}</span>
-                <div><b>{ACTIVITY_INFO[t.activity].title}</b> · {describeRange([t.start, t.end])}<small>{surahNames([t.start, t.end])}</small></div>
+                <div><b>{ACTIVITY_INFO[t.activity].title}</b> · {describeRange([t.start, t.end])}<small>{describeAyahs([t.start, t.end])}</small></div>
                 <button className="hz-btn hz-btn-ghost" onClick={() => openTask(t.id)}>Open</button>
               </li>
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section className="hz-card" aria-label="Streaks">
-        <h2 className="hz-h2"><Flame size={22} aria-hidden="true" />Streaks</h2>
-        <div className="hz-streak">
-          <div><strong>{streak.current}</strong><span>Current streak</span></div>
-          <div><strong>{streak.longest}</strong><span>Longest streak</span></div>
-          <div><strong style={{ fontSize: 15, lineHeight: "28px" }}>{streak.lastActive ? fmtDate(streak.lastActive) : "—"}</strong><span>Last active</span></div>
-        </div>
-        <div className="hz-cal" aria-label="Activity in the last 5 weeks">
-          {streak.calendar.map((d) => (
-            <div key={d.date} className={`${d.active ? "on" : ""} ${d.date === today ? "today" : ""}`} title={`${fmtDate(d.date)}${d.active ? ": active" : ""}`}>{+d.date.slice(8)}</div>
-          ))}
-        </div>
-        <p className="hz-muted" style={{ marginBottom: 0 }}>Finish at least one task a day to keep your streak. It survives one missed day and resets after two missed days in a row.</p>
-      </section>
+      <StudentHistory done={done} today={today} onOpen={(id) => openTask(id)} />
 
       <section className="hz-card" aria-label="Revision tracking">
         <h2 className="hz-h2"><RotateCw size={22} aria-hidden="true" />Revision Tracking</h2>
@@ -583,16 +610,6 @@ export default function HifzTracker({ repo, onSummary }) {
             <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${stats.longMonthPercent}%` }} /></div>
           </div>
         </div>
-        {recentDone.length > 0 && (
-          <>
-            <div className="hz-sub" style={{ color: TP.navy }}><CheckCircle2 size={16} aria-hidden="true" />Recently done</div>
-            <ul className="hz-list">
-              {recentDone.map((t) => (
-                <li key={t.id}><span className="hz-date">{fmtDay(t.taskDate)}</span><div><b>{ACTIVITY_INFO[t.activity].title}</b> · {describeRange([t.start, t.end])}<small>{surahNames([t.start, t.end])}</small></div></li>
-              ))}
-            </ul>
-          </>
-        )}
       </section>
     </div>
   );
