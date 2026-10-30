@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Flame, Star, BookOpen, Users, Mic, Baby, Award, LineChart, Smartphone, UserRound, Phone, Mail, MapPin } from "lucide-react";
 import { CONTACT, SHOW } from "./content.js";
+import { useLang } from "./i18n.jsx";
 
 export const ICONS = { flame: Flame, star: Star, book: BookOpen, users: Users, mic: Mic, baby: Baby, award: Award, chart: LineChart, phone: Smartphone };
 
@@ -103,21 +104,22 @@ export function useReveal(key) {
 // Mock of the student portal's dashboard (header with streak, hifz
 // percentage tracker, stat tiles) filled with sample numbers.
 export function PortalPreview({ sample, className = "" }) {
+  const { t } = useLang();
   return (
-    <div className={`ld-portal ${className}`} aria-label="Sample of the student portal">
+    <div className={`ld-portal ${className}`} aria-label={t("sample.label")}>
       <div className="ld-portal-head">
         <span className="ld-portal-av"><UserRound size={22} aria-hidden="true" /></span>
-        <span className="ld-who">Student name<small>Sample portal</small></span>
-        <span className="ld-streak"><Flame size={26} aria-hidden="true" /><b>{sample.streak}</b>day streak</span>
+        <span className="ld-who">{t("sample.student")}<small>{t("sample.portal")}</small></span>
+        <span className="ld-streak"><Flame size={26} aria-hidden="true" /><b>{sample.streak}</b>{t("sample.dayStreak")}</span>
       </div>
       <div className="ld-panel">
-        <div className="ld-panel-row"><span>Hifz percentage tracker</span><span><CountOnView value={sample.percent} decimals={1} />%</span></div>
+        <div className="ld-panel-row"><span>{t("sample.tracker")}</span><span><CountOnView value={sample.percent} decimals={1} />%</span></div>
         <div className="ld-bar"><div className="ld-bar-fill" data-w={`${Math.max(sample.percent * 2, 6)}%`} /></div>
-        <div className="ld-bar-foot"><span>{sample.ayahs} / 6,236 ayaat</span><span>Juz Amma path</span></div>
+        <div className="ld-bar-foot"><span>{t("sample.ayaat", { n: sample.ayahs })}</span><span>{t("sample.path")}</span></div>
       </div>
       <div className="ld-mini">
-        <div>Surahs completed<b><CountOnView value={sample.surahs} /> / 114</b></div>
-        <div>Pages this week<b><CountOnView value={sample.pagesThisWeek} /></b></div>
+        <div>{t("sample.surahs")}<b><CountOnView value={sample.surahs} /> / 114</b></div>
+        <div>{t("sample.pages")}<b><CountOnView value={sample.pagesThisWeek} /></b></div>
       </div>
     </div>
   );
@@ -126,6 +128,7 @@ export function PortalPreview({ sample, className = "" }) {
 // Closing band on Home and Hifz: how to get in touch to enrol. Call and
 // email buttons only appear once CONTACT has a real phone or email.
 export function EnrolCta({ title, text, navigate }) {
+  const { t } = useLang();
   return (
     <section className="ld-cta">
       <div className="ld-wrap ld-cta-in ld-reveal">
@@ -134,10 +137,10 @@ export function EnrolCta({ title, text, navigate }) {
           <p>{text}</p>
         </div>
         <div className="ld-cta-actions">
-          {CONTACT.phone && <a className="ld-btn ld-btn-white" href={`tel:${CONTACT.phone}`}><Phone size={18} aria-hidden="true" />Call {CONTACT.phoneDisplay}</a>}
-          {CONTACT.email && <a className="ld-btn ld-btn-ghost" href={`mailto:${CONTACT.email}`}><Mail size={18} aria-hidden="true" />Email us</a>}
-          {!CONTACT.phone && !CONTACT.email && <span className="ld-cta-visit"><MapPin size={18} aria-hidden="true" />Visit us in {CONTACT.location}</span>}
-          {SHOW.rules && <Link to="/rules" navigate={navigate} className="ld-btn ld-btn-ghost">Read the class rules</Link>}
+          {CONTACT.phone && <a className="ld-btn ld-btn-white" href={`tel:${CONTACT.phone}`}><Phone size={18} aria-hidden="true" />{t("cta.call", { phone: CONTACT.phoneDisplay })}</a>}
+          {CONTACT.email && <a className="ld-btn ld-btn-ghost" href={`mailto:${CONTACT.email}`}><Mail size={18} aria-hidden="true" />{t("cta.email")}</a>}
+          {!CONTACT.phone && !CONTACT.email && <span className="ld-cta-visit"><MapPin size={18} aria-hidden="true" />{t("cta.visit", { location: t("contact.location") })}</span>}
+          {SHOW.rules && <Link to="/rules" navigate={navigate} className="ld-btn ld-btn-ghost">{t("cta.rules")}</Link>}
         </div>
       </div>
     </section>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ArrowRight } from "lucide-react";
 import { ICONS, Link } from "./parts.jsx";
+import { useLang } from "./i18n.jsx";
 import { CATEGORIES, loadOpenOfferings } from "../registrations/registrations.js";
 
 // The class times offered on the website (Admin → Registrations → Website
@@ -17,13 +18,14 @@ export function useOfferings() {
 // registration form with that class chosen, where the age group, the time
 // and the fees come one step at a time.
 export default function ClassesSection({ navigate }) {
+  const { lang, t } = useLang();
   return (
     <section className="ld-sec ld-soft" id="classes">
       <div className="ld-wrap">
         <div className="ld-center ld-reveal">
-          <p className="ld-tag">Classes offered</p>
-          <h2 className="ld-h2">Find the right class</h2>
-          <p className="ld-lead">Choose a class to see its times for children and for teens and adults, and register online.</p>
+          <p className="ld-tag">{t("classes.tag")}</p>
+          <h2 className="ld-h2">{t("classes.title")}</h2>
+          <p className="ld-lead">{t("classes.lead")}</p>
         </div>
         <div className="ld-grid ld-grid-3">
           {CATEGORIES.map((c, i) => {
@@ -31,10 +33,10 @@ export default function ClassesSection({ navigate }) {
             return (
               <Link key={c.key} to={`/register?cat=${c.key}`} navigate={navigate} className={`ld-card ld-cls-card ld-reveal ld-d${i + 1}`}>
                 <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
-                <h3>{c.en}</h3>
-                <span className="ld-dv" lang="dv" dir="rtl">{c.dv}</span>
-                <p>{c.blurb}</p>
-                <span className="ld-link">Register <ArrowRight size={18} aria-hidden="true" /></span>
+                <h3>{t(`class.${c.key}.name`)}</h3>
+                {lang !== "dv" && <span className="ld-dv" lang="dv" dir="rtl">{c.dv}</span>}
+                <p>{t(`class.${c.key}.blurb`)}</p>
+                <span className="ld-link">{t("classes.register")} <ArrowRight size={18} aria-hidden="true" /></span>
               </Link>
             );
           })}

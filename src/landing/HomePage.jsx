@@ -4,8 +4,10 @@ import { usePublicReviews } from "./reviews.js";
 import Showcase from "./Showcase.jsx";
 import ClassesSection from "./ClassesSection.jsx";
 import { ICONS, Link, Stars, Marquee, CountOnView, EnrolCta, avatarColor, initials, useReveal } from "./parts.jsx";
+import { useLang } from "./i18n.jsx";
 
 export function Hero({ navigate, reviews }) {
+  const { t } = useLang();
   return (
     <section className="ld-hero">
       <div className="ld-wrap ld-hero-in">
@@ -15,13 +17,13 @@ export function Hero({ navigate, reviews }) {
             <h1 className="ld-callig-h1 ld-reveal">
               <img className="ld-callig" src="/images/calligraphy-khairukum.png" alt="خيركم من تعلم القرآن وعلمه — The best of you are those who learn the Quran and teach it" />
             </h1>
-            <p className="ld-callig-tr ld-reveal ld-d1">“The best of you are those who learn the Quran and teach it.”</p>
+            <p className="ld-callig-tr ld-reveal ld-d1">{t("hero.quote")}</p>
             <div className="ld-hero-actions ld-reveal ld-d3">
-              <Link to="/register" navigate={navigate} className="ld-btn ld-btn-white">Register now</Link>
-              <Link to="/#classes" navigate={navigate} className="ld-btn ld-btn-ghost">Explore classes</Link>
-              {SHOW.rules && <Link to="/rules" navigate={navigate} className="ld-btn ld-btn-ghost">Rules and regulations</Link>}
+              <Link to="/register" navigate={navigate} className="ld-btn ld-btn-white">{t("hero.register")}</Link>
+              <Link to="/#classes" navigate={navigate} className="ld-btn ld-btn-ghost">{t("hero.explore")}</Link>
+              {SHOW.rules && <Link to="/rules" navigate={navigate} className="ld-btn ld-btn-ghost">{t("hero.rules")}</Link>}
             </div>
-            {reviews.length > 0 && <div className="ld-rating ld-reveal ld-d3"><Stars /> Loved by parents and students</div>}
+            {reviews.length > 0 && <div className="ld-rating ld-reveal ld-d3"><Stars /> {t("hero.loved")}</div>}
           </div>
         </div>
         <div className="ld-hero-art ld-reveal ld-d2">
@@ -32,7 +34,7 @@ export function Hero({ navigate, reviews }) {
                 ? reviews.slice(0, 3).map((r, i) => <span key={r.name} style={{ background: avatarColor(i) }}>{initials(r.name)}</span>)
                 : [0, 1, 2].map((i) => <span key={i} style={{ background: avatarColor(i) }}><UserRound size={16} /></span>)}
             </div>
-            <div><b><CountOnView value={HERO.studentCount} />+</b><span className="ld-badge-label">{HERO.studentLabel}</span></div>
+            <div><b><bdi dir="ltr"><CountOnView value={HERO.studentCount} />+</bdi></b><span className="ld-badge-label">{t("hero.students")}</span></div>
           </div>
         </div>
       </div>
@@ -41,12 +43,13 @@ export function Hero({ navigate, reviews }) {
 }
 
 export function Reviews({ reviews }) {
+  const { t } = useLang();
   return (
     <section className="ld-sec ld-soft" id="reviews">
       <div className="ld-wrap ld-center ld-reveal">
-        <p className="ld-tag">Reviews</p>
-        <h2 className="ld-h2">Kind words from our students and parents</h2>
-        <p className="ld-lead">Honest reviews of our classes, shared by the people who learn with us.</p>
+        <p className="ld-tag">{t("reviews.tag")}</p>
+        <h2 className="ld-h2">{t("reviews.title")}</h2>
+        <p className="ld-lead">{t("reviews.lead")}</p>
       </div>
       <div className="ld-reviews">
         <Marquee
@@ -71,29 +74,31 @@ export function Reviews({ reviews }) {
   );
 }
 
+// Wording in siteStrings.js under portal.<key>.title / .text.
 const PORTAL_FEATURES = [
-  { icon: Flame, title: "Daily streak", text: "One task a day keeps the streak alive and builds a lasting habit." },
-  { icon: ListChecks, title: "Today's plan", text: "New lesson and revision planned for every student, every day." },
-  { icon: FileText, title: "Exam reports", text: "Regular tests with teacher remarks, shared with parents." },
+  { icon: Flame, key: "streak" },
+  { icon: ListChecks, key: "plan" },
+  { icon: FileText, key: "reports" },
 ];
 
 function PortalHighlight({ navigate }) {
+  const { t } = useLang();
   return (
     <section className="ld-sec">
       <div className="ld-wrap ld-split">
         <div className="ld-reveal">
-          <p className="ld-tag">Student portal</p>
-          <h2 className="ld-h2">Watch your child's hifz grow</h2>
-          <p className="ld-lead">Every hifz student gets their own portal: a daily plan, a streak that builds the habit, and a live percentage of the Quran memorised.</p>
-          <Link to="/hifz" navigate={navigate} className="ld-link">See our hifz program <ArrowRight size={18} aria-hidden="true" /></Link>
+          <p className="ld-tag">{t("portal.tag")}</p>
+          <h2 className="ld-h2">{t("portal.title")}</h2>
+          <p className="ld-lead">{t("portal.lead")}</p>
+          <Link to="/hifz" navigate={navigate} className="ld-link">{t("portal.link")} <ArrowRight size={18} aria-hidden="true" /></Link>
         </div>
         <div className="ld-feats">
           {PORTAL_FEATURES.map((f, i) => {
             const Icon = f.icon;
             return (
-              <div key={f.title} className={`ld-feat ld-reveal ld-d${i + 1}`}>
+              <div key={f.key} className={`ld-feat ld-reveal ld-d${i + 1}`}>
                 <span className="ld-icon"><Icon size={22} aria-hidden="true" /></span>
-                <span><b>{f.title}</b>{f.text}</span>
+                <span><b>{t(`portal.${f.key}.title`)}</b>{t(`portal.${f.key}.text`)}</span>
               </div>
             );
           })}
@@ -104,12 +109,13 @@ function PortalHighlight({ navigate }) {
 }
 
 function Why() {
+  const { t } = useLang();
   return (
     <section className="ld-sec ld-why" id="why">
       <div className="ld-wrap">
         <div className="ld-center ld-reveal">
-          <p className="ld-tag">Why Aflaah</p>
-          <h2 className="ld-h2">Why parents choose this class</h2>
+          <p className="ld-tag">{t("why.tag")}</p>
+          <h2 className="ld-h2">{t("why.title")}</h2>
         </div>
         <div className="ld-grid ld-grid-3">
           {WHY.map((w, i) => {
@@ -117,8 +123,8 @@ function Why() {
             return (
               <div key={w.title} className={`ld-why-item ld-reveal ld-d${i + 1}`}>
                 <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
-                <h3>{w.title}</h3>
-                <p>{w.text}</p>
+                <h3>{t(`why.${w.icon}.title`)}</h3>
+                <p>{t(`why.${w.icon}.text`)}</p>
               </div>
             );
           })}
@@ -129,19 +135,20 @@ function Why() {
 }
 
 function StorePreview({ navigate }) {
+  const { t } = useLang();
   return (
     <section className="ld-sec">
       <div className="ld-wrap">
         <div className="ld-center ld-reveal">
-          <p className="ld-tag">Book store</p>
-          <h2 className="ld-h2">Books for every level</h2>
-          <p className="ld-lead">The books we use in class, from the first letters to the full mushaf.</p>
+          <p className="ld-tag">{t("store.tag")}</p>
+          <h2 className="ld-h2">{t("store.title")}</h2>
+          <p className="ld-lead">{t("store.lead")}</p>
         </div>
         <div className="ld-grid ld-grid-4 ld-books">
           {BOOKS.slice(0, 4).map((b, i) => <BookCard key={b.id} book={b} delay={i} />)}
         </div>
         <div className="ld-center ld-more">
-          <Link to="/store" navigate={navigate} className="ld-btn ld-btn-outline">View all books <ArrowRight size={18} aria-hidden="true" /></Link>
+          <Link to="/store" navigate={navigate} className="ld-btn ld-btn-outline">{t("store.viewAll")} <ArrowRight size={18} aria-hidden="true" /></Link>
         </div>
       </div>
     </section>
@@ -149,16 +156,19 @@ function StorePreview({ navigate }) {
 }
 
 export function BookCard({ book, delay = 0 }) {
+  const { t } = useLang();
+  const title = t(`book.${book.id}`);
   return (
     <article className={`ld-card ld-book ld-reveal ld-d${delay % 4}`}>
-      <div className="ld-cover" style={{ background: book.color }}><span>{book.title}</span></div>
-      <h3>{book.title}</h3>
-      <div className="ld-book-foot">{SHOW.prices && <span className="ld-price">MVR {book.price}</span>}<span className="ld-pill">{book.category}</span></div>
+      <div className="ld-cover" style={{ background: book.color }}><span>{title}</span></div>
+      <h3>{title}</h3>
+      <div className="ld-book-foot">{SHOW.prices && <span className="ld-price">MVR {book.price}</span>}<span className="ld-pill">{t(`bookCat.${book.category}`)}</span></div>
     </article>
   );
 }
 
 export default function HomePage({ navigate }) {
+  const { t } = useLang();
   const reviews = usePublicReviews();
   // Reviews arrive after the page's first reveal pass, so fade them in too.
   useReveal(reviews.length);
@@ -171,7 +181,7 @@ export default function HomePage({ navigate }) {
       <Why />
       <StorePreview navigate={navigate} />
       <div id="enrol">
-        <EnrolCta title={`Join ${HERO.studentCount}+ students today`} text="Talk to us about the right class for your child, class times and fees." navigate={navigate} />
+        <EnrolCta title={t("cta.title", { count: `${HERO.studentCount}+` })} text={t("cta.text")} navigate={navigate} />
       </div>
     </>
   );

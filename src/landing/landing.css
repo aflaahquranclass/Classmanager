@@ -3,7 +3,8 @@
    App.jsx, .sp-grad / .sp-bar-fill in StudentPortal.jsx. */
 @import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap");
 /* Dhivehi (Thaana letters only) on the website: Faruma for text, MV Aammu FK
-   for headings (.ld-dvh, the form title and field labels). */
+   for headings (.ld-dvh, the form title and field labels, and the main
+   headings of the Dhivehi website). */
 @font-face { font-family: "Aammu"; src: url("/fonts/MV_AammuFK_Regular.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
 @font-face { font-family: "Faruma"; src: url("/fonts/Faruma.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
 
@@ -583,3 +584,37 @@ select.ld-input { appearance: auto; }
   .ld-rg-pay dl:not(.ld-wz-fees) dd { margin-bottom: 8px; }
   .ld-wz-nav .ld-btn-primary { max-width: none; }
 }
+
+/* Dhivehi website (.ld[lang="dv"], right to left): Aammu for the main
+   headings, Faruma for everything else. Both fonts only cover Thaana, so
+   digits and English words keep the usual fonts. */
+.ld-lang { border: 1px solid var(--line); background: #fff; color: var(--navy); border-radius: 999px; padding: 0 14px; min-height: 36px; font: 600 15px/1 Faruma, Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+.ld-lang:hover { border-color: var(--blue); color: var(--blue); }
+.ld-lang[lang="en"] { font-size: 13px; }
+.ld[lang="dv"] { --serif: Faruma, Fraunces, Georgia, serif; }
+.ld[lang="dv"] :is(.ld-btn, .ld-brand-name small, .ld-filter, .ld-seg button, .ld-wz-pick) { font-family: Faruma, Inter, system-ui, sans-serif; }
+.ld[lang="dv"] :is(.ld-h2, .ld-hero h1, .ld-brand-name) { font-family: Aammu, Faruma, Fraunces, Georgia, serif; font-weight: 400; letter-spacing: 0; }
+.ld[lang="dv"] .ld-h2 { line-height: 1.45; }
+.ld[lang="dv"] .ld-brand-name small { letter-spacing: 0; font-size: clamp(11px, .9vw, 14px); font-weight: 400; margin-top: .25em; }
+.ld[lang="dv"] .ld-tag { letter-spacing: 0; font-size: 14px; }
+.ld[lang="dv"] :is(.ld-lead, .ld-why-item p, .ld-feat, .ld-cls-card p, .ld-foot p) { line-height: 1.9; }
+.ld[lang="dv"] :is(.ld-callig-tr, .ld-remark p) { font-style: normal; line-height: 1.8; }
+.ld[lang="dv"] .ld-btn { line-height: 1.3; }
+/* Mirror what points one way, and keep the moving strips running left. */
+.ld[dir="rtl"] .lucide-arrow-right { transform: scaleX(-1); }
+.ld[dir="rtl"] .ld-login-menu { right: auto; left: 0; }
+.ld[dir="rtl"] .ld-track { direction: ltr; }
+.ld[dir="rtl"] .ld-track > * { direction: rtl; }
+.ld[dir="rtl"] .ld-avatars span { margin-left: 0; margin-right: -10px; }
+.ld[dir="rtl"] .ld-avatars span:first-child { margin-right: 0; }
+.ld[dir="rtl"] .ld-person :is(b, small) { text-align: right; }
+.ld[dir="rtl"] .ld-score { text-align: left; }
+.ld[dir="rtl"] .ld-grade { margin: 4px auto 0 0; }
+/* Thaana in Faruma reads smaller than Latin at the same size. */
+.ld[lang="dv"] .ld-links { font-size: clamp(16px, 1.25vw, 19px); }
+.ld[lang="dv"] .ld-btn { font-size: clamp(15px, 1.15vw, 18px); }
+.ld[lang="dv"] .ld-btn-sm { font-size: clamp(14px, 1.05vw, 16px); }
+.ld[lang="dv"] .ld-lead { font-size: clamp(17px, 1.35vw, 20px); }
+.ld[lang="dv"] :is(.ld-badge-label, .ld-badge-tag, .ld-rating, .ld-foot-col, .ld-copy) { font-size: 15px; }
+.ld[lang="dv"] .ld-arch :is(.ld-panel, .ld-panel-row, .ld-mini div, .ld-tasks) { font-size: 14px; }
+.ld[lang="dv"] .ld-arch .ld-bar-foot { font-size: 12.5px; }

@@ -8,7 +8,7 @@ import { buildPassageReport, canvasToPagedPdf, hasPassages } from "./exams/examR
 import { dhivehiRemarks } from "./exams/dhivehiRemarks.js";
 import { useRemarkLanguage, RemarkLanguageSwitch, RemarkInput } from "./exams/DhivehiInput.jsx";
 import { REPORT_LANGUAGES, loadReportOverrides, reportTranslator } from "./exams/reportStrings.js";
-import { AdminReportLanguage } from "./exams/ReportLanguageAdmin.jsx";
+import { AdminLanguage } from "./LanguageAdmin.jsx";
 import { AdminNotifications } from "./notifications/NotificationsAdmin.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { AdminPaymentSlips, usePendingSlipCount } from "./payments/PaymentSlipsAdmin.jsx";
@@ -6688,7 +6688,7 @@ export default function App() {
               )}
 
               {/* ---------------- DATA (attendance & records cleanup) ---------------- */}
-              {section === "language" && role === "admin" && <AdminReportLanguage students={students} showToast={showToast} />}
+              {section === "language" && role === "admin" && <AdminLanguage students={students} showToast={showToast} />}
 
               {section === "notifications" && role === "admin" && <AdminNotifications key={notificationsTab} students={students} teachers={teachers} classes={classes} showToast={showToast} initialTab={notificationsTab} />}
 
