@@ -35,12 +35,10 @@ export const TP = {
   bg: "#EEF6FA",
   navy: "#123B67",
   blue: "#176FD1",
-  teal: "#18A9BD",
+  teal: "#0A94B1",
   border: "#C7DDF4",
   secondaryText: "#567493",
-  logoutCoral: "#FF817D",
   gradStart: "#0D4F85",
-  gradMid: "#0875A2",
   gradEnd: "#0A94B1",
 };
 
@@ -74,20 +72,31 @@ export const TP_PATTERN_MAIN_URL = "/images/tp-pattern-main.png";
 // Shared CSS for the Teacher Portal and Admin Portal shells (sidebar,
 // header/card/accordion/badge page chrome) — defined once so the two
 // layouts never duplicate each other's styles.
+// The brand blue gradient (sign-in pages, loading screen, sidebar, buttons).
+const BRAND_GRADIENT = (angle) => `linear-gradient(${angle}, ${TP.gradStart} 0%, ${TP.blue} 55%, ${TP.gradEnd} 100%)`;
+
 export const TP_SHARED_STYLES = `
-        .tp-shell { display: flex; align-items: stretch; min-height: 640px; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
+        .tp-shell { display: flex; align-items: stretch; min-height: 100vh; min-height: 100dvh; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background: ${TP.bg}; }
         .tp-mobile-bar { display: none; }
         .tp-sidebar-wrap { display: contents; }
         .tp-sidebar {
           position: relative; overflow: hidden; width: clamp(260px, 20vw, 300px); flex-shrink: 0;
-          background: linear-gradient(180deg, ${TP.gradStart} 0%, ${TP.gradMid} 58%, ${TP.gradEnd} 100%);
+          background: radial-gradient(circle at 20% 0%, rgba(255,255,255,0.14), transparent 45%), ${BRAND_GRADIENT("170deg")};
           color: #FFFFFF; padding: 28px 18px 20px; display: flex; flex-direction: column; box-sizing: border-box;
         }
-        .tp-sidebar-pattern {
-          position: absolute; left: 0; bottom: 0; width: 300px; max-width: 90%; height: auto; opacity: 0.13;
-          pointer-events: none; user-select: none; z-index: 0;
+        /* Wide screens: the sidebar fills the window and stays put while the page scrolls. */
+        @media (min-width: 901px) {
+          .tp-sidebar { position: sticky; top: 0; height: 100vh; height: 100dvh; overflow-y: auto; }
         }
-        .tp-content { position: relative; flex: 1; min-width: 0; overflow: hidden; }
+        /* The rosette's centre sits in the sidebar's bottom-left corner; faded
+           before its rough outer edge (as on the sign-in pages). */
+        .tp-sidebar-pattern {
+          position: absolute; left: 0; bottom: 0; width: 300px; max-width: 95%; height: auto; opacity: 0.16;
+          pointer-events: none; user-select: none; z-index: 0;
+          -webkit-mask-image: radial-gradient(circle at 0% 100%, #000 0%, #000 42%, rgba(0,0,0,0.55) 56%, transparent 72%);
+          mask-image: radial-gradient(circle at 0% 100%, #000 0%, #000 42%, rgba(0,0,0,0.55) 56%, transparent 72%);
+        }
+        .tp-content { position: relative; flex: 1; min-width: 0; overflow: hidden; background: ${TP.bg}; }
         .tp-content-tinted { background: ${TP.bg}; }
         .tp-content .lc-main { position: relative; z-index: 1; }
         .tp-page-pattern {
@@ -126,11 +135,11 @@ export const TP_SHARED_STYLES = `
         .tp-sidebar-spacer { flex: 1; }
         .tp-logout {
           position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; justify-content: center;
-          padding: 12px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; color: ${TP.logoutCoral};
-          background: rgba(255,255,255,0.04); border: 1px solid rgba(255,129,125,0.55); cursor: pointer;
+          padding: 12px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; color: #FFFFFF;
+          background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.35); cursor: pointer;
           margin-top: 16px; transition: background 0.15s ease, box-shadow 0.15s ease;
         }
-        .tp-logout:hover { background: rgba(255,129,125,0.16); }
+        .tp-logout:hover { background: rgba(255,255,255,0.18); }
         .tp-logout:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
         .tp-ghost-btn {
           position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; justify-content: center;
@@ -154,7 +163,7 @@ export const TP_SHARED_STYLES = `
         .tp-btn-outline:hover { background: #F3F9FD; box-shadow: 0 3px 10px rgba(23,111,209,0.12); }
         .tp-btn-outline:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
         .tp-btn-outline:disabled { opacity: 0.6; cursor: not-allowed; }
-        .tp-btn-gradient { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 18px; border-radius: 12px; border: none; background: linear-gradient(90deg, ${TP.blue}, ${TP.teal}); color: #FFFFFF; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 8px 18px rgba(23,111,209,0.28); transition: filter 0.15s ease, transform 0.1s ease; min-height: 44px; }
+        .tp-btn-gradient { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 18px; border-radius: 12px; border: none; background: ${BRAND_GRADIENT("90deg")}; color: #FFFFFF; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 8px 18px rgba(13,79,133,0.26); transition: filter 0.15s ease, transform 0.1s ease; min-height: 44px; }
         .tp-btn-gradient:hover { filter: brightness(1.06); }
         .tp-btn-gradient:active { transform: scale(0.98); }
         .tp-btn-gradient:focus-visible { outline: 2px solid ${TP.navy}; outline-offset: 2px; }
@@ -169,8 +178,8 @@ export const TP_SHARED_STYLES = `
         .tp-segment-btn { flex: 0 0 auto; padding: 12px 22px; border-radius: 12px; border: 1px solid ${TP.border}; background: #FFFFFF; color: ${TP.navy}; font-weight: 600; font-size: 14px; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease; min-height: 44px; font-family: inherit; }
         .tp-segment-btn:hover { background: #F3F9FD; }
         .tp-segment-btn:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
-        .tp-segment-btn-active { background: linear-gradient(90deg, ${TP.blue}, ${TP.teal}); color: #FFFFFF; border-color: transparent; }
-        .tp-segment-btn-active:hover { background: linear-gradient(90deg, ${TP.blue}, ${TP.teal}); }
+        .tp-segment-btn-active { background: ${BRAND_GRADIENT("90deg")}; color: #FFFFFF; border-color: transparent; }
+        .tp-segment-btn-active:hover { background: ${BRAND_GRADIENT("90deg")}; }
         .tp-accordion-row { display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box; padding: 16px 18px; border: 1px solid ${TP.border}; border-radius: 14px; background: #FFFFFF; cursor: pointer; text-align: left; font-family: inherit; transition: box-shadow 0.15s ease, border-color 0.15s ease; margin-bottom: 10px; min-height: 44px; }
         .tp-accordion-row:hover { box-shadow: 0 4px 14px rgba(18,59,103,0.08); border-color: #AFCFEC; }
         .tp-accordion-row:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
@@ -183,7 +192,7 @@ export const TP_SHARED_STYLES = `
         .tp-month-heading-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
         .tp-month-icon { color: ${TP.blue}; flex-shrink: 0; }
         .tp-month-heading { font-size: 19px; font-weight: 700; color: ${TP.navy}; white-space: nowrap; }
-        .tp-month-underline { width: 56px; height: 3px; border-radius: 2px; background: linear-gradient(90deg, ${TP.blue}, ${TP.teal}); flex-shrink: 0; }
+        .tp-month-underline { width: 56px; height: 3px; border-radius: 2px; background: ${BRAND_GRADIENT("90deg")}; flex-shrink: 0; }
         .tp-month-line { flex: 1; min-width: 24px; height: 1px; background: ${TP.border}; }
         .tp-date-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: ${TP.navy}; background: #EAF3FC; border: 1px solid ${TP.border}; padding: 6px 14px; border-radius: 999px; margin-bottom: 10px; }
         .tp-table-wrap { overflow-x: auto; }
@@ -200,10 +209,10 @@ export const TP_SHARED_STYLES = `
         table.tp-table thead th:last-child { border-top-right-radius: 12px; }
         table.tp-table td { padding: 10px 12px; border-bottom: 1px solid #E4EFF9; vertical-align: top; }
         table.tp-table td.tp-time-cell { color: ${TP.navy}; font-weight: 600; white-space: nowrap; background: #F8FBFE; }
-        .tp-entry { display: block; box-sizing: border-box; padding: 8px 10px; margin-bottom: 6px; border-radius: 10px; font-size: 13px; font-weight: 600; color: ${TP.navy}; }
+        .tp-entry { display: block; box-sizing: border-box; padding: 8px 10px 8px 12px; margin-bottom: 6px; border-radius: 10px; font-size: 13px; font-weight: 600; color: ${TP.navy}; border-left: 3px solid ${TP.blue}; }
         .tp-entry:last-child { margin-bottom: 0; }
-        .tp-entry-blue { background: #DCEBFB; }
-        .tp-entry-aqua { background: #DAF3F1; }
+        .tp-entry-blue { background: #E3EFFC; border-left-color: ${TP.blue}; }
+        .tp-entry-aqua { background: #E6F2FA; border-left-color: ${TP.gradStart}; }
         @media (max-width: 640px) {
           .tp-header { gap: 12px; }
           .tp-actions { width: 100%; }
@@ -217,7 +226,7 @@ export const TP_SHARED_STYLES = `
           .tp-bell-desktop { display: none; }
           .tp-mobile-bar {
             display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;
-            background: linear-gradient(90deg, ${TP.gradStart}, ${TP.gradEnd}); color: #FFFFFF;
+            background: ${BRAND_GRADIENT("90deg")}; color: #FFFFFF;
             position: sticky; top: 0; z-index: 50;
           }
           .tp-mobile-bar-brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 700; }
