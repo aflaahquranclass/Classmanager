@@ -48,7 +48,10 @@ if (DEMO) {
   const h = createMemoryHifzRepo(hifzDemoStore, "demo", { teacherId: "demo-teacher" });
   const today = maldivesToday();
   // Has Juz 30 and is memorising Juz 29 from Al-Mulk (pages 562–569 done).
-  h.saveProfile({ memorized: [[pageToUnit(562), pageToUnit(570)], [pageToUnit(582), pageToUnit(605)]], goalYear: 2030 });
+  h.saveProfile({
+    memorized: [[pageToUnit(562), pageToUnit(570)], [pageToUnit(582), pageToUnit(605)]],
+    direction: "juz_reverse", startUnit: pageToUnit(582), newUnits: 30, shortPages: 2, longStartUnit: pageToUnit(582), longMode: "juz",
+  });
   h.addTasks([
     { taskDate: today, activity: "new", start: pageToUnit(570), end: pageToUnit(571), notes: "Read it 10 times before memorising." },
     { taskDate: today, activity: "short", start: pageToUnit(568), end: pageToUnit(570), notes: "" },

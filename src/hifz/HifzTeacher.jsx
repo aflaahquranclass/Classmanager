@@ -4,14 +4,14 @@
 // on the Madinah Mushaf (tap a word), clearing each one once it's corrected.
 // The student's portal updates live and they get a phone notification.
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, Highlighter, ArrowRight, Search, Flame, Target, X, Undo2, Check } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
-import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay, surahNames } from "../HifzTracker.jsx";
+import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, describeRange, describeAmount } from "./quran.js";
-import { unitsOf, toSet, subtract, addDays } from "./engine.js";
-import { ACTIVITIES, suggestPortion, suggestDate, nextAfter, mistakesForTask, summarizeHifz, planOf, PATH_STARTS } from "./tasks.js";
+import { unitsOf, toSet, subtract } from "./engine.js";
+import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, describeAyahs, nextTasksToSet, previewNext } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -30,15 +30,34 @@ const teacherCss = `
   .ht-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #8FADC0; pointer-events: none; }
   .ht-search .hz-input { padding-left: 38px; }
   .ht-assign { display: flex; flex-direction: column; gap: 12px; }
-  .ht-act { border: 1px solid #DCEBF8; border-radius: 14px; padding: 12px 14px; background: #FFFFFF; }
-  .ht-act-off { background: #F7F9FB; }
-  .ht-act-off .ht-act-body { display: none; }
-  .ht-act-head { display: flex; align-items: center; gap: 10px; min-height: 40px; }
-  .ht-act-head label { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #123B67; cursor: pointer; flex: 1; }
+  .ht-day { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .ht-day label { font-size: 14px; font-weight: 700; color: #123B67; margin-right: 4px; }
+  .ht-day .hz-input { width: auto; min-width: 170px; }
+  .ht-act { border: 1px solid #DCEBF8; border-radius: 14px; background: #FFFFFF; overflow: hidden; }
+  .ht-act-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 14px; background: #F3F8FD; border-bottom: 1px solid #E1EDF8; }
+  .ht-act-toggle { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 40px; padding: 0; border: none; background: none; font: inherit; text-align: left; cursor: pointer; }
+  .ht-act-toggle:disabled { cursor: default; }
+  .ht-act-toggle:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; border-radius: 8px; }
+  .ht-act-title { font-weight: 700; color: #123B67; font-size: 15px; margin-right: auto; }
+  .ht-act-chev { color: #567493; transition: transform 0.2s ease; flex-shrink: 0; }
+  .ht-act-toggle[aria-expanded="true"] .ht-act-chev { transform: rotate(180deg); }
+  .ht-act-closed .ht-act-body { display: none; }
+  .ht-act-closed .ht-act-head { border-bottom: none; }
+  .ht-act-repeat { background: #FCF1DD; color: #7A5410; }
   .ht-act-head input { width: 20px; height: 20px; accent-color: #176FD1; }
-  .ht-act-head .hz-muted { font-size: 13px; }
-  .ht-act-body .hz-field { margin-top: 8px; }
+  .ht-act-icon { width: 30px; height: 30px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0D4F85, #176FD1); color: #FFFFFF; }
+  .ht-act-sum { font-size: 13px; font-weight: 600; color: #1452A8; background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 999px; padding: 4px 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ht-act-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .ht-act-off .ht-act-body { display: none; }
+  .ht-act-off .ht-act-head { border-bottom: none; }
+  .ht-act-off .ht-act-sum { color: #8296A8; }
+  .ht-act-hint { font-size: 13px; color: #567493; background: #EEF6FD; border-radius: 10px; padding: 7px 10px; }
+  .ht-link { border: none; background: none; padding: 0; color: #176FD1; font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; }
+  .ht-portion { display: flex; flex-direction: column; gap: 10px; }
+  .ht-note { min-height: 42px !important; }
   .ht-sum { font-size: 13px; color: #1452A8; margin-top: 8px; }
+  .ht-next { border: 1px dashed #9FC3EA; border-radius: 12px; background: #F6FAFE; padding: 12px; }
+  .ht-next-head { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #123B67; margin-bottom: 10px; }
   .ht-rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
   .ht-row { border: 1px solid #E1EDF8; border-radius: 14px; background: #F7FAFD; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
   .ht-row-done { background: linear-gradient(160deg, #ECFAF4, #FFFFFF 60%); border-color: #9FD9BE; }
@@ -64,22 +83,33 @@ const teacherCss = `
   @media (max-width: 520px) { .ht-row-actions .hz-btn { flex: 1 1 auto; } }
 `;
 
-// From / To (last line included) pickers for a [start, end) portion.
+// From / To (this line included) for a [start, end) portion.
 function PortionFields({ value, onChange }) {
   const toUnit = Math.max(value.start, value.end - UNITS_PER_LINE);
   return (
-    <>
-      <PositionPicker label="From" unit={value.start} onChange={(u) => onChange({ start: u, end: Math.max(value.end, u + UNITS_PER_LINE) })} />
-      <PositionPicker label="To (this line included)" unit={toUnit} onChange={(u) => onChange({ start: Math.min(value.start, u), end: Math.min(TOTAL_UNITS, u + UNITS_PER_LINE) })} />
-      <div className="ht-sum">{describeRange([value.start, value.end])} · {describeAmount(value.end - value.start)} · {surahNames([value.start, value.end])}</div>
-    </>
+    <div className="ht-portion">
+      {/* A new "From" keeps the portion's length (1 page stays 1 page). */}
+      <PositionPicker label="From" unit={value.start} onChange={(u) => onChange({ start: u, end: Math.min(TOTAL_UNITS, u + Math.max(UNITS_PER_LINE, value.end - value.start)) })} />
+      <PositionPicker label="To" edge="end" unit={toUnit} onChange={(u) => onChange({ start: Math.min(value.start, u), end: Math.min(TOTAL_UNITS, u + UNITS_PER_LINE) })} />
+    </div>
   );
 }
+
+// "p. 158 · 1 page · Al-A'raf 58 – 67"
+const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeAmount(r.end - r.start)} · ${describeAyahs([r.start, r.end])}`;
 
 // ---------- the student's Hifz plan ----------
 // Where the Hifz started, what was memorised before (page to page), and how
 // Short and Long Muraja'ah work. New, Short and Long portions are worked out
 // from this (tasks.js: suggestPortion). The target year is the student's own.
+
+const NEW_AMOUNTS = [
+  { units: 10, label: "5 lines" },
+  { units: 15, label: "½ page" },
+  { units: 30, label: "1 page" },
+  { units: 45, label: "1½ pages" },
+  { units: 60, label: "2 pages" },
+];
 
 const PATHS = [
   { direction: "forward", label: "From Al-Baqarah", hint: "Front to back, page 2 onward" },
@@ -136,7 +166,17 @@ function ProfileEditor({ profile, onSave, onCancel, busy }) {
       </div>
 
       <div className="ht-plan-step">
-        <h4>3. Short Muraja'ah: how many pages a day?</h4>
+        <h4>3. New Hifz: how much a day?</h4>
+        <div className="hz-options" style={{ marginTop: 0 }}>
+          {NEW_AMOUNTS.map((o) => (
+            <button key={o.units} type="button" className="hz-option" aria-pressed={plan.newUnits === o.units} onClick={() => set({ newUnits: o.units })}>{o.label}</button>
+          ))}
+        </div>
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each class day the next {describeAmount(plan.newUnits)} of the Hifz path is set.</p>
+      </div>
+
+      <div className="ht-plan-step">
+        <h4>4. Short Muraja'ah: how many pages a day?</h4>
         <div className="hz-chips">
           {[1, 2, 3, 4, 5, 6].map((n) => <button key={n} type="button" className="hz-chip" style={{ minWidth: 52 }} aria-pressed={plan.shortPages === n} onClick={() => set({ shortPages: n })}>{n}</button>)}
           <input className="hz-input" style={{ width: 110 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Short Muraja'ah pages"
@@ -146,7 +186,7 @@ function ProfileEditor({ profile, onSave, onCancel, busy }) {
       </div>
 
       <div className="ht-plan-step">
-        <h4>4. Long Muraja'ah</h4>
+        <h4>5. Long Muraja'ah</h4>
         <PositionPicker label="Start from" unit={longStart} allowLine={false} onChange={(u) => set({ longStartUnit: u })} />
         <div className="hz-field">
           <span>How much a day?</span>
@@ -170,66 +210,7 @@ function ProfileEditor({ profile, onSave, onCancel, busy }) {
   );
 }
 
-// ---------- assigning ----------
-
-const freshForm = (data) => {
-  const date = suggestDate(data.tasks, data.today);
-  const rows = {};
-  for (const a of ACTIVITIES) {
-    const p = suggestPortion(a, data.tasks, data.memorized, data.profile);
-    rows[a] = { on: !!p, start: p?.start ?? pageToUnit(582), end: p?.end ?? pageToUnit(583), notes: "" };
-  }
-  return { date, rows };
-};
-
-function AssignForm({ data, onAssign, busy }) {
-  const [form, setForm] = useState(() => freshForm(data));
-  const setRow = (a, patch) => setForm((f) => ({ ...f, rows: { ...f.rows, [a]: { ...f.rows[a], ...patch } } }));
-  const chosen = ACTIVITIES.filter((a) => form.rows[a].on);
-  const already = data.tasks.filter((t) => t.taskDate === form.date);
-  const submit = async () => {
-    const ok = await onAssign(chosen.map((a) => ({ taskDate: form.date, activity: a, start: form.rows[a].start, end: form.rows[a].end, notes: form.rows[a].notes })));
-    if (ok) setForm(freshForm({ ...data, tasks: [...data.tasks, ...chosen.map((a) => ({ ...form.rows[a], activity: a, taskDate: form.date, createdAt: new Date().toISOString() }))] }));
-  };
-  return (
-    <div className="ht-assign">
-      <div className="hz-field" style={{ marginTop: 0 }}>
-        <label htmlFor="ht-date">Day</label>
-        <div className="hz-row" style={{ justifyContent: "flex-start" }}>
-          <input id="ht-date" className="hz-input" style={{ maxWidth: 220 }} type="date" value={form.date} onChange={(e) => e.target.value && setForm((f) => ({ ...f, date: e.target.value }))} />
-          {[["Today", data.today], ["Tomorrow", addDays(data.today, 1)]].map(([label, d]) => (
-            <button key={label} type="button" className="hz-chip" style={{ padding: "0 14px" }} aria-pressed={form.date === d} onClick={() => setForm((f) => ({ ...f, date: d }))}>{label}</button>
-          ))}
-        </div>
-        {already.length > 0 && <span className="hz-muted" style={{ fontWeight: 400 }}>Already set for {fmtDay(form.date)}: {already.map((t) => ACTIVITY_INFO[t.activity].title).join(", ")}</span>}
-      </div>
-      {ACTIVITIES.map((a) => {
-        const r = form.rows[a];
-        const { title, Icon } = ACTIVITY_INFO[a];
-        return (
-          <div key={a} className={`ht-act ${r.on ? "" : "ht-act-off"}`}>
-            <div className="ht-act-head">
-              <label><input type="checkbox" checked={r.on} onChange={(e) => setRow(a, { on: e.target.checked })} /><Icon size={18} aria-hidden="true" />{title}</label>
-              {!r.on && <span className="hz-muted">Not set</span>}
-            </div>
-            <div className="ht-act-body">
-              <PortionFields value={r} onChange={(p) => setRow(a, p)} />
-              <div className="hz-field">
-                <label htmlFor={`ht-notes-${a}`}>Note for the student (optional)</label>
-                <input id={`ht-notes-${a}`} className="hz-input" maxLength={1000} value={r.notes} onChange={(e) => setRow(a, { notes: e.target.value })} placeholder="e.g. Read it 10 times before memorising" />
-              </div>
-            </div>
-          </div>
-        );
-      })}
-      <button className="hz-btn hz-btn-primary" disabled={busy || chosen.length === 0} onClick={submit}>
-        <Plus size={18} aria-hidden="true" />Set {chosen.length || ""} task{chosen.length === 1 ? "" : "s"} for {fmtDay(form.date)}
-      </button>
-    </div>
-  );
-}
-
-function EditTask({ task, onSave, onCancel, busy }) {
+function EditTask({ task, onSave, onCancel, busy, saveLabel = "Save changes" }) {
   const [draft, setDraft] = useState({ taskDate: task.taskDate, start: task.start, end: task.end, notes: task.notes });
   return (
     <div>
@@ -238,13 +219,14 @@ function EditTask({ task, onSave, onCancel, busy }) {
         <input id={`ht-edit-date-${task.id}`} className="hz-input" style={{ maxWidth: 220 }} type="date" value={draft.taskDate} onChange={(e) => e.target.value && setDraft((d) => ({ ...d, taskDate: e.target.value }))} />
       </div>
       <PortionFields value={draft} onChange={(p) => setDraft((d) => ({ ...d, ...p }))} />
+      <div className="ht-sum">{portionSummary(draft)}</div>
       <div className="hz-field">
         <label htmlFor={`ht-edit-notes-${task.id}`}>Note for the student</label>
         <input id={`ht-edit-notes-${task.id}`} className="hz-input" maxLength={1000} value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} />
       </div>
       <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 12 }}>
         <button className="hz-btn hz-btn-outline" onClick={onCancel}>Cancel</button>
-        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave(draft)}>Save changes</button>
+        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave(draft)}>{saveLabel}</button>
       </div>
     </div>
   );
@@ -259,6 +241,9 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
   const [editingId, setEditingId] = useState(null);
   const [markingId, setMarkingId] = useState(null); // task open in the Mushaf
   const [selectedKey, setSelectedKey] = useState(null);
+  const [drafts, setDrafts] = useState({}); // activity → the teacher's confirmed next task
+  const [nextOpen, setNextOpen] = useState(null); // task whose next task is being looked at
+  const generating = useRef(false);
 
   const run = async (fn) => {
     setBusy(true);
@@ -266,12 +251,57 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
     try { await fn(); await refresh(); return true; } catch (e) { setError(e.message); return false; } finally { setBusy(false); }
   };
 
+  // Tasks come from the Hifz plan: keep one waiting for each of New Hifz,
+  // Short and Long Muraja'ah on the student's class days (e.g. after the
+  // plan is first saved, or a task the student ticked done at home).
+  const planReady = !!data && data.hasProfile && !data.profile?.fromLegacy;
+  useEffect(() => {
+    if (!planReady || generating.current) return;
+    const rows = nextTasksToSet({ tasks: data.tasks, memorized: data.memorized, profile: data.profile, today: data.today, schedule: student.schedule, drafts });
+    if (!rows.length) return;
+    generating.current = true;
+    repo.addTasks(rows)
+      .then(() => { setDrafts((d) => { const n = { ...d }; rows.forEach((r) => delete n[r.activity]); return n; }); return refresh(); })
+      .catch((e) => setError(e.message))
+      .finally(() => { generating.current = false; });
+  }, [data, planReady]);
+
   if (!data) return <div className="ht">{error ? <div className="hz-error" role="alert">{error}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
 
-  const { stats, streak, todayTasks, overdue, upcoming, recentDone, today, mistakes, openMistakes, memorized, tasks } = data;
+  const { stats, streak, todayTasks, overdue, upcoming, today, mistakes, openMistakes, memorized, tasks } = data;
   const marking = tasks.find((t) => t.id === markingId) || null;
   const selected = openMistakes.find((m) => `${m.verseKey}:${m.position}` === selectedKey) || null;
   const needsProfile = !data.hasProfile || data.profile?.fromLegacy;
+
+  const ctx = { tasks, memorized, profile: data.profile, today, schedule: student.schedule };
+  const nextOf = (t) => drafts[t.activity] || previewNext(t, ctx);
+  // Done: the next class day's task for the same activity is set (with the
+  // teacher's confirmed changes, if any) and the student is notified.
+  const markDone = (t) => {
+    const next = nextOf(t);
+    const stillOpen = tasks.some((x) => x.activity === t.activity && !x.completedAt && x.id !== t.id);
+    generating.current = true;
+    return run(async () => {
+      await repo.setTaskDone(t.id, true);
+      if (next && !stillOpen) await repo.addTasks([{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "" }]);
+      setDrafts((d) => { const n = { ...d }; delete n[t.activity]; return n; });
+      setNextOpen(null);
+      if (markingId === t.id) { setMarkingId(null); setSelectedKey(null); }
+    }).finally(() => { generating.current = false; });
+  };
+  const nextBox = (t) => {
+    const next = nextOf(t);
+    if (!next) return <div className="ht-next"><span className="hz-muted">Nothing comes next on the plan.</span></div>;
+    return (
+      <div className="ht-next">
+        <div className="ht-next-head"><ArrowRight size={16} aria-hidden="true" />Next {ACTIVITY_INFO[t.activity].title} · {fmtDay(next.taskDate)}{drafts[t.activity] ? " · confirmed" : ""}</div>
+        <EditTask key={`${t.id}-${next.taskDate}-${next.start}-${next.end}`} task={{ ...next, id: `next-${t.id}`, notes: next.notes || "" }} busy={busy} saveLabel="Confirm"
+          onCancel={() => setNextOpen(null)}
+          onSave={(d) => { setDrafts((prev) => ({ ...prev, [t.activity]: d })); setNextOpen(null); }} />
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>It's set when you mark this task done, and the student is notified.</p>
+      </div>
+    );
+  };
 
   const tapWord = (w) => {
     setSelectedKey(w.key);
@@ -285,7 +315,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
 
   const taskRow = (t) => {
     const { title, Icon } = ACTIVITY_INFO[t.activity];
-    const next = nextAfter(t, tasks, memorized, today, data.profile);
+    const confirmed = drafts[t.activity];
     const count = mistakesForTask(t, mistakes).length;
     if (editingId === t.id) {
       return (
@@ -310,18 +340,17 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
           <button className="hz-btn hz-btn-primary" onClick={() => { setSelectedKey(null); setMarkingId(markingId === t.id ? null : t.id); setTimeout(() => document.getElementById("ht-mushaf")?.scrollIntoView({ behavior: "smooth" }), 50); }}>
             <Highlighter size={15} aria-hidden="true" />{markingId === t.id ? "Close Mushaf" : "Listen & mark"}
           </button>
-          <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => run(() => repo.setTaskDone(t.id, !t.completedAt))}>
+          <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => (t.completedAt ? run(() => repo.setTaskDone(t.id, false)) : markDone(t))}>
             {t.completedAt ? <><Undo2 size={15} aria-hidden="true" />Not done</> : <><CheckCircle2 size={15} aria-hidden="true" />Done</>}
           </button>
+          <button className="hz-btn hz-btn-outline" aria-expanded={nextOpen === t.id} onClick={() => setNextOpen(nextOpen === t.id ? null : t.id)}>
+            <ArrowRight size={15} aria-hidden="true" />Next task
+          </button>
           <button className="hz-btn hz-btn-outline" onClick={() => setEditingId(t.id)}><Pencil size={15} aria-hidden="true" />Change</button>
-          {next && (
-            <button className="hz-btn hz-btn-outline" disabled={busy} title={`Set ${title} for ${fmtDay(next.taskDate)}: ${describeRange([next.start, next.end])}`}
-              onClick={() => run(() => repo.addTasks([{ ...next, notes: "" }]))}>
-              Next day: {describeRange([next.start, next.end])}<ArrowRight size={15} aria-hidden="true" />
-            </button>
-          )}
           <button className="hz-btn hz-btn-ghost" aria-label={`Delete ${title} for ${fmtDay(t.taskDate)}`} onClick={() => remove("task", () => repo.deleteTask(t.id))}><Trash2 size={15} aria-hidden="true" /></button>
         </div>
+        {confirmed && nextOpen !== t.id && <div className="hz-muted" style={{ fontSize: 13 }}>Next (confirmed): {fmtDay(confirmed.taskDate)} · {portionSummary(confirmed)}</div>}
+        {nextOpen === t.id && markingId !== t.id && nextBox(t)}
       </li>
     );
   };
@@ -331,7 +360,6 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
       <ul className="ht-rows">{list.map(taskRow)}</ul>
     </>
   );
-  const recentFixed = mistakes.filter((m) => m.correctedAt).sort((a, b) => (a.correctedAt < b.correctedAt ? 1 : -1)).slice(0, 8);
 
   return (
     <div className="ht">
@@ -349,7 +377,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
           <div><span>Memorised</span><strong>{describeAmount(stats.memorizedUnits)}</strong></div>
           <div><span>Target year (set by the student)</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not chosen yet"}</strong></div>
           <div><span>Streak</span><strong><Flame size={14} aria-hidden="true" /> {streak.current} day{streak.current === 1 ? "" : "s"}</strong></div>
-          <div><span>Mistakes to fix</span><strong>{openMistakes.length}</strong></div>
+          <div><span>Tasks waiting</span><strong>{tasks.filter((t) => !t.completedAt).length}</strong></div>
         </div>
         {editingProfile || needsProfile ? (
           <div style={{ marginTop: 16 }}>
@@ -362,19 +390,28 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         )}
       </section>
 
-      <section className="hz-card" aria-label="Set Hifz tasks">
-        <h2 className="hz-h2"><Plus size={22} aria-hidden="true" />Set Hifz Tasks</h2>
-        <p className="hz-muted" style={{ marginTop: 0 }}>Portions are filled in to carry on from the last tasks. The student gets a phone notification.</p>
-        <AssignForm key={`${tasks.length}-${data.today}-${stats.memorizedUnits}-${JSON.stringify(planOf(data.profile))}`} data={data} busy={busy} onAssign={(rows) => run(() => repo.addTasks(rows))} />
-      </section>
-
       <section className="hz-card" aria-label="Tasks">
         <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />Tasks</h2>
-        {tasks.length === 0 && <p className="hz-muted" style={{ margin: 0 }}>No tasks yet. Set the first ones above.</p>}
-        {group(`Today · ${fmtDate(today)}`, todayTasks)}
-        {group("Not finished from earlier days", overdue)}
-        {group("Coming up", upcoming)}
-        {group("Recently done", recentDone.slice(0, 6))}
+        <p className="hz-muted" style={{ marginTop: 0 }}>
+          {planReady
+            ? <>Set automatically from the Hifz plan for the class days{student.schedule?.days?.length ? ` (${student.schedule.days.join(", ")})` : ""}. Mark a task done and the next one is set; the student is notified.</>
+            : "Save the Hifz plan above to start. The tasks are then set automatically for the class days."}
+        </p>
+        {/* Done tasks leave the teacher's list straight away; the student keeps them as history. */}
+        {(() => {
+          const open = (list) => list.filter((t) => !t.completedAt);
+          const doneCount = tasks.filter((t) => t.completedAt).length;
+          const any = open(todayTasks).length + overdue.length + open(upcoming).length;
+          return (
+            <>
+              {!any && planReady && <p className="hz-muted" style={{ margin: 0 }}>Setting the next tasks…</p>}
+              {group(`Today · ${fmtDate(today)}`, open(todayTasks))}
+              {group("Not finished from earlier days", overdue)}
+              {group("Coming up", open(upcoming))}
+              {doneCount > 0 && <p className="hz-muted" style={{ margin: "14px 0 0" }}>{doneCount} done task{doneCount === 1 ? "" : "s"} moved to the student's history.</p>}
+            </>
+          );
+        })()}
       </section>
 
       {marking && (
@@ -400,39 +437,15 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
           )}
           <div className="hz-wiz-nav" style={{ marginTop: 12 }}>
             <span className="hz-muted">{mistakesForTask(marking, mistakes).length} mistake(s) to fix on these pages</span>
-            {!marking.completedAt && <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setTaskDone(marking.id, true))}><CheckCircle2 size={17} aria-hidden="true" />Mark task done</button>}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="hz-btn hz-btn-outline" aria-expanded={nextOpen === marking.id} onClick={() => setNextOpen(nextOpen === marking.id ? null : marking.id)}><ArrowRight size={17} aria-hidden="true" />Next task</button>
+              {!marking.completedAt && <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => markDone(marking)}><CheckCircle2 size={17} aria-hidden="true" />Mark task done</button>}
+            </div>
           </div>
+          {nextOpen === marking.id && nextBox(marking)}
         </section>
       )}
 
-      <section className="hz-card" aria-label="Mistakes">
-        <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Mistakes to Fix</h2>
-        {openMistakes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>None. Use “Listen & mark” on a task to highlight mistakes.</p> : (
-          <ul className="hz-list">
-            {openMistakes.map((m) => (
-              <li key={m.id}>
-                <span className="hz-ar" lang="ar">{m.wordText || "—"}</span>
-                <div>Page {m.page} · Ayah {m.verseKey}<small>Marked {fmtDate(m.createdAt.slice(0, 10))}</small></div>
-                <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(m.id, true))}><Check size={16} aria-hidden="true" />Corrected</button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {recentFixed.length > 0 && (
-          <>
-            <div className="ht-group">Recently corrected</div>
-            <ul className="hz-list">
-              {recentFixed.map((m) => (
-                <li key={m.id}>
-                  <span className="hz-ar" lang="ar" style={{ color: "#156B45" }}>{m.wordText || "—"}</span>
-                  <div>Page {m.page} · Ayah {m.verseKey}</div>
-                  <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(m.id, false))}><Undo2 size={15} aria-hidden="true" />Not yet</button>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
     </div>
   );
 }

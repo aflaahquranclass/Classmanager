@@ -32,10 +32,12 @@ const taskPatchToDb = (p) => {
 const profileFromDb = (r) => ({
   memorized: r.memorized || [], goalYear: r.goal_year, direction: r.direction || "forward", startUnit: r.start_unit,
   shortPages: Number(r.short_pages ?? 1), longStartUnit: r.long_start_unit, longMode: r.long_mode || "juz", longPages: Number(r.long_pages ?? 2),
+  newUnits: r.new_units ?? 30,
 });
 const profileToDb = (p) => ({
   memorized: p.memorized || [], direction: p.direction || "forward", start_unit: p.startUnit ?? null,
   short_pages: p.shortPages ?? 1, long_start_unit: p.longStartUnit ?? null, long_mode: p.longMode || "juz", long_pages: p.longPages ?? 2,
+  new_units: p.newUnits ?? 30,
 });
 
 export const HIFZ_TASK_MAPS = { taskFromDb, mistakeFromDb, profileFromDb };

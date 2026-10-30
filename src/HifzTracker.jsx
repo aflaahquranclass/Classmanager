@@ -11,8 +11,9 @@ import { BookOpenText, RotateCw, History, Flame, CalendarDays, CheckCircle2, Clo
 import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { unitsOf, intersect } from "./hifz/engine.js";
-import { describeAyahRange, nearestAyahs } from "./hifz/ayahs.js";
-import { ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask } from "./hifz/tasks.js";
+import { nearestAyahs } from "./hifz/ayahs.js";
+import { ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs } from "./hifz/tasks.js";
+import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
 import MushafPage from "./thilawa/MushafPage.jsx";
 
@@ -25,10 +26,6 @@ export const ACTIVITY_INFO = {
 export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 export const fmtDay = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 export const surahEndPage = (i) => (i + 1 < SURAHS.length ? Math.max(SURAHS[i].startPage, SURAHS[i + 1].startPage - 1) : TOTAL_PAGES);
-const pagesOfSurah = (num) => {
-  const i = num - 1;
-  return Array.from({ length: surahEndPage(i) - SURAHS[i].startPage + 1 }, (_, k) => SURAHS[i].startPage + k);
-};
 // Surahs in a range, from the ayah data (accurate even when a surah starts mid-page).
 export const surahNames = (range) => {
   const { first, last } = nearestAyahs(range);
@@ -197,6 +194,20 @@ export const HIFZ_CSS = `
   .hz-list small { display: block; color: ${TP.secondaryText}; font-size: 12px; margin-top: 2px; }
   .hz-ar { font-family: "UthmanicHafs", serif; font-size: 24px; line-height: 1.5; color: #9B1C0A; direction: rtl; }
   .hz-date { font-weight: 700; color: ${TP.navy}; min-width: 92px; }
+  /* Position: Surah → Ayah → Page → Line, each kept in step with the others */
+  .hz-pos { display: grid; grid-template-columns: 52px minmax(150px, 2.2fr) minmax(64px, 0.8fr) minmax(70px, 0.9fr) minmax(64px, 0.8fr) auto; align-items: end; gap: 8px; }
+  .hz-pos-noline { grid-template-columns: 52px minmax(150px, 2.2fr) minmax(64px, 0.8fr) minmax(70px, 0.9fr) auto; }
+  .hz-pos-label { align-self: center; padding-top: 16px; font-size: 13px; font-weight: 700; color: ${TP.secondaryText}; text-transform: uppercase; letter-spacing: 0.04em; }
+  .hz-pos > label { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 11px; font-weight: 600; color: ${TP.secondaryText}; }
+  .hz-pos .hz-input, .hz-pos .hz-select { min-height: 42px; font-size: 15px; font-weight: 600; padding: 0 8px; }
+  .hz-pos-juz { align-self: center; padding-top: 16px; font-size: 12px; font-weight: 600; color: ${TP.secondaryText}; white-space: nowrap; }
+  @media (max-width: 640px) {
+    .hz-pos, .hz-pos-noline { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .hz-pos-label { grid-column: 1 / 3; grid-row: 1; padding-top: 0; }
+    .hz-pos-juz { grid-column: 3 / 4; grid-row: 1; padding-top: 0; text-align: right; }
+    .hz-pos-surah-pick { grid-column: 1 / -1; }
+    .hz-pos-noline .hz-pos-page { grid-column: span 2; }
+  }
   @font-face { font-family: "UthmanicHafs"; src: url("/fonts/UthmanicHafs1Ver18.woff2") format("woff2"); font-display: swap; }
   @media (max-width: 520px) {
     .hz-reader-card { padding: 12px 6px; }
@@ -208,29 +219,74 @@ export const HIFZ_CSS = `
 
 // ---------- position picker (Surah → page → line) ----------
 
-export function PositionPicker({ label, unit, onChange, allowLine = true, minPage = 1, maxPage = TOTAL_PAGES }) {
+// Surah → Ayah → Page → Line. Changing any one moves the others with it:
+// a surah goes to its first ayah, an ayah to the line it's on, a typed page to
+// its first line, and the surah/ayah always show what's on the chosen line.
+// `edge`: "start" (a portion's first line: the first ayah on it) or "end"
+// (its last line: the last ayah on it). allowLine={false} works by page.
+export function PositionPicker({ label, unit, onChange, allowLine = true, minPage = 1, maxPage = TOTAL_PAGES, edge = "start" }) {
   const page = unitToPage(Math.min(unit, TOTAL_UNITS - 1));
   const line = Math.floor((unit % UNITS_PER_PAGE) / UNITS_PER_LINE) + 1;
-  const surah = surahsOnPages(page, page).pop() || SURAHS[0];
-  const surahChoices = SURAHS.filter((s, i) => s.startPage <= maxPage && surahEndPage(i) >= minPage);
-  const pageChoices = pagesOfSurah(surah.number).filter((p) => p >= minPage && p <= maxPage);
+  // The ayah the teacher picked stays shown while it's on the chosen line (an
+  // ayah can start mid-line, after the end of the one before it).
+  const [picked, setPicked] = useState(null);
+  const here = picked && picked.unit === unit ? picked : ayahAtLine(allowLine ? unit : pageToUnit(page), edge);
+  const [text, setText] = useState(String(page));
+  useEffect(() => { setText(String(page)); }, [page]);
+  const clampPage = (u) => {
+    const p = unitToPage(u);
+    if (p < minPage) return pageToUnit(minPage);
+    if (p > maxPage) return pageToUnit(maxPage);
+    return allowLine ? u : pageToUnit(p);
+  };
+  const toAyah = (surah, ayah) => {
+    const u = clampPage(unitOfAyah(surah, ayah, edge));
+    setPicked({ surah, ayah, unit: u });
+    onChange(u);
+  };
+  const commitPage = (v) => {
+    const p = Math.round(+v);
+    if (p >= minPage && p <= maxPage) onChange(pageToUnit(p, 1));
+    else setText(String(page));
+  };
+  const juz = JUZ_START_PAGES.filter((p) => p <= page).length;
   return (
-    <div className="hz-field">
-      <span>{label}</span>
-      <div className="hz-grid3">
-        <select className="hz-select" aria-label={`${label}: surah`} value={surah.number}
-          onChange={(e) => onChange(pageToUnit(Math.max(minPage, SURAHS[+e.target.value - 1].startPage)))}>
-          {surahChoices.map((s) => <option key={s.number} value={s.number}>{s.number}. {s.name}</option>)}
+    <div className={`hz-pos ${allowLine ? "" : "hz-pos-noline"}`}>
+      <span className="hz-pos-label">{label}</span>
+      <label className="hz-pos-surah-pick">
+        <span>Surah</span>
+        <select className="hz-select" aria-label={`${label}: surah`} value={here.surah} onChange={(e) => toAyah(+e.target.value, 1)}>
+          {SURAHS.map((s) => <option key={s.number} value={s.number}>{s.number}. {s.name}</option>)}
         </select>
-        <select className="hz-select" aria-label={`${label}: page`} value={page} onChange={(e) => onChange(pageToUnit(+e.target.value))}>
-          {pageChoices.map((p) => <option key={p} value={p}>Page {p}</option>)}
+      </label>
+      <label className="hz-pos-ayah">
+        <span>Ayah</span>
+        <select className="hz-select" aria-label={`${label}: ayah`} value={here.ayah} onChange={(e) => toAyah(here.surah, +e.target.value)}>
+          {Array.from({ length: SURAH_AYAH_COUNTS[here.surah - 1] }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
         </select>
-        {allowLine && (
+      </label>
+      <label className="hz-pos-page">
+        <span>Page</span>
+        <input className="hz-input" type="number" inputMode="numeric" min={minPage} max={maxPage} value={text} aria-label={`${label}: page`}
+          onChange={(e) => {
+            // Apply as soon as the number can't get longer (e.g. "158"); otherwise
+            // on leaving the box or Enter, so typing "1…" doesn't jump to page 1.
+            setText(e.target.value);
+            const p = Math.round(+e.target.value);
+            if (p >= minPage && p <= maxPage && p * 10 > maxPage) commitPage(p);
+          }}
+          onBlur={(e) => commitPage(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitPage(e.currentTarget.value); } }} />
+      </label>
+      {allowLine && (
+        <label className="hz-pos-line">
+          <span>Line</span>
           <select className="hz-select" aria-label={`${label}: line`} value={line} onChange={(e) => onChange(pageToUnit(page, +e.target.value))}>
-            {Array.from({ length: 15 }, (_, i) => <option key={i} value={i + 1}>Line {i + 1}</option>)}
+            {Array.from({ length: 15 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
           </select>
-        )}
-      </div>
+        </label>
+      )}
+      <span className="hz-pos-juz">Juz {juz}</span>
     </div>
   );
 }
@@ -244,7 +300,7 @@ export function PortionText({ task }) {
     <div className="hz-portion">
       {describeRange(r)} <span className="hz-muted" style={{ fontWeight: 400 }}>· {describeAmount(task.end - task.start)}</span>
       <small>{surahNames(r)}</small>
-      <small className="hz-ayah">Ayah {describeAyahRange(r)}</small>
+      <small className="hz-ayah">Ayah {describeAyahs(r)}</small>
     </div>
   );
 }

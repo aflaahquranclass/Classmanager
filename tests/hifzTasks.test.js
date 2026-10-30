@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pageToUnit, UNITS_PER_PAGE } from "../src/hifz/quran.js";
-import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile } from "../src/hifz/tasks.js";
+import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile, shortBefore, nextClassDay, nextTasksToSet, previewNext } from "../src/hifz/tasks.js";
 import { loadHifz } from "../src/hifz/taskService.js";
 import { createHifzMemoryStore, createMemoryHifzRepo } from "../src/hifz/taskRepos.js";
 
@@ -37,12 +37,23 @@ test("overdue, today and upcoming are split by date; today is ordered New, Short
 test("New Hifz follows the path; Short revises the latest pages; Long goes juz by juz", () => {
   const done = "2026-10-30T10:00:00Z";
   // From Al-Baqarah: pages 2–49 known, half of page 50 just done.
-  const fwd = { direction: "forward", startUnit: pageToUnit(2), shortPages: 4, longStartUnit: pageToUnit(10), longMode: "juz" };
+  const fwd = { direction: "forward", startUnit: pageToUnit(2), newUnits: P / 2, shortPages: 4, longStartUnit: pageToUnit(10), longMode: "juz" };
   const tasks = [task("2026-10-30", "new", [pageToUnit(50), pageToUnit(50) + P / 2], done)];
   const memorized = [[pageToUnit(2), pageToUnit(50) + P / 2]];
   assert.deepEqual(suggestPortion("new", tasks, memorized, fwd), { start: pageToUnit(50) + P / 2, end: pageToUnit(51) });
-  // Short: the 4 most recently memorised pages, not a new part.
+  // Short: the 4 pages straight before the next New Hifz, not a new part.
   assert.deepEqual(suggestPortion("short", tasks, memorized, fwd), { start: pageToUnit(46) + P / 2, end: pageToUnit(50) + P / 2 });
+  // With Juz 30 memorised too (outside the path), Short still comes from just before the New Hifz.
+  const withJuz30 = [...memorized, pages(582, 604)];
+  assert.deepEqual(suggestPortion("short", tasks, withJuz30, fwd), { start: pageToUnit(46) + P / 2, end: pageToUnit(50) + P / 2 });
+  // For a New Hifz the teacher picks (Al-A'raf p. 158), Short is the 4 pages before it.
+  assert.deepEqual(shortBefore(pageToUnit(158), [pages(2, 157)], fwd), { start: pageToUnit(154), end: pageToUnit(158) });
+  // The real case: the Hifz started at p. 158 (forward), p. 182–604 known; New Hifz p. 158 → Short p. 154–157.
+  assert.deepEqual(shortBefore(pageToUnit(158), [[5430, 18120]], { direction: "forward", startUnit: pageToUnit(158), shortPages: 4 }), { start: pageToUnit(154), end: pageToUnit(158) });
+  // … even when only Juz 30 has been entered as memorised so far.
+  assert.deepEqual(shortBefore(pageToUnit(158), [pages(582, 604)], fwd), { start: pageToUnit(154), end: pageToUnit(158) });
+  // An-Naba path, New Hifz at the start of Juz 29 (p. 562): the pages before it on the path are the end of Juz 30.
+  assert.deepEqual(shortBefore(pageToUnit(562), [pages(582, 604)], { ...fwd, direction: "juz_reverse", startUnit: pageToUnit(582) }), { start: pageToUnit(601), end: pageToUnit(605) });
   // Long: from the chosen start to the end of its juz (Juz 1 ends on page 21) …
   assert.deepEqual(suggestPortion("long", tasks, memorized, fwd), { start: pageToUnit(10), end: pageToUnit(22) });
   // … then the next juz, and back to the beginning after the last memorised page.
@@ -109,3 +120,57 @@ test("teacher sets and changes tasks and mistakes; the student can only tick", a
   stop();
 });
 
+
+test("next class day comes from the timetable; a part not done comes again", () => {
+  // 2026-10-31 is a Saturday. Classes on Sun, Tue, Thu.
+  const sched = { days: ["Sun", "Tue", "Thu"] };
+  assert.equal(nextClassDay(sched, "2026-10-31"), "2026-11-01");          // Sat → Sun
+  assert.equal(nextClassDay(sched, "2026-11-01"), "2026-11-03");          // Sun → Tue
+  assert.equal(nextClassDay(sched, "2026-11-01", true), "2026-11-01");    // today is a class day
+  assert.equal(nextClassDay(null, "2026-11-01"), "2026-11-02");           // no timetable: next day
+  assert.equal(suggestDate([task("2026-11-01", "new", pages(1, 1))], "2026-11-01", sched), "2026-11-03");
+
+  const plan = { direction: "forward", startUnit: pageToUnit(2), shortPages: 4, longStartUnit: pageToUnit(2), longMode: "pages", longPages: 2 };
+  const memorized = [pages(2, 20)];
+  const due = task("2026-11-01", "new", pages(21, 21));                   // today's New Hifz, not done
+  const p = suggestPortion("new", [due], memorized, plan, "2026-11-01");
+  assert.deepEqual([p.start, p.end, p.repeat], [pageToUnit(21), pageToUnit(22), true]);
+  // Done → the next part; set for a later day (not due yet) → carry on after it.
+  assert.equal(suggestPortion("new", [{ ...due, completedAt: "2026-11-01T10:00:00Z" }], [pages(2, 21)], plan, "2026-11-01").start, pageToUnit(22));
+  assert.equal(suggestPortion("new", [{ ...due, taskDate: "2026-11-03" }], memorized, plan, "2026-11-01").start, pageToUnit(22));
+  // Short follows the repeated New Hifz: the 4 pages before p. 21.
+  assert.deepEqual(suggestPortion("short", [due], memorized, plan, "2026-11-01"), { start: pageToUnit(17), end: pageToUnit(21) });
+  // Next day button: Sun's task → Tue.
+  assert.equal(nextAfter({ ...due, completedAt: "x" }, [{ ...due, completedAt: "x" }], [pages(2, 21)], "2026-11-01", plan, sched).taskDate, "2026-11-03");
+});
+
+test("tasks are generated from the plan for class days; done creates the next", () => {
+  const sched = { days: ["Sun", "Tue", "Thu"] };
+  // Hifz from p. 2, pages 2–157 known, 1 page a day, Short 4 pages, Long 2 pages from p. 2.
+  const plan = { direction: "forward", startUnit: pageToUnit(2), newUnits: P, shortPages: 4, longStartUnit: pageToUnit(2), longMode: "pages", longPages: 2 };
+  const memorized = [pages(2, 157)];
+  // Plan just saved on Sunday 1 Nov (a class day): today's three tasks.
+  const first = nextTasksToSet({ tasks: [], memorized, profile: plan, today: "2026-11-01", schedule: sched });
+  assert.deepEqual(first.map((r) => [r.activity, r.taskDate, r.start, r.end]), [
+    ["new", "2026-11-01", pageToUnit(158), pageToUnit(159)],
+    ["short", "2026-11-01", pageToUnit(154), pageToUnit(158)],
+    ["long", "2026-11-01", pageToUnit(2), pageToUnit(4)],
+  ]);
+  // Nothing more while each activity has a task waiting.
+  const set = first.map((r, i) => ({ ...r, id: `t${i}`, completedAt: null, createdAt: `2026-11-01T0${i}` }));
+  assert.equal(nextTasksToSet({ tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched }).length, 0);
+  // While listening on Sunday: the next tasks are Tuesday's.
+  const nNew = previewNext(set[0], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
+  const nShort = previewNext(set[1], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
+  const nLong = previewNext(set[2], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
+  assert.deepEqual([nNew.taskDate, nNew.start], ["2026-11-03", pageToUnit(159)]);
+  assert.deepEqual([nShort.start, nShort.end], [pageToUnit(155), pageToUnit(159)]); // 4 pages before Tuesday's New Hifz
+  assert.deepEqual([nLong.start, nLong.end], [pageToUnit(4), pageToUnit(6)]);
+  // A task the student ticked done at home: the teacher's page fills in the next one.
+  const doneNew = set.map((t, i) => (i === 0 ? { ...t, completedAt: "2026-11-01T10:00:00Z" } : t));
+  const after = nextTasksToSet({ tasks: doneNew, memorized: [pages(2, 158)], profile: plan, today: "2026-11-01", schedule: sched });
+  assert.deepEqual(after.map((r) => [r.activity, r.taskDate, r.start]), [["new", "2026-11-03", pageToUnit(159)]]);
+  // The teacher's confirmed change is used instead.
+  const drafted = nextTasksToSet({ tasks: doneNew, memorized: [pages(2, 158)], profile: plan, today: "2026-11-01", schedule: sched, drafts: { new: { start: pageToUnit(159), end: pageToUnit(159) + P / 2, taskDate: "2026-11-05", notes: "Half today" } } });
+  assert.deepEqual([drafted[0].taskDate, drafted[0].end, drafted[0].notes], ["2026-11-05", pageToUnit(159) + P / 2, "Half today"]);
+});
