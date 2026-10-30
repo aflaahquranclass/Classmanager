@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App, { PORTAL } from "./App.jsx";
 import StudentPortal from "./StudentPortal.jsx";
 import { ConfirmHost } from "./ConfirmDialog.jsx";
+import { SplashDone } from "./splash.jsx";
 
 // The main domain shows the public website; its staff sign-in lives at
 // /login. Portal subdomains (and ?portal= on localhost) go straight to their
@@ -12,7 +13,7 @@ const showLanding = !PORTAL && window.location.pathname !== "/login";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {PORTAL === "student" ? <StudentPortal /> : showLanding ? <Suspense fallback={null}><Landing /></Suspense> : <App />}
+    {PORTAL === "student" ? <StudentPortal /> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <App />}
     <ConfirmHost />
   </React.StrictMode>
 );

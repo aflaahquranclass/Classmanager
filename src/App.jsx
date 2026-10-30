@@ -17,6 +17,7 @@ import { AdminRegistrations, usePendingRegistrationCount } from "./registrations
 import { usePendingInfoCount } from "./registrations/InfoUpdatesAdmin.jsx";
 import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
 import { ProgramPicker, hasProgram } from "./thilawa/programs.jsx";
+import { hideSplash, LogoLoader } from "./splash.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
 const TeacherThilawa = lazy(() => import("./thilawa/ThilawaTeacher.jsx").then((m) => ({ default: m.TeacherThilawa })));
 const TeacherHifz = lazy(() => import("./hifz/HifzTeacher.jsx").then((m) => ({ default: m.TeacherHifz })));
@@ -981,6 +982,8 @@ export default function App() {
   // too, so this is UX routing, not the actual security boundary.
   const [role, setRole] = useState("admin"); // admin | teacher
   const [authView, setAuthView] = useState("checking"); // checking | login | app
+  // Fade out the loading screen once the sign-in page or the loaded portal shows.
+  useEffect(() => { if (authView === "login" || (authView === "app" && !loading)) hideSplash(); }, [authView, loading]);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminEmailInput, setAdminEmailInput] = useState("");
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
@@ -3557,7 +3560,7 @@ export default function App() {
 
       {authView === "checking" ? (
         <div style={{ minHeight: "640px", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", background: C.f }}>
-          <div style={{ color: C.a, fontSize: "14px" }}>Loading…</div>
+          <LogoLoader />
         </div>
       ) : authView === "login" ? (
         <LoginScreen
@@ -3589,13 +3592,13 @@ export default function App() {
             {saveError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "14px" }}>{saveError}</div>}
 
             {section === "hifz" && (
-              <Suspense fallback={<div style={{ color: C.a, fontSize: "14px" }}>Loading…</div>}>
+              <Suspense fallback={<LogoLoader label="Loading Hifz…" />}>
                 <TeacherHifz teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && hasProgram(s, "hifz"))} />
               </Suspense>
             )}
 
             {section === "thilawa" && (
-              <Suspense fallback={<div style={{ color: C.a, fontSize: "14px" }}>Loading…</div>}>
+              <Suspense fallback={<LogoLoader label="Loading Thilawa…" />}>
                 <TeacherThilawa teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && hasProgram(s, "thilawa"))} />
               </Suspense>
             )}

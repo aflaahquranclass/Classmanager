@@ -8,6 +8,7 @@ import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } f
 import { pageToUnit } from "./hifz/quran.js";
 import { TOTAL_AYAHS } from "./hifz/ayahs.js";
 import { maldivesToday } from "./dates.js";
+import { hideSplash } from "./splash.jsx";
 import { StudentExams } from "./exams/ExamUI.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
@@ -247,6 +248,7 @@ const writeDash = (v) => { try { localStorage.setItem(DASH_KEY, v); } catch { /*
 export default function StudentPortal() {
   const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode", class_name: "Demo class", fee: 375, joined_month: "2026-08", programs: ["hifz", "thilawa"] } } : { status: "loading" });
   const [loginError, setLoginError] = useState("");
+  useEffect(() => { if (auth.status !== "loading") hideSplash(); }, [auth.status]);
   const [view, setView] = useState("dashboard");
   const [thilawa, setThilawa] = useState(null);
   const [dashPick, setDashPick] = useState(readDash);

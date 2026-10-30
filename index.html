@@ -31,6 +31,43 @@
         document.querySelector('link[rel="apple-touch-icon"]').href = p === "admin" ? "/icons/admin-apple-touch-icon.png" : "/icons/apple-touch-icon.png";
       })();
     </script>
+    <link rel="preload" as="image" href="/images/logo-icon-only.png" />
+    <style>
+      /* Loading screen: shown straight away (before the app's code has
+         downloaded) and faded out by the app once it has something to show
+         (window.__aqcHideSplash, see src/splash.js). */
+      #aqc-splash { position: fixed; inset: 0; z-index: 2147483000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; overflow: hidden;
+        background: radial-gradient(circle at 50% 38%, rgba(255,255,255,0.16), transparent 55%), linear-gradient(135deg, #0D4F85 0%, #176FD1 55%, #0A94B1 100%);
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: #FFFFFF; transition: opacity 0.45s ease, visibility 0.45s ease; }
+      #aqc-splash.aqc-splash-out { opacity: 0; visibility: hidden; }
+      .aqc-splash-stage { position: relative; width: min(46vw, 220px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+      .aqc-splash-ring { position: absolute; inset: 0; border-radius: 50%; border: 2px solid rgba(255,255,255,0.55); opacity: 0; animation: aqc-ring 2.4s cubic-bezier(0.2, 0.6, 0.2, 1) infinite; }
+      .aqc-splash-ring:nth-child(2) { animation-delay: 0.8s; }
+      .aqc-splash-ring:nth-child(3) { animation-delay: 1.6s; }
+      .aqc-splash-disc { position: absolute; inset: 14%; border-radius: 50%; background: rgba(255,255,255,0.12); box-shadow: 0 0 60px rgba(255,255,255,0.25), inset 0 0 0 1px rgba(255,255,255,0.25); animation: aqc-breathe 2.4s ease-in-out infinite; }
+      /* The emblem is the logo's shape filled white, with a light sweeping across it. */
+      .aqc-splash-mark { position: relative; width: 62%; aspect-ratio: 596 / 394;
+        -webkit-mask: url(/images/logo-icon-only.png) center / contain no-repeat; mask: url(/images/logo-icon-only.png) center / contain no-repeat;
+        background: linear-gradient(110deg, #FFFFFF 0%, #FFFFFF 40%, #BFF3FF 50%, #FFFFFF 60%, #FFFFFF 100%); background-size: 250% 100%;
+        animation: aqc-rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) both, aqc-sheen 2.4s ease-in-out 0.9s infinite, aqc-float 2.4s ease-in-out 0.9s infinite; }
+      .aqc-splash-name { font-size: 20px; font-weight: 700; letter-spacing: 0.02em; animation: aqc-fade 0.8s ease 0.35s both; }
+      .aqc-splash-name small { display: block; margin-top: 4px; text-align: center; font-size: 13px; font-weight: 500; opacity: 0.8; letter-spacing: 0.08em; text-transform: uppercase; }
+      .aqc-splash-dots { display: flex; gap: 8px; animation: aqc-fade 0.8s ease 0.6s both; }
+      .aqc-splash-dots i { width: 8px; height: 8px; border-radius: 50%; background: #FFFFFF; opacity: 0.4; animation: aqc-dot 1.2s ease-in-out infinite; }
+      .aqc-splash-dots i:nth-child(2) { animation-delay: 0.15s; }
+      .aqc-splash-dots i:nth-child(3) { animation-delay: 0.3s; }
+      @keyframes aqc-ring { 0% { transform: scale(0.55); opacity: 0; } 25% { opacity: 0.7; } 100% { transform: scale(1.25); opacity: 0; } }
+      @keyframes aqc-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+      @keyframes aqc-rise { from { opacity: 0; transform: translateY(14px) scale(0.85); } to { opacity: 1; transform: none; } }
+      @keyframes aqc-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -5px; } }
+      @keyframes aqc-sheen { 0% { background-position: 120% 0; } 60%, 100% { background-position: -20% 0; } }
+      @keyframes aqc-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+      @keyframes aqc-dot { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
+      @media (prefers-reduced-motion: reduce) {
+        #aqc-splash *, #aqc-splash *::before { animation: none !important; }
+        .aqc-splash-ring { display: none; }
+      }
+    </style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -39,6 +76,30 @@
     />
   </head>
   <body>
+    <div id="aqc-splash" role="status" aria-live="polite" aria-label="Loading Aflaah Quran Class">
+      <div class="aqc-splash-stage" aria-hidden="true">
+        <span class="aqc-splash-ring"></span><span class="aqc-splash-ring"></span><span class="aqc-splash-ring"></span>
+        <span class="aqc-splash-disc"></span>
+        <span class="aqc-splash-mark"></span>
+      </div>
+      <div class="aqc-splash-name">Aflaah Quran Class<small>Loading…</small></div>
+      <div class="aqc-splash-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+    </div>
+    <script>
+      // Fades the loading screen out once the app is ready. It stays at least
+      // ~0.9 s so the animation is seen instead of flashing, and never more
+      // than 15 s whatever happens.
+      window.__aqcHideSplash = function () {
+        var el = document.getElementById("aqc-splash");
+        if (!el || el.getAttribute("data-hiding")) return;
+        el.setAttribute("data-hiding", "1");
+        setTimeout(function () {
+          el.classList.add("aqc-splash-out");
+          setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 500);
+        }, Math.max(0, 900 - performance.now()));
+      };
+      setTimeout(window.__aqcHideSplash, 15000);
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
