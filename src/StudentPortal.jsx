@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Target, Presentation } from "lucide-react";
-import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI } from "./App.jsx";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Target, Presentation, Eye, EyeOff } from "lucide-react";
+import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
 import HifzTracker, { HIFZ_CSS, completedCounts, useHifz } from "./HifzTracker.jsx";
 import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
@@ -9,6 +9,7 @@ import { pageToUnit } from "./hifz/quran.js";
 import { TOTAL_AYAHS } from "./hifz/ayahs.js";
 import { maldivesToday } from "./dates.js";
 import { hideSplash } from "./splash.jsx";
+import AuthShell from "./AuthShell.jsx";
 import { StudentExams } from "./exams/ExamUI.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
@@ -158,9 +159,16 @@ export const studentLoginEmail = (id) => {
   return v.includes("@") ? v : `${v.toLowerCase()}@${STUDENT_LOGIN_DOMAIN}`;
 };
 
+const STUDENT_INTRO = {
+  portal: "Student Portal",
+  tagline: "Follow your Quran journey with your teacher, every day.",
+  features: ["Hifz and Thilawa tasks in the Madinah Mushaf", "Your progress, streaks and teacher's notes", "Attendance, fees and exam results"],
+};
+
 function StudentLogin({ error, onSignIn }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const submit = async (e) => {
     e.preventDefault();
@@ -169,20 +177,32 @@ function StudentLogin({ error, onSignIn }) {
     setBusy(false);
   };
   return (
-    <form className="sp-card sp-login" onSubmit={submit} aria-label="Student sign in">
-      <div className="sp-avatar sp-login-avatar"><StudentAvatarIcon /></div>
-      <h1>Student Portal</h1>
-      <p className="hz-muted">Sign in with your Student ID and password.</p>
-      <label className="sp-login-field"><ContactRound size={18} aria-hidden="true" />
-        <input className="hz-input" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false} placeholder="Student ID (e.g. AQC0001)" aria-label="Student ID" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </label>
-      <label className="sp-login-field"><Lock size={18} aria-hidden="true" />
-        <input className="hz-input" type="password" autoComplete="current-password" placeholder="Password" aria-label="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </label>
-      {error && <div className="hz-error" role="alert">{error}</div>}
-      <button className="hz-btn hz-btn-primary" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
-      <p className="hz-muted" style={{ fontSize: "13px" }}>Forgot your password? Contact the class admin for a new one-time password.</p>
-    </form>
+    <AuthShell {...STUDENT_INTRO} title="Welcome back" subtitle="Sign in with your Student ID and password.">
+      <form onSubmit={submit} aria-label="Student sign in">
+        <div className="login-field">
+          <label htmlFor="sp-login-id">Student ID</label>
+          <div className="login-input-wrap">
+            <ContactRound size={17} className="login-input-icon" aria-hidden="true" />
+            <input id="sp-login-id" className="login-input" type="text" autoComplete="username" autoCapitalize="characters" spellCheck={false} autoFocus
+              placeholder="e.g. AQC0001" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+        </div>
+        <div className="login-field">
+          <label htmlFor="sp-login-password">Password</label>
+          <div className="login-input-wrap">
+            <Lock size={17} className="login-input-icon" aria-hidden="true" />
+            <input id="sp-login-password" className="login-input" type={show ? "text" : "password"} autoComplete="current-password"
+              placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <button type="button" className="login-input-toggle" onClick={() => setShow((v) => !v)} aria-label={show ? "Hide password" : "Show password"}>
+              {show ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>
+          </div>
+        </div>
+        {error && <div className="login-error" role="alert">{error}</div>}
+        <button className="login-submit" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
+      </form>
+      <p className="auth-help">Forgot your password? Contact the class admin for a new one-time password.</p>
+    </AuthShell>
   );
 }
 
@@ -205,20 +225,30 @@ function SetPassword({ studentName, onDone, onCancel }) {
     onDone();
   };
   return (
-    <form className="sp-card sp-login" onSubmit={submit} aria-label="Set your password">
-      <div className="sp-avatar sp-login-avatar"><StudentAvatarIcon /></div>
-      <h1>Set your password</h1>
-      <p className="hz-muted">Assalaamu alaikum{studentName ? ` ${studentName}` : ""}! Choose your own password — you'll use it with your Student ID from now on.</p>
-      <label className="sp-login-field"><Lock size={18} aria-hidden="true" />
-        <input className="hz-input" type="password" autoComplete="new-password" placeholder="New password" aria-label="New password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </label>
-      <label className="sp-login-field"><Lock size={18} aria-hidden="true" />
-        <input className="hz-input" type="password" autoComplete="new-password" placeholder="Confirm new password" aria-label="Confirm new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
-      </label>
-      {error && <div className="hz-error" role="alert">{error}</div>}
-      <button className="hz-btn hz-btn-primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
-      <button className="hz-btn" type="button" onClick={onCancel}>Sign out</button>
-    </form>
+    <AuthShell {...STUDENT_INTRO} title="Set your password"
+      subtitle={`Assalaamu alaikum${studentName ? ` ${studentName}` : ""}! Choose your own password. You'll use it with your Student ID from now on.`}>
+      <form onSubmit={submit} aria-label="Set your password">
+        <div className="login-field">
+          <label htmlFor="sp-new-password">New password</label>
+          <div className="login-input-wrap">
+            <Lock size={17} className="login-input-icon" aria-hidden="true" />
+            <input id="sp-new-password" className="login-input" type="password" autoComplete="new-password" autoFocus placeholder="At least 8 characters"
+              value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+        </div>
+        <div className="login-field">
+          <label htmlFor="sp-confirm-password">Confirm new password</label>
+          <div className="login-input-wrap">
+            <Lock size={17} className="login-input-icon" aria-hidden="true" />
+            <input id="sp-confirm-password" className="login-input" type="password" autoComplete="new-password" placeholder="Type it again"
+              value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          </div>
+        </div>
+        {error && <div className="login-error" role="alert">{error}</div>}
+        <button className="login-submit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
+        <button className="login-secondary" type="button" onClick={onCancel}>Sign out</button>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -265,7 +295,9 @@ export default function StudentPortal() {
     try {
       const student = await loadStudentForUser(user.id);
       if (!student) {
-        await supabase.auth.signOut();
+        // This browser only: a teacher or admin opening the student address
+        // must not be signed out on their other devices.
+        await supabase.auth.signOut({ scope: "local" });
         setLoginError("This login isn't linked to a student yet. Ask the admin to link it.");
         setAuth({ status: "login" });
         return;
@@ -358,6 +390,12 @@ export default function StudentPortal() {
   ];
   const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
 
+  // Signing in uses the shared full-screen sign-in layout.
+  if (auth.status === "login") return <StudentLogin error={loginError} onSignIn={signIn} />;
+  if (auth.status === "set-password") {
+    return <SetPassword studentName={auth.student?.name} onDone={() => setAuth((a) => ({ ...a, status: "ready" }))} onCancel={() => supabase.auth.signOut()} />;
+  }
+
   return (
     <div className={`sp-page ${ready ? "sp-page-shell" : ""}`}>
       <style>{`
@@ -435,13 +473,6 @@ export default function StudentPortal() {
         .sp-hadith .sp-hadith-src { margin-top: 12px; font-weight: 700; }
 
         .sp-setup-btn { margin-top: 14px; width: 100%; }
-        .sp-login { max-width: 420px; width: 100%; margin: 8vh auto 0; padding: 28px 24px; display: flex; flex-direction: column; gap: 14px; text-align: center; box-sizing: border-box; }
-        .sp-login h1 { margin: 0; font-size: 26px; color: #0F2F8A; }
-        .sp-login p { margin: 0; }
-        .sp-login-avatar { margin: 0 auto; background: linear-gradient(135deg, #E4F1FC, #FFFFFF); width: 92px; }
-        .sp-login-field { position: relative; display: flex; align-items: center; }
-        .sp-login-field svg { position: absolute; left: 14px; color: #8FADC0; pointer-events: none; }
-        .sp-login-field .hz-input { padding-left: 42px; }
         ${HIFZ_CSS}
         ${thilawaCss()}
         .sp-switch { display: flex; gap: 6px; padding: 6px; border-radius: 16px; background: rgba(255,255,255,0.92); border: 1px solid #DCEBF8; box-shadow: 0 6px 18px rgba(18,59,103,0.06); }
@@ -535,16 +566,6 @@ export default function StudentPortal() {
         <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-bottom" alt="" aria-hidden="true" />
       </>}
       {auth.status === "loading" && <main className="sp-wrap"><div className="hz-card hz-muted">Loading…</div></main>}
-      {auth.status === "login" && <main className="sp-wrap"><StudentLogin error={loginError} onSignIn={signIn} /></main>}
-      {auth.status === "set-password" && (
-        <main className="sp-wrap">
-          <SetPassword
-            studentName={auth.student?.name}
-            onDone={() => setAuth((a) => ({ ...a, status: "ready" }))}
-            onCancel={() => supabase.auth.signOut()}
-          />
-        </main>
-      )}
       {ready && (
       <div className="tp-shell sp-shell">
         <style>{TP_SHARED_STYLES}</style>
@@ -564,8 +585,7 @@ export default function StudentPortal() {
         <div className={`tp-sidebar-wrap ${navOpen ? "tp-sidebar-wrap-open" : ""}`}>
           <nav className="tp-sidebar" aria-label="Student portal navigation">
             <img src={PATTERN_ON_BLUE_URL} className="tp-sidebar-pattern" alt="" aria-hidden="true" />
-            <div className="tp-sidebar-logo"><img src={LOGO_WHITE_DATA_URI} alt="" /></div>
-            <div className="tp-sidebar-brand">Aflaah Quran Class</div>
+            <div className="tp-sidebar-logo"><img src={TP_LOGO_FULL_WHITE_URL} alt="Aflaah Quran Class" /></div>
             <div className="tp-sidebar-role">Student Portal</div>
             <div className="tp-avatar-row">
               <span className="tp-avatar" aria-hidden="true"><StudentAvatarIcon size={30} /></span>

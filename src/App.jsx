@@ -18,6 +18,7 @@ import { usePendingInfoCount } from "./registrations/InfoUpdatesAdmin.jsx";
 import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
 import { ProgramPicker, hasProgram } from "./thilawa/programs.jsx";
 import { hideSplash, LogoLoader } from "./splash.jsx";
+import AuthShell from "./AuthShell.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
 const TeacherThilawa = lazy(() => import("./thilawa/ThilawaTeacher.jsx").then((m) => ({ default: m.TeacherThilawa })));
 const TeacherHifz = lazy(() => import("./hifz/HifzTeacher.jsx").then((m) => ({ default: m.TeacherHifz })));
@@ -27,27 +28,6 @@ export const LOGO_WHITE_DATA_URI = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg
 
 // Palette + background pattern for the sign-in screen only (kept separate from
 // the `C` palette below, which drives the rest of the app's inner screens).
-const LOGIN = {
-  bg: "#EFF8FF",
-  primary: "#2D87C8",
-  primaryDark: "#256FA8",
-  accent: "#74C0E8",
-  text: "#173B57",
-  white: "#FFFFFF",
-  gold: "#C89B43",
-  gradStart: "#2A4B8D",
-  gradEnd: "#22B8C4",
-};
-
-// Full-bleed background photo/illustration for the sign-in screen — a finished
-// asset (not CSS-generated), served from /public/images/.
-const LOGIN_BACKGROUND_URL = "/images/aflaah-login-background.jpg";
-
-// Sign-in screen logo icon only (cropped from the client-supplied brand
-// graphic). Kept separate from LOGO_DATA_URI, which stays wired to PDF/report
-// generation elsewhere in the app and shouldn't change with this.
-const LOGIN_LOGO_ICON_URL = "/images/logo-icon-only.png";
-
 // Palette for the redesigned Teacher Portal shell (sidebar + "My timetable"
 // page). Kept separate from `C` so the rest of the teacher portal (Attendance,
 // Class records) is unaffected.
@@ -87,6 +67,8 @@ function classBadgeStyle(code) {
 // /public/images/. Rendered once in TeacherPortalLayout so they appear
 // consistently behind every teacher-portal page without duplication.
 export const TP_PATTERN_SIDEBAR_URL = "/images/tp-pattern-sidebar.png";
+// The official logo with its wordmark, white (also logo-full-color / -black.png).
+export const TP_LOGO_FULL_WHITE_URL = "/images/logo-full-white.png";
 export const TP_PATTERN_MAIN_URL = "/images/tp-pattern-main.png";
 
 // Shared CSS for the Teacher Portal and Admin Portal shells (sidebar,
@@ -117,7 +99,7 @@ export const TP_SHARED_STYLES = `
           .tp-page-pattern { width: 200px; }
         }
         .tp-sidebar-logo { display: flex; justify-content: center; margin-bottom: 8px; position: relative; z-index: 1; }
-        .tp-sidebar-logo img { height: 52px; width: auto; display: block; }
+        .tp-sidebar-logo img { width: 150px; height: auto; display: block; }
         .tp-sidebar-brand { position: relative; z-index: 1; text-align: center; font-size: 19px; font-weight: 700; line-height: 1.25; }
         .tp-sidebar-role {
           position: relative; z-index: 1; text-align: center; font-size: 13px; color: rgba(255,255,255,0.78);
@@ -571,192 +553,121 @@ function LoginScreen({
   forgotPasswordStatus,
 }) {
   const segments = [
-    { key: "teacher", label: "Teachers Portal", renderIcon: () => <BookOpen size={44} aria-hidden="true" /> },
-    {
-      key: "admin",
-      label: "Admin Portal",
-      renderIcon: () => (
-        <span className="login-segment-icon-shield">
-          <Shield size={44} aria-hidden="true" />
-          <KeyRound size={44} aria-hidden="true" />
-        </span>
-      ),
-    },
+    { key: "teacher", label: "Teachers Portal", Icon: BookOpen },
+    { key: "admin", label: "Admin Portal", Icon: Shield },
   ].filter((s) => !PORTAL || s.key === PORTAL);
+  const single = segments.length === 1 ? segments[0] : null;
+  const intro = {
+    teacher: {
+      tagline: "Plan and follow each student's Quran journey, all in one place.",
+      features: ["Your timetable and attendance", "Hifz and Thilawa plans for every student", "Exams, reports and notifications"],
+    },
+    admin: {
+      tagline: "Run the class: students, teachers, fees and more.",
+      features: ["Students, teachers and classes", "Fees, payments and finance", "Registrations, exams and notifications"],
+    },
+  };
+  const info = single ? intro[single.key] : { tagline: "Sign in to the Teachers Portal or the Admin Portal.", features: [...intro.teacher.features.slice(0, 2), intro.admin.features[1]] };
 
   // Focus ring is driven by explicit state (not just the :focus pseudo-class)
   // so it's guaranteed visible and testable across environments.
   const [focusedField, setFocusedField] = useState(null); // "email" | "password" | null
 
   return (
-    <div className="login-page">
-      <style>{`
-        body { margin: 0; }
-        .login-page { position: relative; min-height: 100vh; min-height: 100dvh; background-color: ${LOGIN.bg}; background-image: url("${LOGIN_BACKGROUND_URL}"); background-size: cover; background-position: center; background-repeat: no-repeat; display: flex; align-items: center; justify-content: center; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; color: ${LOGIN.text}; }
-        .login-card { position: relative; width: min(460px, calc(100vw - 32px)); box-sizing: border-box; background: transparent; border: none; border-radius: 0; padding: 40px 8px; box-shadow: none; }
-        .login-card-logo { display: flex; flex-direction: column; align-items: center; text-align: center; margin-bottom: 26px; }
-        .login-card-logo img { width: clamp(84px, 8vw, 100px); height: auto; display: block; margin-bottom: 14px; }
-        .login-card-brand-name { font-size: clamp(24px, 2.4vw, 30px); font-weight: 600; color: ${LOGIN.text}; line-height: 1.25; }
-        .login-card-sub { font-size: clamp(17px, 1.4vw, 20px); color: #5A7C93; text-align: center; margin-bottom: 28px; }
-        .login-segment { display: flex; border: 1px solid #DCEEFA; border-radius: 16px; overflow: hidden; margin-bottom: 28px; height: clamp(100px, 10vw, 118px); background: ${LOGIN.white}; }
-        .login-segment-btn { flex: 1 1 0%; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 6px 4px; border: none; border-right: 1px solid #E3F0FA; background: transparent; color: #5A8CB8; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; }
-        .login-segment-btn:last-child { border-right: none; }
-        .login-segment-btn:hover { background: rgba(45,135,200,0.06); }
-        .login-segment-btn:active { transform: scale(0.98); }
-        .login-segment-btn:focus-visible { outline: 2px solid ${LOGIN.primary}; outline-offset: -3px; }
-        .login-segment-btn-active { background: #EAF4FB; color: ${LOGIN.primary}; box-shadow: inset 0 0 0 2px ${LOGIN.primary}; border-radius: 14px; }
-        .login-segment-btn svg { width: clamp(28px, 4.2vw, 44px); height: clamp(28px, 4.2vw, 44px); }
-        .login-segment-icon-shield { position: relative; width: clamp(28px, 4.2vw, 44px); height: clamp(28px, 4.2vw, 44px); display: inline-flex; align-items: center; justify-content: center; }
-        .login-segment-icon-shield svg { position: absolute; }
-        .login-segment-icon-shield svg:last-child { width: 46% !important; height: 46% !important; transform: rotate(-45deg); }
-        .login-segment-label { font-size: clamp(12px, 1.3vw, 16px); font-weight: 600; color: ${LOGIN.text}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-        .login-field { margin-bottom: 18px; }
-        .login-field label { display: block; font-size: 14px; font-weight: 600; color: ${LOGIN.text}; margin-bottom: 8px; }
-        .login-input-wrap { position: relative; display: flex; align-items: center; }
-        .login-input-wrap svg.login-input-icon { position: absolute; left: 16px; color: #8FADC0; pointer-events: none; }
-        .login-input { width: 100%; box-sizing: border-box; height: 54px; border: 1px solid #C4DCEC; border-radius: 11px; padding: 0 44px; font-size: 16px; background: ${LOGIN.white}; color: ${LOGIN.text}; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-        .login-input:hover { border-color: ${LOGIN.accent}; }
-        .login-input:focus, .login-input-focused { outline: none; border-color: ${LOGIN.primary}; box-shadow: 0 0 0 3px rgba(45,135,200,0.16); }
-        .login-input-toggle { position: absolute; right: 12px; background: none; border: none; padding: 6px; display: flex; color: #8FADC0; cursor: pointer; border-radius: 6px; }
-        .login-input-toggle:hover { color: ${LOGIN.primary}; }
-        .login-input-toggle:focus-visible { outline: 2px solid ${LOGIN.primary}; outline-offset: 1px; }
-        .login-row-between { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; font-size: 14px; flex-wrap: wrap; gap: 10px; }
-        .login-remember { display: flex; align-items: center; gap: 9px; color: #43617A; cursor: pointer; }
-        .login-remember input { width: 17px; height: 17px; accent-color: ${LOGIN.primary}; cursor: pointer; }
-        .login-forgot { background: none; border: none; padding: 0; color: ${LOGIN.primary}; font-size: 14px; font-weight: 600; cursor: pointer; }
-        .login-forgot:hover { text-decoration: underline; }
-        .login-forgot:focus-visible { outline: 2px solid ${LOGIN.primary}; outline-offset: 2px; }
-        .login-error { font-size: 14px; color: #B5432E; margin: -6px 0 16px; }
-        .login-status { font-size: 14px; color: ${LOGIN.primaryDark}; margin: -6px 0 16px; }
-        .login-submit { width: 100%; border: none; border-radius: 12px; height: 64px; font-size: 19px; font-weight: 700; color: ${LOGIN.white}; background: linear-gradient(90deg, ${LOGIN.gradStart}, ${LOGIN.gradEnd}); cursor: pointer; box-shadow: 0 10px 24px rgba(34,184,196,0.28); transition: filter 0.15s ease, transform 0.1s ease; }
-        .login-submit:hover { filter: brightness(1.06); }
-        .login-submit:active { transform: scale(0.99); }
-        .login-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-        .login-submit:focus-visible { outline: 3px solid ${LOGIN.accent}; outline-offset: 2px; }
-        @media (max-width: 480px) {
-          .login-page { background-position: center top; }
-          .login-card { width: calc(100vw - 24px); padding: 24px; border-radius: 18px; }
-          .login-card-logo { margin-bottom: 20px; }
-          .login-card-sub { margin-bottom: 22px; }
-          .login-segment { height: clamp(88px, 24vw, 104px); margin-bottom: 22px; }
-        }
-        /* Short viewports (laptops, browser chrome eating into height): shrink
-           vertical rhythm so the card fits without page scroll. Sized off vh
-           (not vw) so it responds to height regardless of how wide the window
-           is. Independent of the width breakpoints above, can combine with them. */
-        @media (max-height: 820px) {
-          .login-page { padding: 6px 0; align-items: flex-start; }
-          .login-card { padding-top: 14px; padding-bottom: 14px; margin: auto 0; }
-          .login-card-logo { margin-bottom: 6px; }
-          .login-card-logo img { width: clamp(36px, 8vh, 60px); margin-bottom: 4px; }
-          .login-card-brand-name { font-size: clamp(16px, 2.6vh, 22px); }
-          .login-card-sub { font-size: clamp(11px, 1.8vh, 15px); margin-bottom: 6px; }
-          .login-segment { height: clamp(50px, 9vh, 80px); margin-bottom: 6px; }
-          .login-segment-btn svg, .login-segment-icon-shield { width: clamp(16px, 3.4vh, 28px); height: clamp(16px, 3.4vh, 28px); }
-          .login-segment-label { font-size: clamp(9px, 1.4vh, 12px); }
-          .login-field { margin-bottom: 6px; }
-          .login-field label { margin-bottom: 2px; font-size: 12px; }
-          .login-input { height: clamp(32px, 5.6vh, 44px); }
-          .login-row-between { margin-bottom: 6px; font-size: 12px; }
-          .login-submit { height: clamp(38px, 6vh, 48px); font-size: clamp(14px, 1.8vh, 16px); }
-        }
-      `}</style>
-      <div className="login-card">
-        <div className="login-card-logo">
-          <img src={LOGIN_LOGO_ICON_URL} alt="Aflaah Quran Class logo" />
-          <div className="login-card-brand-name">Aflaah Quran Class</div>
+    <AuthShell
+      portal={single ? single.label : "Staff Portal"}
+      tagline={info.tagline}
+      features={info.features}
+      title="Welcome back"
+      subtitle={single ? `Sign in to the ${single.label} with your email and password.` : "Choose your portal and sign in."}
+    >
+      {segments.length > 1 && (
+        <div className="login-segment" role="group" aria-label="Portal">
+          {segments.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={accountType === key}
+              className={`login-segment-btn ${accountType === key ? "login-segment-btn-active" : ""}`}
+              onClick={() => onAccountTypeChange(key)}
+            >
+              <Icon aria-hidden="true" />
+              {label}
+            </button>
+          ))}
         </div>
+      )}
 
-        <div className="login-card-sub">{segments.length === 1 ? `Sign in to the ${segments[0].label}` : "Sign in to continue"}</div>
-
-        {segments.length > 1 && (
-          <div className="login-segment" role="group" aria-label="Portal">
-            {segments.map(({ key, label, renderIcon }) => (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={accountType === key}
-                className={`login-segment-btn ${accountType === key ? "login-segment-btn-active" : ""}`}
-                onClick={() => onAccountTypeChange(key)}
-              >
-                {renderIcon()}
-                <span className="login-segment-label">{label}</span>
-              </button>
-            ))}
+      <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+        <div className="login-field">
+          <label htmlFor="login-email">Email address</label>
+          <div className="login-input-wrap">
+            <Mail size={17} className="login-input-icon" aria-hidden="true" />
+            <input
+              id="login-email"
+              className={`login-input ${focusedField === "email" ? "login-input-focused" : ""}`}
+              type="email"
+              autoComplete="email"
+              autoFocus
+              value={fields.email}
+              onChange={(e) => fields.setEmail(e.target.value)}
+              onFocus={() => setFocusedField("email")}
+              onBlur={() => setFocusedField((f) => (f === "email" ? null : f))}
+              placeholder="you@example.com"
+            />
           </div>
-        )}
-
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-          <div className="login-field">
-            <label htmlFor="login-email">Email address</label>
-            <div className="login-input-wrap">
-              <Mail size={17} className="login-input-icon" aria-hidden="true" />
-              <input
-                id="login-email"
-                className={`login-input ${focusedField === "email" ? "login-input-focused" : ""}`}
-                type="email"
-                autoComplete="email"
-                autoFocus
-                value={fields.email}
-                onChange={(e) => fields.setEmail(e.target.value)}
-                onFocus={() => setFocusedField("email")}
-                onBlur={() => setFocusedField((f) => (f === "email" ? null : f))}
-                placeholder="you@example.com"
-              />
-            </div>
-          </div>
-          <div className="login-field">
-            <label htmlFor="login-password">Password</label>
-            <div className="login-input-wrap">
-              <Lock size={17} className="login-input-icon" aria-hidden="true" />
-              <input
-                id="login-password"
-                className={`login-input ${focusedField === "password" ? "login-input-focused" : ""}`}
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={fields.password}
-                onChange={(e) => fields.setPassword(e.target.value)}
-                onFocus={() => setFocusedField("password")}
-                onBlur={() => setFocusedField((f) => (f === "password" ? null : f))}
-                placeholder="Enter your password"
-              />
-              <button
-                type="button"
-                className="login-input-toggle"
-                onClick={onToggleShowPassword}
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
-              </button>
-            </div>
-          </div>
-
-          <div className="login-row-between">
-            <label className="login-remember">
-              <input
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => onToggleRememberMe(e.target.checked)}
-              />
-              Remember me
-            </label>
-            <button type="button" className="login-forgot" onClick={onForgotPassword}>
-              Forgot password?
+        </div>
+        <div className="login-field">
+          <label htmlFor="login-password">Password</label>
+          <div className="login-input-wrap">
+            <Lock size={17} className="login-input-icon" aria-hidden="true" />
+            <input
+              id="login-password"
+              className={`login-input ${focusedField === "password" ? "login-input-focused" : ""}`}
+              type={showPassword ? "text" : "password"}
+              autoComplete="current-password"
+              value={fields.password}
+              onChange={(e) => fields.setPassword(e.target.value)}
+              onFocus={() => setFocusedField("password")}
+              onBlur={() => setFocusedField((f) => (f === "password" ? null : f))}
+              placeholder="Enter your password"
+            />
+            <button
+              type="button"
+              className="login-input-toggle"
+              onClick={onToggleShowPassword}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
             </button>
           </div>
+        </div>
 
-          {fields.error ? (
-            <div className="login-error">{fields.error}</div>
-          ) : forgotPasswordStatus ? (
-            <div className="login-status">{forgotPasswordStatus}</div>
-          ) : null}
-
-          <button type="submit" className="login-submit" disabled={fields.loading}>
-            {fields.loading ? "Signing in…" : "Sign in"}
+        <div className="login-row-between">
+          <label className="login-remember">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => onToggleRememberMe(e.target.checked)}
+            />
+            Remember me
+          </label>
+          <button type="button" className="login-forgot" onClick={onForgotPassword}>
+            Forgot password?
           </button>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        {fields.error ? (
+          <div className="login-error" role="alert">{fields.error}</div>
+        ) : forgotPasswordStatus ? (
+          <div className="login-status" role="status">{forgotPasswordStatus}</div>
+        ) : null}
+
+        <button type="submit" className="login-submit" disabled={fields.loading}>
+          {fields.loading ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -777,8 +688,7 @@ function TeacherPortalLayout({ activeSection, navItems, teacherDisplayName, onLo
   const sidebar = (
     <nav className="tp-sidebar" aria-label="Teacher portal navigation">
       <img src={TP_PATTERN_SIDEBAR_URL} className="tp-sidebar-pattern" alt="" aria-hidden="true" />
-      <div className="tp-sidebar-logo"><img src={LOGO_WHITE_DATA_URI} alt="" /></div>
-      <div className="tp-sidebar-brand">Aflaah Quran Class</div>
+      <div className="tp-sidebar-logo"><img src={TP_LOGO_FULL_WHITE_URL} alt="Aflaah Quran Class" /></div>
       <div className="tp-sidebar-role">Teacher Portal</div>
       <div className="tp-avatar-row">
         <span className="tp-avatar" aria-hidden="true"><GraduationCap size={24} /></span>
@@ -858,8 +768,7 @@ function AdminPortalLayout({ activeSection, navItems, portalLabel, displayName, 
   const sidebar = (
     <nav className="tp-sidebar" aria-label="Admin portal navigation">
       <img src={TP_PATTERN_SIDEBAR_URL} className="tp-sidebar-pattern" alt="" aria-hidden="true" />
-      <div className="tp-sidebar-logo"><img src={LOGO_WHITE_DATA_URI} alt="" /></div>
-      <div className="tp-sidebar-brand">Aflaah Quran Class</div>
+      <div className="tp-sidebar-logo"><img src={TP_LOGO_FULL_WHITE_URL} alt="Aflaah Quran Class" /></div>
       <div className="tp-sidebar-role">{portalLabel}</div>
       <div className="tp-avatar-row">
         <span className="tp-avatar" aria-hidden="true"><Shield size={22} /></span>
@@ -1035,11 +944,14 @@ export default function App() {
 
   // After a successful sign-in (fresh login or restored session), figure out
   // whether this user is an admin or a teacher and route them accordingly.
+  // Sign-ins that land on the wrong portal (or an unlinked account) are signed
+  // out of this browser only ({ scope: "local" }): Supabase's default signs the
+  // account out on every device.
   const routeSignedInUser = async (userId) => {
     const { data: profile, error: profileErr } = await supabase
       .from("profiles").select("role").eq("id", userId).maybeSingle();
     if (profileErr || !profile) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       setAdminLoginError("Couldn't load this account's role. Contact the admin.");
       setLoginError("Couldn't load this account's role. Contact the admin.");
       setAuthView("login");
@@ -1047,7 +959,7 @@ export default function App() {
     }
     if (profile.role === "admin") {
       if (PORTAL === "teacher") {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         setLoginError("This is the teachers' login. Admins sign in at the admin address.");
         setAuthView("login");
         return;
@@ -1059,7 +971,7 @@ export default function App() {
       .from("teachers").select("id").eq("user_id", userId).maybeSingle();
     if (teacherRow) {
       if (PORTAL === "admin") {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         setAdminLoginError("This is the admin login. Teachers sign in at the teachers' address.");
         setAuthView("login");
         return;
@@ -1067,7 +979,7 @@ export default function App() {
       setRole("teacher"); setLoggedInTeacherId(teacherRow.id); setAuthView("app"); setSection("timetable");
       return;
     }
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     setLoginError("This login isn't linked to a teacher record yet. Ask the admin to link it.");
     setAdminLoginError("This account isn't an admin account.");
     setAccountType(PORTAL || "teacher");
@@ -1094,7 +1006,7 @@ export default function App() {
       setAdminLoginLoading(false);
       return;
     }
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     setAdminLoginError("This account isn't an admin account.");
     setAdminLoginLoading(false);
   };
@@ -1112,7 +1024,7 @@ export default function App() {
     }
     const { data: teacherRow } = await supabase.from("teachers").select("id").eq("user_id", data.user.id).maybeSingle();
     if (!teacherRow) {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       setLoginError("This login isn't linked to a teacher record yet. Ask the admin to link it under Teachers.");
       setTeacherLoginLoading(false);
       return;
