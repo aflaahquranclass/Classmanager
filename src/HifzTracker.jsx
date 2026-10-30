@@ -1,25 +1,36 @@
-import { useState, useEffect, useCallback } from "react";
-import { BookOpenText, RotateCw, History, Flame, CalendarDays, CheckCircle2, Clock, Pencil, ChevronLeft, ChevronRight, AlertTriangle, ArrowRight, X } from "lucide-react";
-import { TP } from "./App.jsx";
-import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, juzOfPage, surahsOnPages, describeRange, describeUnit, describeAmount } from "./hifz/quran.js";
-import { NEW_TARGET_OPTIONS, SHORT_TARGET_OPTIONS, unitsOf, intersect, subtract, toSet, goalCheck, validateSettings, localDate } from "./hifz/engine.js";
-import { loadTracker, recordProgress, saveSettings, previewSettingsChange } from "./hifz/service.js";
-import { describeAyahRange, nearestAyahs } from "./hifz/ayahs.js";
+// Student portal: Hifz Tracker. The teacher plans the Hifz — New Hifz,
+// Short and Long Muraja'ah portions for each day — and the student reads each
+// one in the Madinah Mushaf, sees the mistakes the teacher highlighted, and
+// ticks it done. Progress, streaks and revision come from the ticked tasks
+// (see hifz/tasks.js). Updates from the teacher arrive live.
+//
+// HIFZ_CSS and PositionPicker are shared with the teacher's screens.
 
-const ACTIVITY_INFO = {
-  new: { title: "New Hifz", Icon: BookOpenText },
-  short: { title: "Short Muraja'ah", Icon: RotateCw },
-  long: { title: "Long Muraja'ah", Icon: History },
+import { useState, useEffect, useCallback } from "react";
+import { BookOpenText, RotateCw, History, Flame, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock } from "lucide-react";
+import { TP } from "./App.jsx";
+import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
+import { unitsOf, intersect } from "./hifz/engine.js";
+import { describeAyahRange, nearestAyahs } from "./hifz/ayahs.js";
+import { ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask } from "./hifz/tasks.js";
+import { loadHifz } from "./hifz/taskService.js";
+import MushafPage from "./thilawa/MushafPage.jsx";
+
+export const ACTIVITY_INFO = {
+  new: { title: ACTIVITY_TITLES.new, Icon: BookOpenText },
+  short: { title: ACTIVITY_TITLES.short, Icon: RotateCw },
+  long: { title: ACTIVITY_TITLES.long, Icon: History },
 };
 
-const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-const surahEndPage = (i) => (i + 1 < SURAHS.length ? Math.max(SURAHS[i].startPage, SURAHS[i + 1].startPage - 1) : TOTAL_PAGES);
+export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+export const fmtDay = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+export const surahEndPage = (i) => (i + 1 < SURAHS.length ? Math.max(SURAHS[i].startPage, SURAHS[i + 1].startPage - 1) : TOTAL_PAGES);
 const pagesOfSurah = (num) => {
   const i = num - 1;
   return Array.from({ length: surahEndPage(i) - SURAHS[i].startPage + 1 }, (_, k) => SURAHS[i].startPage + k);
 };
 // Surahs in a range, from the ayah data (accurate even when a surah starts mid-page).
-const surahNames = (range) => {
+export const surahNames = (range) => {
   const { first, last } = nearestAyahs(range);
   return SURAHS.slice(first.surah - 1, last.surah).map((x) => x.name).join(", ");
 };
@@ -167,11 +178,37 @@ export const HIFZ_CSS = `
     .hz-card { padding: 16px; }
     .hz-kv { grid-template-columns: 1fr 1fr; }
   }
+  /* ---------- teacher-planned tasks ---------- */
+  .hz-sub { margin: 18px 0 10px; font-size: 14px; font-weight: 700; color: #7A5410; display: flex; align-items: center; gap: 8px; }
+  .hz-task-notes { font-size: 14px; color: ${TP.navy}; background: #F3F8FD; border-radius: 10px; padding: 8px 10px; white-space: pre-wrap; }
+  .hz-task-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; }
+  .hz-task-actions .hz-btn { flex: 1 1 auto; }
+  .hz-mistake-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #9B1C0A; background: #FBEAE6; border-radius: 999px; padding: 3px 10px; }
+  .hz-task-open { box-shadow: 0 0 0 2px ${TP.blue}; }
+  .hz-reader { display: flex; flex-direction: column; gap: 12px; }
+  .hz-reader-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .hz-reader-title { flex: 1; min-width: 0; text-align: center; font-weight: 700; color: ${TP.navy}; font-size: 15px; }
+  .hz-reader-title small { display: block; font-weight: 400; color: ${TP.secondaryText}; font-size: 13px; }
+  .hz-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: ${TP.secondaryText}; }
+  .hz-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
+  .hz-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .hz-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #F7FAFD; border: 1px solid #E1EDF8; border-radius: 12px; padding: 10px 12px; font-size: 14px; color: ${TP.navy}; }
+  .hz-list li > div { flex: 1; min-width: 160px; }
+  .hz-list small { display: block; color: ${TP.secondaryText}; font-size: 12px; margin-top: 2px; }
+  .hz-ar { font-family: "UthmanicHafs", serif; font-size: 24px; line-height: 1.5; color: #9B1C0A; direction: rtl; }
+  .hz-date { font-weight: 700; color: ${TP.navy}; min-width: 92px; }
+  @font-face { font-family: "UthmanicHafs"; src: url("/fonts/UthmanicHafs1Ver18.woff2") format("woff2"); font-display: swap; }
+  @media (max-width: 520px) {
+    .hz-reader-card { padding: 12px 6px; }
+    .hz-reader-card > .hz-row, .hz-reader-card > .hz-legend, .hz-reader-card > .hz-task-notes { margin-left: 8px; margin-right: 8px; }
+    .hz-reader .mp-page { padding: 4% 2.5% 2%; border-radius: 10px; }
+    .hz-reader-nav .hz-btn span { display: none; }
+  }
 `;
 
 // ---------- position picker (Surah → page → line) ----------
 
-function PositionPicker({ label, unit, onChange, allowLine = true, minPage = 1, maxPage = TOTAL_PAGES }) {
+export function PositionPicker({ label, unit, onChange, allowLine = true, minPage = 1, maxPage = TOTAL_PAGES }) {
   const page = unitToPage(Math.min(unit, TOTAL_UNITS - 1));
   const line = Math.floor((unit % UNITS_PER_PAGE) / UNITS_PER_LINE) + 1;
   const surah = surahsOnPages(page, page).pop() || SURAHS[0];
@@ -198,352 +235,226 @@ function PositionPicker({ label, unit, onChange, allowLine = true, minPage = 1, 
   );
 }
 
-// ---------- setup / edit wizard ----------
+// ---------- shared task pieces ----------
 
-const PATHS = {
-  baqarah: { label: "Surah Al-Baqarah", hint: "Front to back, page 2 onward", direction: "forward", startUnit: pageToUnit(2) },
-  naba: { label: "Surah An-Naba (Juz Amma)", hint: "Juz 30 first, then Juz 29, 28 …", direction: "juz_reverse", startUnit: pageToUnit(582) },
-};
-
-function defaultSettings(today) {
-  return {
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    goalYear: +today.slice(0, 4) + 5,
-    startUnit: PATHS.baqarah.startUnit,
-    direction: "forward",
-    currentUnit: PATHS.baqarah.startUnit,
-    extraMemorized: [],
-    newTarget: UNITS_PER_PAGE,
-    shortTarget: UNITS_PER_PAGE,
-    longTarget: 2 * UNITS_PER_PAGE,
-    longStartUnit: pageToUnit(1),
-  };
-}
-
-export function SetupWizard({ repo, initial, onDone, onCancel }) {
-  const today = localDate(new Date(), initial?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC");
-  const [s, setS] = useState(() => initial || defaultSettings(today));
-  const [step, setStep] = useState(0);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [confirmNotes, setConfirmNotes] = useState(null);
-  const set = (patch) => setS((prev) => ({ ...prev, ...patch }));
-  const pathKey = s.direction === "juz_reverse" ? "naba" : "baqarah";
-  const check = goalCheck(s, today);
-  const extraJuz = new Set(JUZ_START_PAGES.map((_, i) => i + 1).filter((j) => unitsOf(intersect([[juzStartUnit(j), juzEndUnit(j)]], s.extraMemorized)) === juzEndUnit(j) - juzStartUnit(j)));
-  const steps = ["Goal", "Start", "New Hifz", "Short", "Long"];
-  const thisYear = +today.slice(0, 4);
-
-  const toggleJuz = (j) => {
-    const r = [juzStartUnit(j), juzEndUnit(j)];
-    set({ extraMemorized: extraJuz.has(j) ? subtract(toSet(s.extraMemorized), [r]) : toSet([...s.extraMemorized, r]) });
-  };
-
-  const finish = async (confirmed = false) => {
-    const errors = validateSettings(s, today);
-    if (errors.length) { setError(errors.join(" ")); return; }
-    setError("");
-    if (initial && !confirmed) {
-      const notes = await previewSettingsChange(repo, s);
-      if (notes.length) { setConfirmNotes(notes); return; }
-    }
-    setSaving(true);
-    try {
-      await saveSettings(repo, s);
-      onDone();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setSaving(false);
-      setConfirmNotes(null);
-    }
-  };
-
+// "p. 45 – 46 · Al-Baqarah · Ayah 197 – 210"
+export function PortionText({ task }) {
+  const r = [task.start, task.end];
   return (
-    <section className="hz-card" aria-label={initial ? "Edit Hifz plan" : "Set up Hifz Tracker"}>
-      <div className="hz-row" style={{ marginBottom: 12 }}>
-        <h2 className="hz-h2" style={{ margin: 0 }}><BookOpenText size={22} aria-hidden="true" />{initial ? "Edit Hifz Plan" : "Set up your Hifz plan"}</h2>
-        {onCancel && <button className="hz-btn hz-btn-ghost" onClick={onCancel} aria-label="Close"><X size={18} aria-hidden="true" /></button>}
-      </div>
-      <div className="hz-wiz-steps" aria-label={`Step ${step + 1} of ${steps.length}: ${steps[step]}`}>
-        {steps.map((name, i) => <span key={name} className={i <= step ? "on" : ""} />)}
-      </div>
-
-      <div key={step} className="hz-wiz-body">
-      {step === 0 && (
-        <>
-          <p className="hz-q">By which year do you want to complete memorizing the Quran?</p>
-          <div className="hz-chips" style={{ marginTop: 14 }}>
-            {Array.from({ length: 16 }, (_, i) => thisYear + i).map((y) => (
-              <button key={y} className="hz-chip" style={{ minWidth: 72 }} aria-pressed={s.goalYear === y} onClick={() => set({ goalYear: y })}>{y}</button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {step === 1 && (
-        <>
-          <p className="hz-q">Where have you started your Hifz?</p>
-          <div className="hz-options">
-            {Object.entries(PATHS).map(([key, p]) => (
-              <button key={key} className="hz-option" aria-pressed={pathKey === key}
-                onClick={() => set({ direction: p.direction, startUnit: p.startUnit, currentUnit: p.startUnit })}>
-                {p.label}<small>{p.hint}</small>
-              </button>
-            ))}
-          </div>
-          <PositionPicker label="Exact starting point" unit={s.startUnit} allowLine={false}
-            minPage={pathKey === "naba" ? 1 : 2}
-            onChange={(u) => set({ startUnit: u, currentUnit: u })} />
-          <PositionPicker label="Where you are now (the next portion you'll memorize)" unit={s.currentUnit}
-            onChange={(u) => set({ currentUnit: u })} />
-          <p className="hz-muted" style={{ marginTop: 8 }}>
-            Everything from your starting point up to here counts as already memorized. {pathKey === "naba" ? "After Juz 30 you continue with Juz 29, then 28, and so on." : "You continue page by page towards the end of the Mushaf."}
-          </p>
-        </>
-      )}
-
-      {step === 2 && (
-        <>
-          <p className="hz-q">How much Quran can you memorize per day?</p>
-          <div className="hz-options">
-            {NEW_TARGET_OPTIONS.map((o) => (
-              <button key={o.units} className="hz-option" aria-pressed={s.newTarget === o.units} onClick={() => set({ newTarget: o.units })}>{o.label}</button>
-            ))}
-          </div>
-          <p className="hz-muted" style={{ marginTop: 12 }}>This is your daily maximum. If you fall behind, unfinished work comes first and the rest of the plan moves later. Your daily amount never grows.</p>
-          <div className="hz-kv">
-            <div><span>Estimated completion</span><strong>{fmtDate(check.estimatedDate)}</strong></div>
-            <div><span>Your goal</span><strong>End of {s.goalYear}</strong></div>
-          </div>
-          {!check.onTrack && (
-            <div className="hz-note"><AlertTriangle size={18} aria-hidden="true" />
-              <span>At this pace you'd finish after {s.goalYear}. {check.recommended ? `To reach your goal, about ${check.recommended.label} a day would work.` : "Reaching that year would need more than 2 pages a day. You could pick a later year."} You can keep your choice.</span>
-            </div>
-          )}
-        </>
-      )}
-
-      {step === 3 && (
-        <>
-          <p className="hz-q">How many pages can you revise daily for Short Muraja'ah?</p>
-          <div className="hz-options">
-            {SHORT_TARGET_OPTIONS.map((o) => (
-              <button key={o.units} className="hz-option" aria-pressed={s.shortTarget === o.units} onClick={() => set({ shortTarget: o.units })}>{o.label}</button>
-            ))}
-          </div>
-          <p className="hz-muted" style={{ marginTop: 12 }}>Each day you revise your most recently memorized pages, up to this amount. As you memorize new pages, they join this revision and older ones drop off. Long Muraja'ah goes through everything you've memorized over a longer cycle.</p>
-        </>
-      )}
-
-      {step === 4 && (
-        <>
-          <p className="hz-q">Where would you like to start your Long Muraja'ah?</p>
-          <div className="hz-field">
-            <span>Juz</span>
-            <select className="hz-select" value={juzOfPage(unitToPage(s.longStartUnit))} onChange={(e) => set({ longStartUnit: juzStartUnit(+e.target.value) })}>
-              {JUZ_START_PAGES.map((p, i) => <option key={i} value={i + 1}>Juz {i + 1} (page {p})</option>)}
-            </select>
-          </div>
-          <PositionPicker label="Surah and page" unit={s.longStartUnit} allowLine={false} onChange={(u) => set({ longStartUnit: u })} />
-          <div className="hz-field">
-            <label htmlFor="hz-long-target">How many pages would you like to revise daily for Long Muraja'ah?</label>
-            <input id="hz-long-target" className="hz-input" type="number" min="0.5" step="0.5" inputMode="decimal"
-              value={s.longTarget / UNITS_PER_PAGE}
-              onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; set({ longTarget: v > 0 ? v * UNITS_PER_PAGE : 0 }); }} />
-          </div>
-          <div className="hz-field">
-            <span>Have you memorized any other complete juz outside your Hifz path?</span>
-            <div className="hz-chips">
-              {JUZ_START_PAGES.map((_, i) => (
-                <button key={i} className="hz-chip" aria-pressed={extraJuz.has(i + 1)} onClick={() => toggleJuz(i + 1)}>{i + 1}</button>
-              ))}
-            </div>
-            <span className="hz-muted" style={{ fontWeight: 400 }}>Long Muraja'ah only uses pages you've memorized, so this helps it include them.</span>
-          </div>
-        </>
-      )}
-
-      </div>
-
-      {error && <div className="hz-error" style={{ marginTop: 14 }} role="alert">{error}</div>}
-
-      <div className="hz-wiz-nav">
-        <button className="hz-btn hz-btn-outline" onClick={() => setStep(step - 1)} disabled={step === 0}><ChevronLeft size={18} aria-hidden="true" />Back</button>
-        {step < steps.length - 1
-          ? <button className="hz-btn hz-btn-primary" onClick={() => setStep(step + 1)}>Next<ChevronRight size={18} aria-hidden="true" /></button>
-          : <button className="hz-btn hz-btn-primary" onClick={() => finish()} disabled={saving}>{saving ? "Saving…" : initial ? "Save changes" : "Create my plan"}</button>}
-      </div>
-
-      {confirmNotes && (
-        <div className="hz-modal-back" role="dialog" aria-modal="true" aria-labelledby="hz-confirm-title">
-          <div className="hz-modal">
-            <h3 id="hz-confirm-title" className="hz-q">Before you save</h3>
-            <ul>{confirmNotes.map((n) => <li key={n}>{n}</li>)}</ul>
-            <div className="hz-wiz-nav">
-              <button className="hz-btn hz-btn-outline" onClick={() => setConfirmNotes(null)}>Go back</button>
-              <button className="hz-btn hz-btn-primary" onClick={() => finish(true)} disabled={saving}>{saving ? "Saving…" : "Apply changes"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </section>
+    <div className="hz-portion">
+      {describeRange(r)} <span className="hz-muted" style={{ fontWeight: 400 }}>· {describeAmount(task.end - task.start)}</span>
+      <small>{surahNames(r)}</small>
+      <small className="hz-ayah">Ayah {describeAyahRange(r)}</small>
+    </div>
   );
 }
 
-// ---------- task card ----------
-
-function TaskCard({ activity, row, onProgress, busy }) {
-  const { title, Icon } = ACTIVITY_INFO[activity];
-  const [partial, setPartial] = useState("");
-  if (!row) return null;
-  const total = unitsOf(row.segments);
-  const done = unitsOf(row.completed);
-  const carried = toSet(intersect(row.segments, row.pendingIn));
-  const isCarried = ([s, e]) => carried.some(([cs, ce]) => s < ce && e > cs);
-  const statusLabel = { completed: "Completed", partial: "Partly done", pending: "To do", empty: "Nothing to revise" }[row.status];
-  const partialChoices = [];
-  for (let u = UNITS_PER_LINE; u < total; u += UNITS_PER_LINE) partialChoices.push(u);
-
+// The task's pages in the Mushaf, its portion bright and the rest faded.
+// Only the task's own pages can be turned to; without a task, only `page`.
+// `page` also picks the page to open on (e.g. where a mistake is).
+// Teacher mode: onWordTap / selectedKey / showCorrected (see MushafPage).
+export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false }) {
+  const pages = task ? taskPages(task) : [focus ?? 1];
+  const first = pages[0];
+  const last = pages[pages.length - 1];
+  const clamp = (p) => Math.min(last, Math.max(first, p ?? first));
+  const [page, setPage] = useState(() => clamp(focus));
+  useEffect(() => { setPage(clamp(focus)); }, [task?.id, task?.start, task?.end, focus]);
+  const shown = clamp(page);
+  const open = mistakes.filter((m) => !m.correctedAt && m.page === shown).length;
+  const title = (
+    <div className="hz-reader-title">Page {shown} · {surahsOnPages(shown, shown).map((s) => s.name).join(", ")}
+      <small>{pages.length > 1 ? `Page ${shown - first + 1} of ${pages.length}` : `Juz ${JUZ_START_PAGES.filter((p) => p <= shown).length}`}{open ? ` · ${open} mistake${open === 1 ? "" : "s"} here` : ""}</small>
+    </div>
+  );
   return (
-    <article className={`hz-task ${row.status === "completed" ? "hz-task-done" : ""}`} aria-label={title}>
+    <div className="hz-reader">
+      {pages.length > 1 ? (
+        <div className="hz-reader-nav">
+          <button className="hz-btn hz-btn-outline" disabled={shown <= first} onClick={() => setPage(shown - 1)} aria-label="Previous page"><ChevronLeft size={18} aria-hidden="true" /><span>Previous</span></button>
+          {title}
+          <button className="hz-btn hz-btn-outline" disabled={shown >= last} onClick={() => setPage(shown + 1)} aria-label="Next page"><span>Next</span><ChevronRight size={18} aria-hidden="true" /></button>
+        </div>
+      ) : <div className="hz-reader-nav">{title}</div>}
+      <MushafPage page={shown} range={task ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} />
+    </div>
+  );
+}
+
+const statusOf = (task, today) => (task.completedAt ? "completed" : task.taskDate < today ? "partial" : "pending");
+const STATUS_LABEL = { completed: "Done", partial: "Not done yet", pending: "To do" };
+
+function StudentTaskCard({ task, today, mistakes, open, onOpen, onToggle, busy }) {
+  const { title, Icon } = ACTIVITY_INFO[task.activity];
+  const status = statusOf(task, today);
+  const count = mistakesForTask(task, mistakes).length;
+  return (
+    <article className={`hz-task ${status === "completed" ? "hz-task-done" : ""} ${open ? "hz-task-open" : ""}`} aria-label={title}>
       <div className="hz-task-head">
-        <span className="hz-task-icon">{row.status === "completed" ? <CheckCircle2 size={20} aria-hidden="true" /> : <Icon size={20} aria-hidden="true" />}</span>
+        <span className="hz-task-icon">{status === "completed" ? <CheckCircle2 size={20} aria-hidden="true" /> : <Icon size={20} aria-hidden="true" />}</span>
         <span className="hz-task-title">{title}</span>
-        <span className={`hz-badge hz-badge-${row.status}`}>{statusLabel}</span>
+        <span className={`hz-badge hz-badge-${status}`}>{STATUS_LABEL[status]}</span>
       </div>
-      {total === 0 ? (
-        <p className="hz-muted" style={{ margin: 0 }}>{activity === "new" ? "You've reached the end of your Hifz path. MashaAllah!" : "Nothing memorized yet for this revision. It starts once you have memorized pages."}</p>
-      ) : (
-        <>
-          {row.segments.map((r) => (
-            <div key={r.join("-")} className="hz-portion">
-              {describeRange(r)}{isCarried(r) && <span className="hz-carry">Carried over</span>}
-              <small>{surahNames(r)}</small>
-              {activity !== "long" && <small className="hz-ayah">Ayah {describeAyahRange(r)}</small>}
-            </div>
-          ))}
-          <div className="hz-muted">Daily target: {describeAmount(row.target)} · Done: {describeAmount(done)} of {describeAmount(total)}</div>
-          <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${total ? (done / total) * 100 : 0}%` }} /></div>
-          {row.status !== "completed" ? (
-            <>
-              <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onProgress(row, total)}><CheckCircle2 size={18} aria-hidden="true" />Mark as completed</button>
-              {partialChoices.length > 0 && (
-                <div className="hz-partial">
-                  <select className="hz-select" aria-label={`${title}: how much is done`} value={partial} onChange={(e) => setPartial(e.target.value)}>
-                    <option value="">Record partly done…</option>
-                    {done > 0 && <option value="0">Nothing done yet (undo)</option>}
-                    {partialChoices.map((u) => <option key={u} value={u}>{describeAmount(u)} done</option>)}
-                  </select>
-                  <button className="hz-btn hz-btn-outline" disabled={busy || partial === ""} onClick={() => { onProgress(row, +partial); setPartial(""); }}>Save</button>
-                </div>
-              )}
-            </>
-          ) : (
-            <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => onProgress(row, 0)}>Undo</button>
-          )}
-        </>
-      )}
+      {task.taskDate !== today && <span className="hz-muted"><CalendarDays size={13} aria-hidden="true" /> Set for {fmtDay(task.taskDate)}</span>}
+      <PortionText task={task} />
+      {task.notes && <div className="hz-task-notes">{task.notes}</div>}
+      {count > 0 && <span className="hz-mistake-badge"><Highlighter size={13} aria-hidden="true" />{count} mistake{count === 1 ? "" : "s"} to fix</span>}
+      <div className="hz-task-actions">
+        <button className="hz-btn hz-btn-outline" onClick={onOpen} aria-expanded={open}><BookOpen size={17} aria-hidden="true" />{open ? "Close Mushaf" : "Open Mushaf"}</button>
+        {status === "completed"
+          ? <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => onToggle(task, false)}>Undo</button>
+          : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onToggle(task, true)}><CheckCircle2 size={17} aria-hidden="true" />Mark as done</button>}
+      </div>
     </article>
   );
 }
 
-// ---------- main tracker ----------
-
-export default function HifzTracker({ repo, onSummary }) {
+// Keeps a summary loaded and fresh: reloads on the teacher's changes (live)
+// and when the student comes back to the app.
+export function useHifz(repo, onSummary) {
   const [state, setState] = useState(null);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [editing, setEditing] = useState(false);
-
   const refresh = useCallback(async () => {
+    if (!repo) return;
     try {
-      const t = await loadTracker(repo);
-      setState(t);
-      onSummary?.(t);
+      const s = await loadHifz(repo);
+      setState(s);
+      onSummary?.(s);
       setError("");
-    } catch (e) {
-      setError(e.message);
-    }
+    } catch (e) { setError(e.message); }
   }, [repo, onSummary]);
+  useEffect(() => {
+    refresh();
+    const stop = repo?.subscribe?.(() => refresh());
+    const onShow = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onShow);
+    return () => { stop?.(); document.removeEventListener("visibilitychange", onShow); };
+  }, [repo, refresh]);
+  return { state, error, setError, refresh };
+}
 
-  useEffect(() => { refresh(); }, [refresh]);
+// ---------- student tracker ----------
 
-  const onProgress = async (row, units) => {
-    setBusy(true);
-    try {
-      await recordProgress(repo, row.id, units);
-      await refresh();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
+export default function HifzTracker({ repo, onSummary }) {
+  const { state, error, setError, refresh } = useHifz(repo, onSummary);
+  const [busy, setBusy] = useState(false);
+  const [openId, setOpenId] = useState(null); // task shown in the Mushaf
+  const [focusPage, setFocusPage] = useState(null); // page to open on (a mistake's page)
 
   if (error && !state) return <div className="hz"><div className="hz-error" role="alert">{error}</div></div>;
-  if (!state) return <div className="hz"><div className="hz-card hz-muted">Loading your Hifz plan…</div></div>;
-  if (state.needsSetup) return <div className="hz"><SetupWizard repo={repo} onDone={refresh} /></div>;
-  if (editing) return <div className="hz"><SetupWizard repo={repo} initial={state.settings} onCancel={() => setEditing(false)} onDone={() => { setEditing(false); refresh(); }} /></div>;
+  if (!state) return <div className="hz"><div className="hz-card hz-muted">Loading your Hifz…</div></div>;
 
-  const { stats, streak, todayRows, today } = state;
-  const pct = stats.percent;
-  const backlog = ["new", "short", "long"].map((a) => {
-    const row = todayRows[a];
-    if (!row) return null;
-    const carriedToday = intersect(row.segments, row.pendingIn);
-    const later = subtract(row.pendingIn, row.segments);
-    return unitsOf(row.pendingIn) ? { a, carriedToday, later } : null;
-  }).filter(Boolean);
+  const { stats, streak, todayTasks, overdue, upcoming, recentDone, today, mistakes, openMistakes } = state;
+  const toggle = async (task, done) => {
+    setBusy(true);
+    try { await repo.setTaskDone(task.id, done); await refresh(); } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+  const allOpen = [...todayTasks, ...overdue, ...upcoming, ...recentDone];
+  const opened = allOpen.find((t) => t.id === openId) || null;
+  const toReader = () => setTimeout(() => document.getElementById("hz-reader")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  const openTask = (id, page = null) => { setOpenId(id); setFocusPage(page); toReader(); };
+  // The task a mistake belongs to: one covering its page, Muraja'ah first,
+  // today's before unfinished and coming ones.
+  const taskFor = (m) => {
+    const covering = [...todayTasks, ...overdue, ...upcoming].filter((t) => mistakeInTask(m, t));
+    return covering.find((t) => t.activity !== "new") || covering[0] || null;
+  };
+  const whenOf = (t) => (t.taskDate === today ? "today's" : t.taskDate < today ? "unfinished" : `${fmtDay(t.taskDate)}`);
+  const counts = completedCounts(state.memorized);
+  const card = (t) => (
+    <StudentTaskCard key={t.id} task={t} today={today} mistakes={mistakes} busy={busy} open={openId === t.id}
+      onOpen={() => (openId === t.id ? setOpenId(null) : openTask(t.id))} onToggle={toggle} />
+  );
+  const reader = opened && (
+    <section className="hz-card hz-reader-card" aria-label="Mushaf" id="hz-reader">
+      <div className="hz-row" style={{ marginBottom: 8 }}>
+        <h2 className="hz-h2" style={{ margin: 0 }}><BookOpen size={22} aria-hidden="true" />{ACTIVITY_INFO[opened.activity].title} <span className="hz-muted" style={{ fontWeight: 400 }}>· {describeRange([opened.start, opened.end])}</span></h2>
+        <button className="hz-btn hz-btn-ghost" onClick={() => { setOpenId(null); setFocusPage(null); }} aria-label="Close Mushaf"><X size={18} aria-hidden="true" /></button>
+      </div>
+      {opened.notes && <div className="hz-task-notes" style={{ marginBottom: 10 }}>{opened.notes}</div>}
+      <div className="hz-legend" style={{ marginBottom: 10 }}>
+        <span><i style={{ background: "#1A1F36" }} />Your portion (other lines are faded)</span>
+        <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />Mistake your teacher marked</span>
+      </div>
+      <TaskReader task={opened} page={focusPage} mistakes={mistakes} />
+      {!opened.completedAt && (
+        <button className="hz-btn hz-btn-primary" style={{ width: "100%", marginTop: 12 }} disabled={busy} onClick={() => toggle(opened, true)}>
+          <CheckCircle2 size={18} aria-hidden="true" />Mark {ACTIVITY_INFO[opened.activity].title} as done
+        </button>
+      )}
+    </section>
+  );
 
   return (
     <div className="hz">
       {error && <div className="hz-error" role="alert">{error}</div>}
 
       <section className="hz-card" aria-label="Overall memorization">
-        <div className="hz-row">
-          <h2 className="hz-h2" style={{ margin: 0 }}><BookOpenText size={22} aria-hidden="true" />Overall Memorization</h2>
-          <button className="hz-btn hz-btn-outline" onClick={() => setEditing(true)}><Pencil size={16} aria-hidden="true" />Edit Hifz Plan</button>
+        <h2 className="hz-h2"><BookOpenText size={22} aria-hidden="true" />Overall Memorization</h2>
+        <div className="hz-row" style={{ margin: "4px 0 10px" }}>
+          <span className="hz-muted">{describeAmount(stats.memorizedUnits)} of 604 pages · {stats.ayahs} of 6236 ayahs</span>
+          <span className="hz-big">{stats.percent}%</span>
         </div>
-        <div className="hz-row" style={{ margin: "14px 0 10px" }}>
-          <span className="hz-muted">{describeAmount(stats.memorizedUnits)} of 604 pages</span>
-          <span className="hz-big">{pct}%</span>
-        </div>
-        <div className="hz-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}><div style={{ width: `${pct}%` }} /></div>
+        <div className="hz-bar" role="progressbar" aria-label="Quran memorized" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.percent}><div style={{ width: `${stats.percent}%` }} /></div>
         <div className="hz-kv">
+          <div><span>Juz completed</span><strong>{counts.juz} / 30</strong></div>
+          <div><span>Surahs completed</span><strong>{counts.surahs} / 114</strong></div>
           <div><span>Remaining</span><strong>{describeAmount(stats.remainingUnits)}</strong></div>
-          <div><span>Completion goal</span><strong>End of {stats.goalYear}</strong></div>
-          <div><span>Estimated completion</span><strong>{fmtDate(stats.estimatedDate)}</strong></div>
-          <div><span>Left on your Hifz path</span><strong>{describeAmount(stats.planRemainingUnits)}</strong></div>
+          <div><span>Completion goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Your teacher will set it"}</strong></div>
         </div>
-        {!stats.onTrack && (
-          <div className="hz-note"><AlertTriangle size={18} aria-hidden="true" />
-            <span>At your current daily target you'd finish after {stats.goalYear}. {stats.recommended ? `About ${stats.recommended.label} a day would reach your goal.` : "Your goal would need more than 2 pages a day. You could choose a later year."} You can change this in Edit Hifz Plan.</span>
-          </div>
+        {!state.hasProfile && state.tasks.length === 0 && (
+          <div className="hz-note"><CalendarClock size={18} aria-hidden="true" /><span>Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set.</span></div>
         )}
       </section>
 
-      <section className="hz-card" aria-label="Today's Hifz plan">
-        <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />Today's Hifz Plan <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDate(today)}</span></h2>
-        <div className="hz-tasks">
-          {["new", "short", "long"].map((a) => <TaskCard key={a} activity={a} row={todayRows[a]} onProgress={onProgress} busy={busy} />)}
-        </div>
+      <section className="hz-card" aria-label="Today's Hifz">
+        <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />Today's Hifz <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDate(today)}</span></h2>
+        {todayTasks.length === 0 && overdue.length === 0
+          ? <p className="hz-muted" style={{ margin: 0 }}>{upcoming.length ? `Nothing set for today. Your next task is on ${fmtDay(upcoming[0].taskDate)}.` : "Nothing set for today yet."}</p>
+          : <div className="hz-tasks">{todayTasks.map(card)}</div>}
+        {overdue.length > 0 && (
+          <>
+            <div className="hz-sub"><AlertTriangle size={16} aria-hidden="true" />Not finished from earlier days</div>
+            <div className="hz-tasks">{overdue.map(card)}</div>
+          </>
+        )}
       </section>
 
-      <section className="hz-card" aria-label="Pending work">
-        <h2 className="hz-h2"><Clock size={22} aria-hidden="true" />Pending Work</h2>
-        {backlog.length === 0 ? (
-          <p className="hz-muted" style={{ margin: 0 }}>Nothing carried over. You're on schedule.</p>
-        ) : (
-          <ul className="hz-pending-list">
-            {backlog.map(({ a, carriedToday, later }) => (
-              <li key={a}>
-                <b>{ACTIVITY_INFO[a].title}</b>
-                <span>
-                  {unitsOf(carriedToday) > 0 && <>Carried into today: {toSet(carriedToday).map(describeRange).join(", ")}. </>}
-                  {unitsOf(later) > 0 && <>Still waiting: {toSet(later).map(describeRange).join(", ")} ({describeAmount(unitsOf(later))}). </>}
-                  <span className="hz-muted">Your schedule moved later so today stays within your daily target.</span>
-                </span>
+      {reader}
+
+      <section className="hz-card" aria-label="Mistakes to fix">
+        <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Mistakes to fix</h2>
+        {openMistakes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No mistakes to fix. MashaAllah!</p> : (
+          <>
+            <p className="hz-muted" style={{ marginTop: 0 }}>Your teacher highlighted these words. Practise them; your teacher clears each one when you read it correctly.</p>
+            <ul className="hz-list">
+              {openMistakes.map((m) => {
+                const t = taskFor(m);
+                return (
+                  <li key={m.id}>
+                    <span className="hz-ar" lang="ar">{m.wordText || "—"}</span>
+                    <div>Page {m.page} · Ayah {m.verseKey}
+                      <small>{t ? `In ${whenOf(t)} ${ACTIVITY_INFO[t.activity].title}` : "Not in a task yet: it shows when your teacher sets this page"}</small>
+                      {m.note && <small>{m.note}</small>}
+                    </div>
+                    {t && <button className="hz-btn hz-btn-outline" onClick={() => openTask(t.id, m.page)}>Show</button>}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <section className="hz-card" aria-label="Coming up">
+        <h2 className="hz-h2"><Clock size={22} aria-hidden="true" />Coming Up</h2>
+        {upcoming.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>Nothing set for the coming days yet.</p> : (
+          <ul className="hz-list">
+            {upcoming.map((t) => (
+              <li key={t.id}>
+                <span className="hz-date">{fmtDay(t.taskDate)}</span>
+                <div><b>{ACTIVITY_INFO[t.activity].title}</b> · {describeRange([t.start, t.end])}<small>{surahNames([t.start, t.end])}</small></div>
+                <button className="hz-btn hz-btn-ghost" onClick={() => openTask(t.id)}>Open</button>
               </li>
             ))}
           </ul>
@@ -559,12 +470,10 @@ export default function HifzTracker({ repo, onSummary }) {
         </div>
         <div className="hz-cal" aria-label="Activity in the last 5 weeks">
           {streak.calendar.map((d) => (
-            <div key={d.date} className={`${d.active ? "on" : ""} ${d.date === today ? "today" : ""}`} title={`${fmtDate(d.date)}${d.active ? ": active" : ""}`}>
-              {+d.date.slice(8)}
-            </div>
+            <div key={d.date} className={`${d.active ? "on" : ""} ${d.date === today ? "today" : ""}`} title={`${fmtDate(d.date)}${d.active ? ": active" : ""}`}>{+d.date.slice(8)}</div>
           ))}
         </div>
-        <p className="hz-muted" style={{ marginBottom: 0 }}>Complete at least one task a day to keep your streak. It survives one missed day and resets after two missed days in a row.</p>
+        <p className="hz-muted" style={{ marginBottom: 0 }}>Finish at least one task a day to keep your streak. It survives one missed day and resets after two missed days in a row.</p>
       </section>
 
       <section className="hz-card" aria-label="Revision tracking">
@@ -572,26 +481,25 @@ export default function HifzTracker({ repo, onSummary }) {
         <div className="hz-rev">
           <div>
             <strong style={{ color: TP.navy }}>{ACTIVITY_INFO.short.title}</strong>
-            <span className="hz-muted">Your latest {describeAmount(state.settings.shortTarget)}, revised every day</span>
-            <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${stats.revision.short.eligibleUnits ? Math.min(100, (unitsOf(stats.revision.short.latest) / state.settings.shortTarget) * 100) : 0}%` }} /></div>
-            <span className="hz-muted">
-              {stats.revision.short.latest.length ? <>Latest pages: {stats.revision.short.latest.map(describeRange).join(", ")}</> : "Nothing memorized for this revision yet"}
-            </span>
+            <span className="hz-muted">Revised in the last 7 days: {describeAmount(stats.shortWeekUnits)}</span>
+            <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${Math.min(100, (stats.shortWeekUnits / (7 * UNITS_PER_PAGE)) * 100)}%` }} /></div>
           </div>
-          {(() => {
-            const r = stats.revision.long;
-            return (
-              <div>
-                <strong style={{ color: TP.navy }}>{ACTIVITY_INFO.long.title}</strong>
-                <span className="hz-muted">Cycle {r.cycle} · {Math.round(r.cycleProgress * 100)}% through</span>
-                <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${r.cycleProgress * 100}%` }} /></div>
-                <span className="hz-muted">
-                  {r.eligibleUnits ? <>Next up: {r.position == null ? "the beginning" : describeUnit(r.position)} <ArrowRight size={12} aria-hidden="true" /> {describeAmount(r.eligibleUnits)} in this cycle</> : "Nothing memorized for this revision yet"}
-                </span>
-              </div>
-            );
-          })()}
+          <div>
+            <strong style={{ color: TP.navy }}>{ACTIVITY_INFO.long.title}</strong>
+            <span className="hz-muted">{stats.longMonthPercent}% of what you've memorized revised in the last 30 days</span>
+            <div className="hz-bar hz-bar-sm" aria-hidden="true"><div style={{ width: `${stats.longMonthPercent}%` }} /></div>
+          </div>
         </div>
+        {recentDone.length > 0 && (
+          <>
+            <div className="hz-sub" style={{ color: TP.navy }}><CheckCircle2 size={16} aria-hidden="true" />Recently done</div>
+            <ul className="hz-list">
+              {recentDone.map((t) => (
+                <li key={t.id}><span className="hz-date">{fmtDay(t.taskDate)}</span><div><b>{ACTIVITY_INFO[t.activity].title}</b> · {describeRange([t.start, t.end])}<small>{surahNames([t.start, t.end])}</small></div></li>
+              ))}
+            </ul>
+          </>
+        )}
       </section>
     </div>
   );

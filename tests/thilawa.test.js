@@ -1,0 +1,94 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
+import { loadThilawa, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "../src/thilawa/service.js";
+import { createThilawaMemoryStore, createMemoryThilawaRepo } from "../src/thilawa/repos.js";
+
+let n = 0;
+const row = (readOn, fromPage, toPage = fromPage, assignmentId = null) => ({ id: `r${++n}`, readOn, fromPage, toPage, assignmentId, createdAt: `${readOn}T08:00:${String(n % 60).padStart(2, "0")}.${String(n).padStart(3, "0")}Z` });
+const at = (date) => new Date(`${date}T08:00:00Z`);
+
+test("khatam progress counts each page once and starts over after 604", () => {
+  const p = khatamProgress([row("2026-10-01", 1, 10), row("2026-10-02", 5, 12)]);
+  assert.equal(p.count, 12);
+  assert.equal(p.khatams, 0);
+  const full = khatamProgress([row("2026-10-01", 1, 600), row("2026-10-02", 601, 604), row("2026-10-03", 1, 2)]);
+  assert.equal(full.khatams, 1);
+  assert.equal(full.lastKhatamOn, "2026-10-02");
+  assert.equal(full.count, 2);
+});
+
+test("completed surahs and juz need every page read", () => {
+  const pages = new Set(Array.from({ length: 21 }, (_, i) => 582 + i)); // 582–602
+  const c = completedCounts(pages);
+  assert.equal(c.juz, 0); // Juz 30 runs to 604
+  assert.ok(c.surahs > 20);
+  assert.equal(completedCounts(new Set([1])).surahs, 1); // Al-Fatihah is page 1
+});
+
+test("ayahs on a page range", () => {
+  assert.deepEqual(ayahsOnPages(1, 1), { first: 1, last: 7 });
+  assert.equal(ayahsOnPages(604, 604).last, 6236);
+  assert.match(describePages(1, 2), /Al-Fatihah – Al-Baqarah · pages 1–2/);
+});
+
+test("goal: pages a day needed and whether recent pace reaches it", () => {
+  const g = goalCheck("2026-11-09", 100, 5, "2026-10-31"); // 10 days incl. both ends
+  assert.equal(g.daysLeft, 10);
+  assert.equal(g.neededPerDay, 10);
+  assert.equal(g.estimatedDate, "2026-11-19");
+  assert.equal(g.onTrack, false);
+  assert.equal(goalCheck("2026-11-09", 100, 20, "2026-10-31").onTrack, true);
+  assert.equal(goalCheck("2026-10-01", 10, 1, "2026-10-31").passed, true);
+});
+
+test("streak and pace come from reading days", () => {
+  const reading = [row("2026-10-28", 1), row("2026-10-29", 2, 3), row("2026-10-31", 4)];
+  const s = readingStreak(reading, "2026-10-31");
+  assert.equal(s.current, 3); // one empty day doesn't break it
+  assert.equal(recentPace(reading, "2026-10-31", 4), 1);
+});
+
+test("levels and where free reading carries on", () => {
+  assert.equal(levelLabel(null), "Not assessed yet");
+  assert.equal(levelLabel(72), "Very good");
+  const l = latestLevels([{ tajweed: 40, fluency: 50, createdAt: "1" }, { tajweed: 55, fluency: 45, createdAt: "2" }]);
+  assert.equal(l.tajweedChange, 15);
+  assert.equal(l.fluencyChange, -5);
+  assert.equal(nextFreePage([row("2026-10-01", 9, 10), row("2026-10-02", 3, 3, "a1")]), 11);
+  assert.equal(nextFreePage([row("2026-10-01", 604)]), 1);
+});
+
+test("student ticks pages and set reading; teacher-only actions are refused", async () => {
+  const store = createThilawaMemoryStore();
+  const teacher = createMemoryThilawaRepo(store, "s1", { teacherId: "t1" });
+  const student = createMemoryThilawaRepo(store, "s1", { asStudent: true });
+  await teacher.addAssignment({ fromPage: 50, toPage: 52, instructions: "Watch the madd" });
+  await teacher.addNote({ body: "Shared", visibleToStudent: true });
+  await teacher.addNote({ body: "Private", visibleToStudent: false });
+  await assert.rejects(student.addAssessment({ tajweed: 90, fluency: 90 }));
+
+  const day = "2026-10-31";
+  await markPageRead(student, 1, day);
+  await markPageRead(student, 2, day);
+  let t = await loadThilawa(student, at(day));
+  assert.equal(t.progress.count, 2);
+  assert.equal(t.notes.length, 1);
+  assert.equal(t.openAssignments, 1);
+
+  await unmarkPage(student, t.reading, 2, day);
+  await completeAssignment(student, t.assignments[0], day);
+  t = await loadThilawa(student, at(day));
+  assert.equal(t.progress.count, 4); // page 1 + pages 50–52
+  assert.equal(t.openAssignments, 0);
+
+  await reopenAssignment(student, t.assignments[0], t.reading);
+  t = await loadThilawa(student, at(day));
+  assert.equal(t.progress.count, 1);
+  assert.equal(t.openAssignments, 1);
+
+  // Another student's repo can't touch these rows.
+  const other = createMemoryThilawaRepo(store, "s2", { asStudent: true });
+  await assert.rejects(other.deleteReading(t.reading[0].id));
+  assert.equal((await other.listReading()).length, 0);
+});

@@ -22,6 +22,7 @@ import { confirmDialog } from "../ConfirmDialog.jsx";
 import { registrationWelcomeText, sendRegistrationWelcome } from "../notifications/smsSend.js";
 import { InfoUpdates, infoCss } from "./InfoUpdatesAdmin.jsx";
 import { CATEGORIES, AGE_GROUPS, DAYS, FORMS, REG_BUCKET, categoryOf, ageGroupOf, formUrl, fmtTime, fmtDays, fmtMvr } from "./registrations.js";
+import { ProgramPicker, programsForCategory } from "../thilawa/programs.jsx";
 
 const SECTIONS = [
   { key: "applications", label: "Applications", icon: Inbox, help: "Registrations sent from the website. Check the payment slip, then accept or reject." },
@@ -326,6 +327,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
     days: sortDays(web?.days), startTime: web?.start_time || "", endTime: web?.end_time || "",
   });
   const [fee, setFee] = useState(String(reg.monthly_fee ?? web?.monthly_fee ?? ""));
+  const [programs, setPrograms] = useState(() => programsForCategory(reg.category));
   const [sendWelcome, setSendWelcome] = useState(true);
   const [message, setMessage] = useState("");
   const [edited, setEdited] = useState(false);
@@ -387,6 +389,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
     // A portal login is made only when the message gives its password.
     const needsLogin = sendWelcome && message.includes("{password}");
     const login = needsLogin ? await supabase.functions.invoke("student-login", { body: { student_id: studentId } }) : null;
+    await supabase.from("students").update({ programs }).eq("id", studentId);
     const { data: row } = await supabase.from("students").select("*").eq("id", studentId).single();
 
     let note = "";
@@ -466,6 +469,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
           </div>
         )}
         <label className="rg-fee">Monthly fee (MVR)<input className="lc-input" type="number" min="0" step="any" value={fee} onChange={(e) => setFee(e.target.value)} /></label>
+        <div className="rg-wide" style={{ marginTop: "10px" }}><ProgramPicker value={programs} onChange={setPrograms} /></div>
       </fieldset>
 
       <fieldset className="rg-step">

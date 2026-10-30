@@ -1,14 +1,21 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X } from "lucide-react";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Target, Presentation } from "lucide-react";
 import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
-import HifzTracker, { HIFZ_CSS, completedCounts } from "./HifzTracker.jsx";
-import { loadTracker } from "./hifz/service.js";
-import { createSupabaseRepo, createMemoryRepo, createMemoryStore } from "./hifz/repos.js";
-import { countAyahs, TOTAL_AYAHS } from "./hifz/ayahs.js";
+import HifzTracker, { HIFZ_CSS, completedCounts, useHifz } from "./HifzTracker.jsx";
+import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
+import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
+import { pageToUnit } from "./hifz/quran.js";
+import { TOTAL_AYAHS } from "./hifz/ayahs.js";
+import { maldivesToday } from "./dates.js";
 import { StudentExams } from "./exams/ExamUI.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
+import { ThilawaTracker, AssignedReading, FreeReading, LevelMeter, THILAWA_HADITH, thilawaCss, fmtDate } from "./thilawa/ThilawaStudent.jsx";
+import { TeacherThilawaStudent } from "./thilawa/ThilawaTeacher.jsx";
+import { loadThilawa } from "./thilawa/service.js";
+import { createSupabaseThilawaRepo, createThilawaMemoryStore, createMemoryThilawaRepo } from "./thilawa/repos.js";
+import { hasProgram } from "./thilawa/programs.jsx";
 
 const TOTAL_SURAHS = 114;
 const TOTAL_JUZ = 30;
@@ -26,7 +33,27 @@ const HADITH = {
 // On localhost, ?portal=student&demo=1 runs the portal on in-browser sample
 // storage (no login, nothing saved to the database) for trying the UI.
 const DEMO = ["localhost", "127.0.0.1"].includes(window.location.hostname) && new URLSearchParams(window.location.search).get("demo") === "1";
-const demoStore = createMemoryStore();
+const hifzDemoStore = createHifzMemoryStore();
+const thilawaDemoStore = createThilawaMemoryStore();
+// Sample teacher data for the demo, so every Thilawa screen has something to show.
+if (DEMO) {
+  const t = createMemoryThilawaRepo(thilawaDemoStore, "demo", { teacherId: "demo-teacher" });
+  t.addAssessment({ tajweed: 45, fluency: 55, comment: "" });
+  t.addAssessment({ tajweed: 60, fluency: 58, comment: "Good improvement on the madd rules." });
+  t.addAssignment({ fromPage: 582, toPage: 583, instructions: "Read Surah An-Naba slowly. Watch the ghunnah on noon and meem.", dueDate: null });
+  t.addNote({ body: "Practise reading 2 pages every day before class.", visibleToStudent: true });
+  t.addNote({ body: "Private: needs help with qalqalah.", visibleToStudent: false });
+  const h = createMemoryHifzRepo(hifzDemoStore, "demo", { teacherId: "demo-teacher" });
+  const today = maldivesToday();
+  // Has Juz 30 and is memorising Juz 29 from Al-Mulk (pages 562–569 done).
+  h.saveProfile({ memorized: [[pageToUnit(562), pageToUnit(570)], [pageToUnit(582), pageToUnit(605)]], goalYear: 2030 });
+  h.addTasks([
+    { taskDate: today, activity: "new", start: pageToUnit(570), end: pageToUnit(571), notes: "Read it 10 times before memorising." },
+    { taskDate: today, activity: "short", start: pageToUnit(568), end: pageToUnit(570), notes: "" },
+    { taskDate: today, activity: "long", start: pageToUnit(582), end: pageToUnit(584), notes: "" },
+  ]);
+  h.addMistake({ page: 582, line: 3, verseKey: "78:2", position: 2, wordText: "ٱلنَّبَإِ", taskId: null });
+}
 
 // Counts a number up from 0 (eases out). Shows the final value straight away
 // when the viewer prefers reduced motion.
@@ -196,23 +223,33 @@ function SetPassword({ studentName, onDone, onCancel }) {
 
 // Signed-in student → their students row (row-level security only returns their own).
 async function loadStudentForUser(userId) {
-  const { data, error } = await supabase.from("students").select("id, name, student_code, class_name, fee, joined_month").eq("user_id", userId).maybeSingle();
+  const { data, error } = await supabase.from("students").select("id, name, student_code, class_name, fee, joined_month, programs").eq("user_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
   return data;
 }
 
+// Hifz and Thilawa pages only show for students enrolled in them.
 const NAV = [
   { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
-  { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText },
+  { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText, program: "hifz" },
+  { key: "thilawa", label: "Thilawa Tracker", Icon: BookOpenCheck, program: "thilawa" },
+  { key: "thilawa-assigned", label: "Teacher's Reading", Icon: ListChecks, program: "thilawa" },
+  { key: "thilawa-free", label: "Free Reading", Icon: BookMarked, program: "thilawa" },
   { key: "attendance", label: "Attendance", Icon: CalendarCheck },
   { key: "finance", label: "Finance", Icon: Wallet },
 ];
 
+// Remembers which dashboard (Hifz or Thilawa) a student enrolled in both last looked at.
+const DASH_KEY = "aqc_student_dashboard";
+const readDash = () => { try { return localStorage.getItem(DASH_KEY); } catch { return null; } };
+const writeDash = (v) => { try { localStorage.setItem(DASH_KEY, v); } catch { /* private mode */ } };
+
 export default function StudentPortal() {
-  const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode", class_name: "Demo class", fee: 375, joined_month: "2026-08" } } : { status: "loading" });
+  const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode", class_name: "Demo class", fee: 375, joined_month: "2026-08", programs: ["hifz", "thilawa"] } } : { status: "loading" });
   const [loginError, setLoginError] = useState("");
   const [view, setView] = useState("dashboard");
-  const [summary, setSummary] = useState(null);
+  const [thilawa, setThilawa] = useState(null);
+  const [dashPick, setDashPick] = useState(readDash);
   const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
@@ -247,7 +284,7 @@ export default function StudentPortal() {
       else setAuth({ status: "login" });
     });
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_OUT") { setAuth({ status: "login" }); setSummary(null); }
+      if (event === "SIGNED_OUT") { setAuth({ status: "login" }); setThilawa(null); setView("dashboard"); }
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
   }, [routeUser]);
@@ -261,27 +298,63 @@ export default function StudentPortal() {
 
   const student = auth.student;
   const repo = useMemo(() => {
-    if (!student) return null;
-    return DEMO ? createMemoryRepo(demoStore, student.id) : createSupabaseRepo(supabase, student.id);
+    if (!student || !hasProgram(student, "hifz")) return null;
+    return DEMO ? createMemoryHifzRepo(hifzDemoStore, student.id, { asStudent: true }) : createSupabaseHifzRepo(supabase, student.id);
   }, [student]);
+  // Kept fresh live (teacher's changes) for the dashboard and header streak.
+  const { state: summary } = useHifz(repo);
+
+  const doesHifz = hasProgram(student, "hifz");
+  const doesThilawa = hasProgram(student, "thilawa");
+  const thilawaRepo = useMemo(() => {
+    if (!student || !doesThilawa) return null;
+    return DEMO ? createMemoryThilawaRepo(thilawaDemoStore, student.id, { asStudent: true }) : createSupabaseThilawaRepo(supabase, student.id);
+  }, [student, doesThilawa]);
+  const refreshThilawa = useCallback(async () => {
+    if (!thilawaRepo) return;
+    try { setThilawa(await loadThilawa(thilawaRepo)); } catch { setThilawa(null); }
+  }, [thilawaRepo]);
 
   useEffect(() => {
-    if (!repo) return;
-    loadTracker(repo).then(setSummary).catch(() => setSummary(null));
-  }, [repo]);
+    refreshThilawa();
+    const stop = thilawaRepo?.subscribe?.(() => refreshThilawa());
+    const onShow = () => { if (document.visibilityState === "visible") refreshThilawa(); };
+    document.addEventListener("visibilitychange", onShow);
+    return () => { stop?.(); document.removeEventListener("visibilitychange", onShow); };
+  }, [refreshThilawa, thilawaRepo]);
+
+  // Dashboard shown: the only program, or the one picked (both enrolled).
+  const dash = doesHifz && doesThilawa ? (dashPick === "thilawa" ? "thilawa" : "hifz") : doesThilawa ? "thilawa" : "hifz";
+  const pickDash = (v) => { setDashPick(v); writeDash(v); };
+  const demoTeacherRepo = useMemo(() => (DEMO && student ? createMemoryThilawaRepo(thilawaDemoStore, student.id, { teacherId: "demo-teacher" }) : null), [student]);
+  const demoHifzTeacherRepo = useMemo(() => (DEMO && student ? createMemoryHifzRepo(hifzDemoStore, student.id, { teacherId: "demo-teacher" }) : null), [student]);
+  const nav = NAV.filter((n) => !n.program || hasProgram(student, n.program));
+  if (DEMO) {
+    nav.push({ key: "demo-teacher-hifz", label: "Teacher: Hifz (demo)", Icon: Presentation });
+    nav.push({ key: "demo-teacher", label: "Teacher: Thilawa (demo)", Icon: Presentation });
+  }
 
   const ready = auth.status === "ready";
   const records = useStudentRecords(ready ? student : null, DEMO);
-  const hasPlan = summary && !summary.needsSetup;
+  const hasPlan = !!summary;
   // Dashboard progress is measured in ayahs (out of 6236), not pages.
-  const ayahsMemorized = hasPlan ? countAyahs(summary.stats.memorizedRanges) : 0;
-  const percent = Math.floor((ayahsMemorized / TOTAL_AYAHS) * 1000) / 10;
-  const counts = hasPlan ? completedCounts(summary.stats.memorizedRanges) : { surahs: 0, juz: 0 };
+  const ayahsMemorized = hasPlan ? summary.stats.ayahs : 0;
+  const percent = hasPlan ? summary.stats.percent : 0;
+  const counts = hasPlan ? completedCounts(summary.memorized) : { surahs: 0, juz: 0 };
+  const todayHifz = summary?.todayTasks || [];
+  const todayHifzDone = todayHifz.filter((t) => t.completedAt).length;
   const stats = [
     { label: "Surah’s completed", Icon: BookOpen, value: <><CountUp value={counts.surahs} /> / {TOTAL_SURAHS}</> },
     { label: "Juz completed", Icon: Layers, value: <><CountUp value={counts.juz} /> / {TOTAL_JUZ}</> },
-    { label: "Target Year", Icon: CalendarDays, value: hasPlan ? summary.settings.goalYear : "—" },
+    { label: "Target Year", Icon: CalendarDays, value: summary?.stats.goalYear ?? "—" },
   ];
+  const th = thilawa;
+  const thStats = [
+    { label: "Surah’s read", Icon: BookOpen, value: <><CountUp value={th?.counts.surahs ?? 0} /> / {TOTAL_SURAHS}</> },
+    { label: "Juz read", Icon: Layers, value: <><CountUp value={th?.counts.juz ?? 0} /> / {TOTAL_JUZ}</> },
+    { label: "Khatam goal", Icon: Target, value: th?.settings ? fmtDate(th.settings.goalDate).replace(/^\d+ /, "") : "—" },
+  ];
+  const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
 
   return (
     <div className={`sp-page ${ready ? "sp-page-shell" : ""}`}>
@@ -368,6 +441,15 @@ export default function StudentPortal() {
         .sp-login-field svg { position: absolute; left: 14px; color: #8FADC0; pointer-events: none; }
         .sp-login-field .hz-input { padding-left: 42px; }
         ${HIFZ_CSS}
+        ${thilawaCss()}
+        .sp-switch { display: flex; gap: 6px; padding: 6px; border-radius: 16px; background: rgba(255,255,255,0.92); border: 1px solid #DCEBF8; box-shadow: 0 6px 18px rgba(18,59,103,0.06); }
+        .sp-switch button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: none; border-radius: 12px; background: transparent; color: ${TP.navy}; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
+        .sp-switch button[aria-selected="true"] { background: linear-gradient(120deg, ${TP.gradStart}, ${TP.blue}); color: #FFFFFF; box-shadow: 0 6px 14px rgba(13,79,133,0.25); }
+        .sp-switch button:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
+        .sp-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; padding: 18px; }
+        .sp-goal-line { margin: 12px 0 0; font-size: 15px; color: #1452A8; }
+        .sp-todo { display: flex; align-items: center; gap: 14px; padding: 16px 18px; flex-wrap: wrap; color: ${TP.navy}; font-size: 16px; }
+        .sp-todo span { flex: 1; min-width: 180px; }
         /* ---------- animations ---------- */
         @keyframes sp-rise { from { opacity: 0; transform: translateY(18px) scale(0.98); } to { opacity: 1; transform: none; } }
         @keyframes sp-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(260%) skewX(-18deg); } }
@@ -492,7 +574,7 @@ export default function StudentPortal() {
               {!DEMO && <span className="tp-bell-desktop"><NotificationBell onDark /></span>}
             </div>
             <div className="tp-nav">
-              {NAV.map(({ key, label, Icon }) => (
+              {nav.map(({ key, label, Icon }) => (
                 <button
                   key={key}
                   type="button"
@@ -528,7 +610,7 @@ export default function StudentPortal() {
           <div className="sp-divider" aria-hidden="true" />
           <div className="sp-streak-box">
             <span>Streak</span>
-            <strong key={hasPlan ? summary.streak.current : 0} className="sp-pop"><CountUp value={hasPlan ? summary.streak.current : 0} /></strong>
+            <strong key={streakNow} className="sp-pop"><CountUp value={streakNow} /></strong>
           </div>
           <div className="sp-flame" aria-hidden="true">
             <Flame strokeWidth={1.8} />
@@ -536,11 +618,96 @@ export default function StudentPortal() {
           </div>
         </section>
 
-        {view === "hifz" && <HifzTracker repo={repo} onSummary={setSummary} />}
+        {view === "hifz" && doesHifz && <HifzTracker repo={repo} />}
+        {view === "thilawa" && doesThilawa && <ThilawaTracker repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} onGo={setView} />}
+        {view === "thilawa-assigned" && doesThilawa && <AssignedReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
+        {view === "thilawa-free" && doesThilawa && <FreeReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
+        {view === "demo-teacher-hifz" && DEMO && (
+          <TeacherHifzStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }} repo={demoHifzTeacherRepo} />
+        )}
+        {view === "demo-teacher" && DEMO && (
+          <TeacherThilawaStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }}
+            repo={demoTeacherRepo} onChanged={refreshThilawa} />
+        )}
         {view === "attendance" && <StudentAttendance records={records} />}
         {view === "finance" && <StudentFinance student={student} records={records} demo={DEMO} />}
 
-        {view === "dashboard" && <>
+        {view === "dashboard" && doesHifz && doesThilawa && (
+          <div className="sp-switch" role="tablist" aria-label="Dashboard">
+            {[["hifz", "Hifz", BookOpenText], ["thilawa", "Thilawa", BookOpenCheck]].map(([key, label, Icon]) => (
+              <button key={key} type="button" role="tab" aria-selected={dash === key} onClick={() => pickDash(key)}><Icon size={18} aria-hidden="true" />{label}</button>
+            ))}
+          </div>
+        )}
+
+        {view === "dashboard" && dash === "thilawa" && <>
+        <section className="sp-card sp-tracker" aria-label="Khatam progress">
+          <div className="sp-tracker-head">
+            <BookOpenCheck size={44} color="#1452A8" strokeWidth={1.8} aria-hidden="true" />
+            <h2>Thilawa Khatam Tracker</h2>
+            <span className="sp-pct"><CountUp value={th?.progress.percent ?? 0} />%</span>
+          </div>
+          <div className="sp-bar-wrap">
+            <div className="sp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={th?.progress.percent ?? 0}>
+              <div className="sp-bar-fill" style={{ width: `${th?.progress.percent ?? 0}%` }} />
+            </div>
+            <span className="sp-bar-icon" style={{ left: `clamp(16px, ${th?.progress.percent ?? 0}%, calc(100% - 16px))` }} aria-hidden="true">
+              <QuranIcon />
+            </span>
+          </div>
+          <div className="sp-tracker-foot">
+            <span><CountUp value={th?.progress.count ?? 0} /> / 604 pages</span>
+            <span>{th?.progress.khatams ? `${th.progress.khatams} khatam${th.progress.khatams === 1 ? "" : "s"} done` : <><CountUp value={th?.progress.percent ?? 0} />% completed</>}</span>
+          </div>
+          {th && !th.settings && (
+            <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("thilawa")}>Set your khatam goal</button>
+          )}
+          {th?.settings && th.goal && !th.goal.passed && th.progress.count < 604 && (
+            <p className="sp-goal-line">Read about <b>{th.goal.neededPerDay} page{th.goal.neededPerDay === 1 ? "" : "s"} a day</b> to finish by {fmtDate(th.settings.goalDate)}.</p>
+          )}
+        </section>
+
+        <section className="sp-card sp-levels" aria-label="Tajweed and fluency levels">
+          <LevelMeter kind="tajweed" value={th?.levels.latest?.tajweed} change={th?.levels.tajweedChange} />
+          <LevelMeter kind="fluency" value={th?.levels.latest?.fluency} change={th?.levels.fluencyChange} />
+        </section>
+
+        <section className="sp-card sp-motivation" aria-label="My motivation">
+          <span className="sp-accent" aria-hidden="true" />
+          <p>{THILAWA_HADITH.short}</p>
+        </section>
+
+        <section className="sp-stats" aria-label="Thilawa summary">
+          {thStats.map(({ label, Icon, value }) => (
+            <div key={label} className="sp-grad sp-stat">
+              <div className="sp-stat-label">{label}</div>
+              <div className="sp-stat-value">
+                <Icon strokeWidth={1.8} aria-hidden="true" />
+                <span>{value}</span>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        {th?.openAssignments > 0 && (
+          <section className="sp-card sp-todo" aria-label="Reading from your teacher">
+            <ListChecks size={30} color="#1452A8" aria-hidden="true" />
+            <span>Your teacher set <b>{th.openAssignments} reading{th.openAssignments === 1 ? "" : "s"}</b> for you.</span>
+            <button className="hz-btn hz-btn-primary" onClick={() => setView("thilawa-assigned")}>Read now</button>
+          </section>
+        )}
+
+        {!DEMO && <div><StudentExams /></div>}
+
+        <section className="sp-card sp-hadith" aria-label="Hadith">
+          <span className="sp-accent" aria-hidden="true" />
+          <h3>Hadith</h3>
+          <p>{THILAWA_HADITH.text}</p>
+          <p className="sp-hadith-src">{THILAWA_HADITH.source}</p>
+        </section>
+        </>}
+
+        {view === "dashboard" && dash === "hifz" && <>
         <section className="sp-card sp-tracker" aria-label="Hifz progress">
           <div className="sp-tracker-head">
             <BookOpenText size={44} color="#1452A8" strokeWidth={1.8} aria-hidden="true" />
@@ -560,8 +727,12 @@ export default function StudentPortal() {
             <span><CountUp value={ayahsMemorized} /> / {TOTAL_AYAHS} ayaat</span>
             <span><CountUp value={percent} />% completed</span>
           </div>
-          {summary?.needsSetup && (
-            <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("hifz")}>Set up your Hifz plan</button>
+          {summary && (
+            <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("hifz")}>
+              {todayHifz.length
+                ? (todayHifzDone === todayHifz.length ? `Today's Hifz done (${todayHifzDone}/${todayHifz.length}). MashaAllah!` : `Today's Hifz: ${todayHifzDone} of ${todayHifz.length} done · Open`)
+                : summary.overdue.length ? `${summary.overdue.length} Hifz task${summary.overdue.length === 1 ? "" : "s"} still to finish · Open` : "Open Hifz Tracker"}
+            </button>
           )}
         </section>
 
