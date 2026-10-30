@@ -333,6 +333,39 @@ export function useHifz(repo, onSummary) {
   return { state, error, setError, refresh };
 }
 
+// ---------- the student's target year ----------
+// Asked the first time a Hifz student opens the portal (required, can't be
+// closed), and changeable later from the Hifz Tracker.
+export function GoalYearDialog({ initial = null, required = false, onSave, onClose }) {
+  const thisYear = new Date().getFullYear();
+  const [year, setYear] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const save = async () => {
+    setBusy(true);
+    setError("");
+    try { await onSave(year); onClose?.(); } catch (e) { setError(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="hz-modal-back" style={{ zIndex: 1000 }} role="dialog" aria-modal="true" aria-labelledby="hz-goal-title">
+      <div className="hz-modal hz">
+        <h3 id="hz-goal-title" className="hz-q" style={{ display: "flex", alignItems: "center", gap: 10 }}><CalendarClock size={22} color={TP.blue} aria-hidden="true" />{required ? "Your Hifz goal" : "Change your Hifz goal"}</h3>
+        <p className="hz-muted" style={{ marginTop: 0 }}>By which year do you want to finish memorising the whole Quran?{required ? " You can change it later." : ""}</p>
+        <div className="hz-chips">
+          {Array.from({ length: 16 }, (_, i) => thisYear + i).map((y) => (
+            <button key={y} type="button" className="hz-chip" style={{ minWidth: 72 }} aria-pressed={year === y} onClick={() => setYear(y)}>{y}</button>
+          ))}
+        </div>
+        {error && <div className="hz-error" role="alert" style={{ marginTop: 12 }}>{error}</div>}
+        <div className="hz-wiz-nav">
+          {!required ? <button className="hz-btn hz-btn-outline" onClick={onClose}>Cancel</button> : <span />}
+          <button className="hz-btn hz-btn-primary" disabled={!year || busy} onClick={save}>{busy ? "Saving…" : "Save my goal"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- student tracker ----------
 
 export default function HifzTracker({ repo, onSummary }) {
@@ -340,6 +373,7 @@ export default function HifzTracker({ repo, onSummary }) {
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState(null); // task shown in the Mushaf
   const [focusPage, setFocusPage] = useState(null); // page to open on (a mistake's page)
+  const [editingGoal, setEditingGoal] = useState(false);
 
   if (error && !state) return <div className="hz"><div className="hz-error" role="alert">{error}</div></div>;
   if (!state) return <div className="hz"><div className="hz-card hz-muted">Loading your Hifz…</div></div>;
@@ -389,6 +423,8 @@ export default function HifzTracker({ repo, onSummary }) {
     <div className="hz">
       {error && <div className="hz-error" role="alert">{error}</div>}
 
+      {editingGoal && <GoalYearDialog initial={stats.goalYear} onClose={() => setEditingGoal(false)} onSave={async (y) => { await repo.saveGoal(y); await refresh(); }} />}
+
       <section className="hz-card" aria-label="Overall memorization">
         <h2 className="hz-h2"><BookOpenText size={22} aria-hidden="true" />Overall Memorization</h2>
         <div className="hz-row" style={{ margin: "4px 0 10px" }}>
@@ -400,7 +436,8 @@ export default function HifzTracker({ repo, onSummary }) {
           <div><span>Juz completed</span><strong>{counts.juz} / 30</strong></div>
           <div><span>Surahs completed</span><strong>{counts.surahs} / 114</strong></div>
           <div><span>Remaining</span><strong>{describeAmount(stats.remainingUnits)}</strong></div>
-          <div><span>Completion goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Your teacher will set it"}</strong></div>
+          <div><span>Completion goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not chosen yet"}{" "}
+            <button type="button" className="hz-btn hz-btn-ghost" style={{ minHeight: 28, padding: "0 4px", fontSize: 13 }} onClick={() => setEditingGoal(true)}>Change</button></strong></div>
         </div>
         {!state.hasProfile && state.tasks.length === 0 && (
           <div className="hz-note"><CalendarClock size={18} aria-hidden="true" /><span>Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set.</span></div>

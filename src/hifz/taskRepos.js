@@ -4,7 +4,8 @@
 // write what: students can only tick tasks; everything else is the teacher's.
 //
 // Interface:
-//   getProfile() → profile | null          saveProfile({ memorized, goalYear })
+//   getProfile() → profile | null          saveProfile(plan)   (see tasks.js: profile)
+//   getGoal() → goalYear | null            saveGoal(goalYear)  (the student's own target year)
 //   getLegacy() → { settings, rows } | null  (the student's old self-made plan)
 //   listTasks() → tasks                    addTasks([{ taskDate, activity, start, end, notes }])
 //   updateTask(id, patch)                  deleteTask(id)          setTaskDone(id, done)
@@ -28,7 +29,16 @@ const taskPatchToDb = (p) => {
   return Object.fromEntries(Object.entries(p).filter(([k]) => map[k]).map(([k, v]) => [map[k], k === "notes" ? (v?.trim() || null) : v]));
 };
 
-export const HIFZ_TASK_MAPS = { taskFromDb, mistakeFromDb };
+const profileFromDb = (r) => ({
+  memorized: r.memorized || [], goalYear: r.goal_year, direction: r.direction || "forward", startUnit: r.start_unit,
+  shortPages: Number(r.short_pages ?? 1), longStartUnit: r.long_start_unit, longMode: r.long_mode || "juz", longPages: Number(r.long_pages ?? 2),
+});
+const profileToDb = (p) => ({
+  memorized: p.memorized || [], direction: p.direction || "forward", start_unit: p.startUnit ?? null,
+  short_pages: p.shortPages ?? 1, long_start_unit: p.longStartUnit ?? null, long_mode: p.longMode || "juz", long_pages: p.longPages ?? 2,
+});
+
+export const HIFZ_TASK_MAPS = { taskFromDb, mistakeFromDb, profileFromDb };
 
 // teacherId: the signed-in teacher (null in the student portal).
 export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
@@ -40,13 +50,20 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
   return {
     async getProfile() {
       const r = check(await own("hifz_profiles").maybeSingle());
-      return r && { memorized: r.memorized || [], goalYear: r.goal_year };
+      return r && profileFromDb(r);
     },
     async saveProfile(p) {
       check(await supabase.from("hifz_profiles").upsert(
-        { student_id: studentId, memorized: p.memorized, goal_year: p.goalYear || null, updated_by: teacherId, updated_at: new Date().toISOString() },
+        { student_id: studentId, ...profileToDb(p), updated_by: teacherId, updated_at: new Date().toISOString() },
         { onConflict: "student_id" },
       ));
+    },
+    async getGoal() {
+      const r = check(await own("hifz_goals").maybeSingle());
+      return r ? r.goal_year : null;
+    },
+    async saveGoal(goalYear) {
+      check(await supabase.from("hifz_goals").upsert({ student_id: studentId, goal_year: goalYear, updated_at: new Date().toISOString() }, { onConflict: "student_id" }));
     },
     async getLegacy() {
       const old = createSupabaseRepo(supabase, studentId);
@@ -76,7 +93,7 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
     async deleteMistake(id) { check(await supabase.from("hifz_mistakes").delete().eq("id", id).eq("student_id", studentId)); },
     subscribe(onChange) {
       const channel = supabase.channel(`hifz-${studentId}-${Math.random().toString(36).slice(2)}`);
-      for (const table of ["hifz_tasks", "hifz_mistakes", "hifz_profiles"]) {
+      for (const table of ["hifz_tasks", "hifz_mistakes", "hifz_profiles", "hifz_goals"]) {
         channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `student_id=eq.${studentId}` }, () => onChange());
       }
       channel.subscribe();
@@ -88,7 +105,7 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
 // ---------- In-memory (tests and local demo) ----------
 
 export function createHifzMemoryStore() {
-  return { profiles: new Map(), legacy: new Map(), tasks: [], mistakes: [], nextId: 1, tick: 0, listeners: new Set() };
+  return { profiles: new Map(), goals: new Map(), legacy: new Map(), tasks: [], mistakes: [], nextId: 1, tick: 0, listeners: new Set() };
 }
 
 // asStudent: like row-level security for a signed-in student — read only,
@@ -106,7 +123,9 @@ export function createMemoryHifzRepo(store, studentId, { asStudent = false, teac
   };
   return {
     async getProfile() { const p = store.profiles.get(studentId); return p ? clone(p) : null; },
-    async saveProfile(p) { teacherOnly(); store.profiles.set(studentId, clone({ memorized: p.memorized, goalYear: p.goalYear || null })); changed(); },
+    async saveProfile(p) { teacherOnly(); const { goalYear, fromLegacy, ...plan } = p; store.profiles.set(studentId, clone(plan)); changed(); },
+    async getGoal() { return store.goals.get(studentId) ?? null; },
+    async saveGoal(goalYear) { store.goals.set(studentId, goalYear); changed(); },
     async getLegacy() { const l = store.legacy.get(studentId); return l ? clone(l) : null; },
     async listTasks() { return clone(store.tasks.filter(own)); },
     async addTasks(rows) {

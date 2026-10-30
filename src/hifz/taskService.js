@@ -7,7 +7,7 @@ import { summarizeHifz, legacyProfile } from "./tasks.js";
 // The teacher's profile, or — until the teacher saves one — the starting
 // point from the student's old self-made plan.
 export async function loadHifz(repo, today = maldivesToday()) {
-  const [saved, tasks, mistakes] = await Promise.all([repo.getProfile(), repo.listTasks(), repo.listMistakes()]);
+  const [saved, tasks, mistakes, goalYear] = await Promise.all([repo.getProfile(), repo.listTasks(), repo.listMistakes(), repo.getGoal().catch(() => null)]);
   const profile = saved || legacyProfile(await repo.getLegacy().catch(() => null));
-  return summarizeHifz({ profile, tasks, mistakes }, today);
+  return summarizeHifz({ profile, tasks, mistakes, goalYear }, today);
 }

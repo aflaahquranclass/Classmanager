@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Target, Presentation, Eye, EyeOff } from "lucide-react";
 import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
-import HifzTracker, { HIFZ_CSS, completedCounts, useHifz } from "./HifzTracker.jsx";
+import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog } from "./HifzTracker.jsx";
 import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
 import { pageToUnit } from "./hifz/quran.js";
@@ -336,7 +336,7 @@ export default function StudentPortal() {
     return DEMO ? createMemoryHifzRepo(hifzDemoStore, student.id, { asStudent: true }) : createSupabaseHifzRepo(supabase, student.id);
   }, [student]);
   // Kept fresh live (teacher's changes) for the dashboard and header streak.
-  const { state: summary } = useHifz(repo);
+  const { state: summary, refresh: refreshHifz } = useHifz(repo);
 
   const doesHifz = hasProgram(student, "hifz");
   const doesThilawa = hasProgram(student, "thilawa");
@@ -566,6 +566,10 @@ export default function StudentPortal() {
         <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-bottom" alt="" aria-hidden="true" />
       </>}
       {auth.status === "loading" && <main className="sp-wrap"><div className="hz-card hz-muted">Loading…</div></main>}
+      {/* Hifz students choose their target year the first time they open the portal. */}
+      {ready && doesHifz && summary && !summary.hasGoal && (
+        <GoalYearDialog required onSave={async (y) => { await repo.saveGoal(y); await refreshHifz(); }} />
+      )}
       {ready && (
       <div className="tp-shell sp-shell">
         <style>{TP_SHARED_STYLES}</style>

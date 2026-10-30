@@ -34,23 +34,33 @@ test("overdue, today and upcoming are split by date; today is ordered New, Short
   assert.equal(s.hasProfile, false);
 });
 
-test("suggestions continue from the last task", () => {
+test("New Hifz follows the path; Short revises the latest pages; Long goes juz by juz", () => {
   const done = "2026-10-30T10:00:00Z";
-  const tasks = [task("2026-10-30", "new", [pageToUnit(50), pageToUnit(50) + P / 2], done), task("2026-10-30", "long", pages(2, 3), done)];
+  // From Al-Baqarah: pages 2–49 known, half of page 50 just done.
+  const fwd = { direction: "forward", startUnit: pageToUnit(2), shortPages: 4, longStartUnit: pageToUnit(10), longMode: "juz" };
+  const tasks = [task("2026-10-30", "new", [pageToUnit(50), pageToUnit(50) + P / 2], done)];
   const memorized = [[pageToUnit(2), pageToUnit(50) + P / 2]];
-  assert.deepEqual(suggestPortion("new", tasks, memorized), { start: pageToUnit(50) + P / 2, end: pageToUnit(51) });
-  // New Hifz skips what's already memorised and stops before the next memorised part.
-  assert.deepEqual(suggestPortion("new", [task("2026-10-30", "new", pages(1, 1))], [pages(2, 3), pages(5, 9)]), { start: pageToUnit(4), end: pageToUnit(5) });
-  // Short repeats the last revision while no New Hifz is done yet.
-  assert.deepEqual(suggestPortion("short", [task("2026-10-30", "short", pages(7, 8))], memorized), { start: pageToUnit(7), end: pageToUnit(9) });
-  assert.deepEqual(suggestPortion("short", tasks, memorized), { start: pageToUnit(49) + P / 2, end: pageToUnit(50) + P / 2 });
-  const span = ([start, end]) => ({ start, end });
-  assert.deepEqual(suggestPortion("long", tasks, memorized), span(pages(4, 5)));
-  // Long wraps back to the beginning after the last memorised page.
-  assert.deepEqual(suggestPortion("long", [task("2026-10-30", "long", [pageToUnit(49), pageToUnit(50) + P / 2])], memorized), { start: pageToUnit(2), end: pageToUnit(3) + P / 2 });
+  assert.deepEqual(suggestPortion("new", tasks, memorized, fwd), { start: pageToUnit(50) + P / 2, end: pageToUnit(51) });
+  // Short: the 4 most recently memorised pages, not a new part.
+  assert.deepEqual(suggestPortion("short", tasks, memorized, fwd), { start: pageToUnit(46) + P / 2, end: pageToUnit(50) + P / 2 });
+  // Long: from the chosen start to the end of its juz (Juz 1 ends on page 21) …
+  assert.deepEqual(suggestPortion("long", tasks, memorized, fwd), { start: pageToUnit(10), end: pageToUnit(22) });
+  // … then the next juz, and back to the beginning after the last memorised page.
+  assert.deepEqual(suggestPortion("long", [task("2026-10-30", "long", [pageToUnit(10), pageToUnit(22)])], memorized, fwd), { start: pageToUnit(22), end: pageToUnit(42) });
+  assert.deepEqual(suggestPortion("long", [task("2026-10-30", "long", [pageToUnit(42), pageToUnit(50) + P / 2])], memorized, fwd).start, pageToUnit(2));
+  assert.deepEqual(suggestPortion("long", tasks, memorized, { ...fwd, longMode: "pages", longPages: 3 }), { start: pageToUnit(10), end: pageToUnit(13) });
+
+  // From An-Naba: Juz 30 known, Juz 29 started (pages 562–563).
+  const rev = { direction: "juz_reverse", startUnit: pageToUnit(582), shortPages: 4 };
+  const memRev = [pages(562, 563), pages(582, 604)];
+  assert.deepEqual(suggestPortion("new", [], memRev, rev), { start: pageToUnit(564), end: pageToUnit(565) });
+  assert.deepEqual(suggestPortion("short", [], memRev, rev), { start: pageToUnit(562), end: pageToUnit(564) });
+  // A New Hifz already set (not done yet) isn't suggested again.
+  assert.equal(suggestPortion("new", [task("2026-11-01", "new", pages(564, 564))], memRev, rev).start, pageToUnit(565));
+
   assert.equal(suggestDate(tasks, TODAY), TODAY);
   assert.equal(suggestDate([task(TODAY, "new", pages(1, 1))], TODAY), "2026-11-01");
-  const next = nextAfter(tasks[0], tasks, memorized, TODAY);
+  const next = nextAfter(tasks[0], tasks, memorized, TODAY, fwd);
   assert.equal(next.taskDate, "2026-11-01");
   assert.equal(next.start, tasks[0].end);
 });

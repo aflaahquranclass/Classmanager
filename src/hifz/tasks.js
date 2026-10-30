@@ -7,11 +7,18 @@
 // New Hifz task.
 //
 // task:    { id, taskDate, activity, start, end, notes, completedAt, createdAt }
-// profile: { memorized: [[s, e], …], goalYear }
+// profile: the plan the teacher sets —
+//   { memorized: [[s, e], …], direction: "forward" | "juz_reverse", startUnit,
+//     shortPages, longStartUnit, longMode: "juz" | "pages", longPages }
+//   direction/startUnit: where the Hifz started (Al-Baqarah onward, or
+//   An-Naba juz by juz towards the front); it orders New Hifz and tells which
+//   pages were memorised most recently.
+// goalYear: the year the student wants to finish by (the student sets it).
 // mistake: { id, page, line, verseKey, position, wordText, note, taskId, correctedAt, createdAt }
 
 import { TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, unitToPage, pageToUnit } from "./quran.js";
-import { unitsOf, union, intersect, toSet, computeStreak, localDate, addDays, memorizedAll } from "./engine.js";
+import { unitsOf, union, intersect, subtract, toSet, computeStreak, localDate, addDays, memorizedAll, newHifzSequence } from "./engine.js";
+import { juzOfPage, juzEndUnit } from "./quran.js";
 import { countAyahs, TOTAL_AYAHS } from "./ayahs.js";
 
 export const ACTIVITIES = ["new", "short", "long"];
@@ -28,10 +35,26 @@ export const taskPages = (t) => {
   return pages;
 };
 
+// Where each path starts when the teacher hasn't picked the exact page.
+export const PATH_STARTS = { forward: pageToUnit(2), juz_reverse: pageToUnit(582) };
+export const DEFAULT_PLAN = { memorized: [], direction: "forward", startUnit: null, shortPages: 1, longStartUnit: null, longMode: "juz", longPages: 2 };
+export const planOf = (profile) => ({ ...DEFAULT_PLAN, ...(profile || {}) });
+
+// The New Hifz path in order (see engine.newHifzSequence).
+export const hifzPath = (profile) => {
+  const plan = planOf(profile);
+  return newHifzSequence({ direction: plan.direction, startUnit: plan.startUnit ?? PATH_STARTS[plan.direction] ?? PATH_STARTS.forward });
+};
+
 // The starting point from a student's old self-made plan, if they had one.
 export function legacyProfile(legacy) {
   if (!legacy?.settings) return null;
-  return { memorized: memorizedAll(legacy.settings, legacy.rows || []), goalYear: legacy.settings.goalYear, fromLegacy: true };
+  const s = legacy.settings;
+  return {
+    memorized: memorizedAll(s, legacy.rows || []), goalYear: s.goalYear, fromLegacy: true,
+    direction: s.direction, startUnit: s.startUnit, shortPages: s.shortTarget / UNITS_PER_PAGE,
+    longStartUnit: s.longStartUnit, longMode: "pages", longPages: s.longTarget / UNITS_PER_PAGE,
+  };
 }
 
 export function memorizedRanges(profile, tasks) {
@@ -46,7 +69,7 @@ function revisedSince(tasks, activity, today, days, timezone) {
     .map(range));
 }
 
-export function summarizeHifz({ profile, tasks, mistakes = [] }, today, timezone = TIMEZONE) {
+export function summarizeHifz({ profile, tasks, mistakes = [], goalYear = null }, today, timezone = TIMEZONE) {
   const sorted = [...tasks].sort(byDateThenMade);
   const memorized = memorizedRanges(profile, sorted);
   const memorizedUnits = unitsOf(memorized);
@@ -70,7 +93,7 @@ export function summarizeHifz({ profile, tasks, mistakes = [] }, today, timezone
       remainingUnits: TOTAL_UNITS - memorizedUnits,
       ayahs,
       percent: Math.floor((ayahs / TOTAL_AYAHS) * 1000) / 10,
-      goalYear: profile?.goalYear ?? null,
+      goalYear: goalYear ?? profile?.goalYear ?? null,
       shortWeekUnits: unitsOf(revisedSince(sorted, "short", today, 7, timezone)),
       longMonthUnits: unitsOf(longRevised),
       longMonthPercent: memorizedUnits ? Math.round((unitsOf(longRevised) / memorizedUnits) * 100) : 0,
@@ -79,6 +102,7 @@ export function summarizeHifz({ profile, tasks, mistakes = [] }, today, timezone
     mistakes,
     openMistakes: mistakes.filter((m) => !m.correctedAt),
     hasProfile: !!profile,
+    hasGoal: (goalYear ?? profile?.goalYear) != null,
   };
 }
 
@@ -92,42 +116,48 @@ export const mistakeInTask = (m, task) => {
 export const mistakesForTask = (task, mistakes) => mistakes.filter((m) => !m.correctedAt && mistakeInTask(m, task));
 
 // ---------- suggestions for the teacher's next task ----------
+// Worked out from the student's plan, so the teacher only adjusts when needed.
 
-const DEFAULT_SIZE = { new: UNITS_PER_PAGE, short: UNITS_PER_PAGE, long: 2 * UNITS_PER_PAGE };
 const lastOf = (tasks, activity) => tasks.filter((t) => t.activity === activity).sort(byDateThenMade).pop() || null;
-const clampEnd = (start, size) => Math.min(TOTAL_UNITS, start + size);
 
 // The portion that naturally comes next for an activity:
-//  new   — straight after the last New Hifz task (skipping anything already
-//          memorised), the same size;
-//  short — the most recently memorised portion, the same size as last time
-//          (or the last revision again while nothing new is done yet);
-//  long  — carries on after the last Long Muraja'ah, back to the start of
-//          what's memorised once it passes the end.
-export function suggestPortion(activity, tasks, memorized) {
+//  new   — the next part of the Hifz path that is neither memorised nor
+//          already set, the same size as the last New Hifz (1 page at first);
+//  short — the student's most recently memorised pages along the path, as
+//          many as the plan's Short Muraja'ah pages;
+//  long  — from where Long Muraja'ah is up to (the plan's start, then the
+//          end of the last Long Muraja'ah) to the end of that juz, or the
+//          plan's number of pages; only memorised pages, wrapping back to the
+//          beginning after the last.
+export function suggestPortion(activity, tasks, memorized, profile = null) {
+  const plan = planOf(profile);
+  const path = hifzPath(plan);
   const last = lastOf(tasks, activity);
-  const size = last ? last.end - last.start : DEFAULT_SIZE[activity];
-  const memEnd = memorized.length ? memorized[memorized.length - 1][1] : 0;
   if (activity === "new") {
-    let start = last ? last.end : memEnd || pageToUnit(2);
-    for (const [s, e] of memorized) if (start >= s && start < e) start = e;
-    if (start >= TOTAL_UNITS) return null;
-    const next = memorized.find(([s]) => s > start);
-    return { start, end: Math.min(clampEnd(start, size), next ? next[0] : TOTAL_UNITS) };
+    const size = last ? last.end - last.start : UNITS_PER_PAGE;
+    const set = tasks.filter((t) => t.activity === "new").map(range);
+    const left = subtract(path, union(memorized, set));
+    if (!left.length) return null;
+    const [s, e] = left[0];
+    return { start: s, end: Math.min(s + size, e) };
   }
   if (activity === "short") {
-    const lastNew = lastOf(tasks.filter((t) => t.completedAt), "new");
-    if (!lastNew && last) return { start: last.start, end: last.end };
-    const end = lastNew ? lastNew.end : memEnd;
-    if (!end) return null;
-    return { start: Math.max(0, end - size), end };
+    const size = Math.round(plan.shortPages * UNITS_PER_PAGE);
+    const onPath = intersect(path, memorized);
+    const latest = onPath.length ? onPath[onPath.length - 1] : memorized[memorized.length - 1];
+    if (!latest) return null;
+    return { start: Math.max(latest[0], latest[1] - size), end: latest[1] };
   }
   if (!memorized.length) return null;
-  let start = last ? last.end : memorized[0][0];
-  // Skip forward to memorised pages; wrap to the beginning after the last one.
-  const next = memorized.find(([s, e]) => e > start);
-  start = next ? Math.max(start, next[0]) : memorized[0][0];
-  return { start, end: clampEnd(start, size) };
+  let pos = last ? last.end : plan.longStartUnit ?? memorized[0][0];
+  // Only memorised pages; back to the beginning after the last one.
+  const block = memorized.find(([, e]) => e > pos) || memorized[0];
+  pos = Math.max(pos, block[0]);
+  if (pos >= block[1]) pos = block[0];
+  const end = plan.longMode === "pages"
+    ? Math.min(pos + Math.round(plan.longPages * UNITS_PER_PAGE), block[1])
+    : Math.min(juzEndUnit(juzOfPage(unitToPage(pos))), block[1]);
+  return { start: pos, end: Math.max(end, pos + UNITS_PER_LINE) };
 }
 
 // The day a new task most likely belongs to: tomorrow if today already has
@@ -137,10 +167,8 @@ export function suggestDate(tasks, today) {
 }
 
 // "Next" after a task: the same activity on the following day.
-export function nextAfter(task, tasks, memorized, today) {
+export function nextAfter(task, tasks, memorized, today, profile = null) {
   const day = addDays(task.taskDate > today ? task.taskDate : today, 1);
-  const portion = task.activity === "new"
-    ? suggestPortion("new", [task], memorized)
-    : suggestPortion(task.activity, tasks, memorized);
+  const portion = suggestPortion(task.activity, tasks, memorized, profile);
   return portion && portion.start < TOTAL_UNITS ? { activity: task.activity, taskDate: day, ...portion } : null;
 }

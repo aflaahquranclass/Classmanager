@@ -9,9 +9,9 @@ import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCir
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay, surahNames } from "../HifzTracker.jsx";
-import { JUZ_START_PAGES, TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, juzStartUnit, juzEndUnit, describeRange, describeAmount } from "./quran.js";
-import { unitsOf, intersect, toSet, subtract, addDays } from "./engine.js";
-import { ACTIVITIES, suggestPortion, suggestDate, nextAfter, mistakesForTask, summarizeHifz } from "./tasks.js";
+import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, describeRange, describeAmount } from "./quran.js";
+import { unitsOf, toSet, subtract, addDays } from "./engine.js";
+import { ACTIVITIES, suggestPortion, suggestDate, nextAfter, mistakesForTask, summarizeHifz, planOf, PATH_STARTS } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -57,6 +57,10 @@ const teacherCss = `
   .ht-ranges span { display: inline-flex; align-items: center; gap: 6px; background: #E4F1FC; color: #1D5FA8; border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 600; }
   .ht-ranges button { border: none; background: transparent; color: inherit; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
   .ht-ranges button:hover { background: #CFE4F8; }
+  .ht-plan { display: flex; flex-direction: column; gap: 14px; }
+  .ht-plan-step { border: 1px solid #E1EDF8; border-radius: 14px; padding: 14px; background: #F9FBFE; }
+  .ht-plan-step h4 { margin: 0 0 10px; font-size: 15px; color: #123B67; }
+  .ht-plan-step .hz-field:first-of-type { margin-top: 10px; }
   @media (max-width: 520px) { .ht-row-actions .hz-btn { flex: 1 1 auto; } }
 `;
 
@@ -72,59 +76,95 @@ function PortionFields({ value, onChange }) {
   );
 }
 
-// ---------- starting point (what was memorised before) and goal ----------
+// ---------- the student's Hifz plan ----------
+// Where the Hifz started, what was memorised before (page to page), and how
+// Short and Long Muraja'ah work. New, Short and Long portions are worked out
+// from this (tasks.js: suggestPortion). The target year is the student's own.
+
+const PATHS = [
+  { direction: "forward", label: "From Al-Baqarah", hint: "Front to back, page 2 onward" },
+  { direction: "juz_reverse", label: "From An-Naba", hint: "Juz 30 first, then Juz 29, 28 …" },
+];
 
 function ProfileEditor({ profile, onSave, onCancel, busy }) {
-  const [memorized, setMemorized] = useState(() => toSet(profile?.memorized || []));
-  const [goalYear, setGoalYear] = useState(profile?.goalYear || new Date().getFullYear() + 3);
+  const start = planOf(profile);
+  const [plan, setPlan] = useState(() => ({ ...start, memorized: toSet(start.memorized), startUnit: start.startUnit ?? PATH_STARTS[start.direction] }));
+  const set = (patch) => setPlan((p) => ({ ...p, ...patch }));
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const fullJuz = new Set(JUZ_START_PAGES.map((_, i) => i + 1).filter((j) => unitsOf(intersect([[juzStartUnit(j), juzEndUnit(j)]], memorized)) === juzEndUnit(j) - juzStartUnit(j)));
-  const toggleJuz = (j) => {
-    const r = [juzStartUnit(j), juzEndUnit(j)];
-    setMemorized((m) => (fullJuz.has(j) ? subtract(toSet(m), [r]) : toSet([...m, r])));
-  };
+  const [pagesError, setPagesError] = useState("");
   const addPages = () => {
     const a = Math.round(+from);
     const b = Math.round(+(to || from));
-    if (a >= 1 && b >= a && b <= 604) { setMemorized((m) => toSet([...m, [pageToUnit(a), pageToUnit(b + 1)]])); setFrom(""); setTo(""); }
+    if (!(a >= 1 && b >= a && b <= 604)) { setPagesError("Pages go from 1 to 604, and the last page can't be before the first."); return; }
+    set({ memorized: toSet([...plan.memorized, [pageToUnit(a), pageToUnit(b + 1)]]) });
+    setFrom(""); setTo(""); setPagesError("");
   };
-  const thisYear = new Date().getFullYear();
+  const longStart = plan.longStartUnit ?? plan.memorized[0]?.[0] ?? pageToUnit(1);
   return (
-    <div>
+    <div className="ht-plan">
       {profile?.fromLegacy && <div className="hz-note" style={{ marginTop: 0, marginBottom: 12 }}><Target size={18} aria-hidden="true" /><span>Filled in from the plan the student made themself. Check it and save.</span></div>}
-      <div className="hz-field" style={{ marginTop: 0 }}>
-        <span>Whole juz memorised before</span>
-        <div className="hz-chips">
-          {JUZ_START_PAGES.map((_, i) => <button key={i} type="button" className="hz-chip" aria-pressed={fullJuz.has(i + 1)} onClick={() => toggleJuz(i + 1)}>{i + 1}</button>)}
+
+      <div className="ht-plan-step">
+        <h4>1. Where did the Hifz start?</h4>
+        <div className="hz-options" style={{ marginTop: 0 }}>
+          {PATHS.map((p) => (
+            <button key={p.direction} type="button" className="hz-option" aria-pressed={plan.direction === p.direction}
+              onClick={() => set({ direction: p.direction, startUnit: PATH_STARTS[p.direction] })}>{p.label}<small>{p.hint}</small></button>
+          ))}
         </div>
+        <PositionPicker label="Exact starting page" unit={plan.startUnit} allowLine={false} minPage={plan.direction === "forward" ? 2 : 1} onChange={(u) => set({ startUnit: u })} />
       </div>
-      <div className="hz-field">
-        <span>Or add pages</span>
+
+      <div className="ht-plan-step">
+        <h4>2. Pages memorised before</h4>
         <div className="hz-grid3">
-          <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="From page" aria-label="From page" value={from} onChange={(e) => setFrom(e.target.value)} />
-          <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="To page" aria-label="To page" value={to} onChange={(e) => setTo(e.target.value)} />
-          <button type="button" className="hz-btn hz-btn-outline" onClick={addPages} disabled={!from}><Plus size={16} aria-hidden="true" />Add</button>
+          <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="From page" aria-label="From page" value={from} onChange={(e) => setFrom(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
+          <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="To page" aria-label="To page" value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
+          <button type="button" className="hz-btn hz-btn-outline" onClick={addPages} disabled={!from}><Plus size={16} aria-hidden="true" />Add pages</button>
         </div>
+        {pagesError && <div className="hz-error" role="alert" style={{ marginTop: 8 }}>{pagesError}</div>}
+        <div className="ht-ranges" aria-label="Memorised before">
+          {plan.memorized.length === 0 && <span style={{ background: "#EEF0F3", color: "#5B6B79", paddingRight: 12 }}>Nothing yet</span>}
+          {plan.memorized.map((r) => (
+            <span key={r.join("-")}>{describeRange(r)}
+              <button type="button" aria-label={`Remove ${describeRange(r)}`} onClick={() => set({ memorized: subtract(plan.memorized, [r]) })}><X size={14} aria-hidden="true" /></button>
+            </span>
+          ))}
+        </div>
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>{describeAmount(unitsOf(plan.memorized))} memorised before. Completed New Hifz tasks are added automatically.</p>
       </div>
-      <div className="ht-ranges" aria-label="Memorised before">
-        {memorized.length === 0 && <span style={{ background: "#EEF0F3", color: "#5B6B79", paddingRight: 12 }}>Nothing yet</span>}
-        {memorized.map((r) => (
-          <span key={r.join("-")}>{describeRange(r)}
-            <button type="button" aria-label={`Remove ${describeRange(r)}`} onClick={() => setMemorized((m) => subtract(m, [r]))}><X size={14} aria-hidden="true" /></button>
-          </span>
-        ))}
-      </div>
-      <p className="hz-muted" style={{ marginBottom: 0 }}>{describeAmount(unitsOf(memorized))} memorised before. Completed New Hifz tasks are added to this automatically.</p>
-      <div className="hz-field">
-        <span>Goal: finish memorising by the end of</span>
+
+      <div className="ht-plan-step">
+        <h4>3. Short Muraja'ah: how many pages a day?</h4>
         <div className="hz-chips">
-          {Array.from({ length: 12 }, (_, i) => thisYear + i).map((y) => <button key={y} type="button" className="hz-chip" style={{ minWidth: 64 }} aria-pressed={goalYear === y} onClick={() => setGoalYear(y)}>{y}</button>)}
+          {[1, 2, 3, 4, 5, 6].map((n) => <button key={n} type="button" className="hz-chip" style={{ minWidth: 52 }} aria-pressed={plan.shortPages === n} onClick={() => set({ shortPages: n })}>{n}</button>)}
+          <input className="hz-input" style={{ width: 110 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Short Muraja'ah pages"
+            value={plan.shortPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ shortPages: Math.min(40, v) }); }} />
         </div>
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each day it revises the {plan.shortPages} most recently memorised page{plan.shortPages === 1 ? "" : "s"} of the Hifz path.</p>
       </div>
+
+      <div className="ht-plan-step">
+        <h4>4. Long Muraja'ah</h4>
+        <PositionPicker label="Start from" unit={longStart} allowLine={false} onChange={(u) => set({ longStartUnit: u })} />
+        <div className="hz-field">
+          <span>How much a day?</span>
+          <div className="hz-options" style={{ marginTop: 0 }}>
+            <button type="button" className="hz-option" aria-pressed={plan.longMode === "juz"} onClick={() => set({ longMode: "juz" })}>To the end of the juz<small>One juz a day</small></button>
+            <button type="button" className="hz-option" aria-pressed={plan.longMode === "pages"} onClick={() => set({ longMode: "pages" })}>A number of pages<small>{plan.longPages} page{plan.longPages === 1 ? "" : "s"} a day</small></button>
+          </div>
+          {plan.longMode === "pages" && (
+            <input className="hz-input" style={{ maxWidth: 160 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Long Muraja'ah pages a day"
+              value={plan.longPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ longPages: Math.min(40, v) }); }} />
+          )}
+        </div>
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>Goes through the memorised pages from here, then starts again from the beginning.</p>
+      </div>
+
       <div className="hz-wiz-nav" style={{ justifyContent: "flex-end" }}>
         {onCancel && <button className="hz-btn hz-btn-outline" onClick={onCancel}>Cancel</button>}
-        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave({ memorized, goalYear })}>Save</button>
+        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave({ ...plan, longStartUnit: longStart })}>Save plan</button>
       </div>
     </div>
   );
@@ -136,7 +176,7 @@ const freshForm = (data) => {
   const date = suggestDate(data.tasks, data.today);
   const rows = {};
   for (const a of ACTIVITIES) {
-    const p = suggestPortion(a, data.tasks, data.memorized);
+    const p = suggestPortion(a, data.tasks, data.memorized, data.profile);
     rows[a] = { on: !!p, start: p?.start ?? pageToUnit(582), end: p?.end ?? pageToUnit(583), notes: "" };
   }
   return { date, rows };
@@ -245,7 +285,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
 
   const taskRow = (t) => {
     const { title, Icon } = ACTIVITY_INFO[t.activity];
-    const next = nextAfter(t, tasks, memorized, today);
+    const next = nextAfter(t, tasks, memorized, today, data.profile);
     const count = mistakesForTask(t, mistakes).length;
     if (editingId === t.id) {
       return (
@@ -307,25 +347,25 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         <div className="hz-bar" style={{ margin: "12px 0" }} role="progressbar" aria-label="Quran memorized" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.percent}><div style={{ width: `${stats.percent}%` }} /></div>
         <div className="hz-kv">
           <div><span>Memorised</span><strong>{describeAmount(stats.memorizedUnits)}</strong></div>
-          <div><span>Goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not set"}</strong></div>
+          <div><span>Target year (set by the student)</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not chosen yet"}</strong></div>
           <div><span>Streak</span><strong><Flame size={14} aria-hidden="true" /> {streak.current} day{streak.current === 1 ? "" : "s"}</strong></div>
           <div><span>Mistakes to fix</span><strong>{openMistakes.length}</strong></div>
         </div>
         {editingProfile || needsProfile ? (
           <div style={{ marginTop: 16 }}>
-            <h3 className="hz-h2" style={{ fontSize: 16 }}><Target size={18} aria-hidden="true" />Starting point and goal</h3>
+            <h3 className="hz-h2" style={{ fontSize: 16 }}><Target size={18} aria-hidden="true" />Hifz plan</h3>
             <ProfileEditor profile={data.profile} busy={busy} onCancel={data.hasProfile && !data.profile?.fromLegacy ? () => setEditingProfile(false) : null}
               onSave={(p) => run(() => repo.saveProfile(p)).then((ok) => ok && setEditingProfile(false))} />
           </div>
         ) : (
-          <button className="hz-btn hz-btn-ghost" style={{ marginTop: 8 }} onClick={() => setEditingProfile(true)}><Target size={16} aria-hidden="true" />Change starting point or goal</button>
+          <button className="hz-btn hz-btn-ghost" style={{ marginTop: 8 }} onClick={() => setEditingProfile(true)}><Target size={16} aria-hidden="true" />Change Hifz plan</button>
         )}
       </section>
 
       <section className="hz-card" aria-label="Set Hifz tasks">
         <h2 className="hz-h2"><Plus size={22} aria-hidden="true" />Set Hifz Tasks</h2>
         <p className="hz-muted" style={{ marginTop: 0 }}>Portions are filled in to carry on from the last tasks. The student gets a phone notification.</p>
-        <AssignForm key={`${tasks.length}-${data.today}-${stats.memorizedUnits}`} data={data} busy={busy} onAssign={(rows) => run(() => repo.addTasks(rows))} />
+        <AssignForm key={`${tasks.length}-${data.today}-${stats.memorizedUnits}-${JSON.stringify(planOf(data.profile))}`} data={data} busy={busy} onAssign={(rows) => run(() => repo.addTasks(rows))} />
       </section>
 
       <section className="hz-card" aria-label="Tasks">
@@ -412,13 +452,17 @@ export function TeacherHifz({ students, teacherId }) {
     try {
       // hifz_profiles is keyed by student_id (no id column).
       const fetch = (table) => selectAll(() => supabase.from(table).select("*").in("student_id", ids).order("created_at").order(table === "hifz_profiles" ? "student_id" : "id"));
-      const [profiles, tasks, mistakes] = await Promise.all(["hifz_profiles", "hifz_tasks", "hifz_mistakes"].map(fetch));
+      const goalsRes = supabase.from("hifz_goals").select("student_id, goal_year").in("student_id", ids);
+      const [profiles, tasks, mistakes, { data: goalRows, error: goalsErr }] = await Promise.all([...["hifz_profiles", "hifz_tasks", "hifz_mistakes"].map(fetch), goalsRes]);
+      if (goalsErr) throw new Error(goalsErr.message);
+      const goals = goalRows || [];
       const today = maldivesToday();
       const out = {};
       for (const id of ids) {
         const p = profiles.find((r) => r.student_id === id);
         out[id] = summarizeHifz({
-          profile: p ? { memorized: p.memorized || [], goalYear: p.goal_year } : null,
+          profile: p ? HIFZ_TASK_MAPS.profileFromDb(p) : null,
+          goalYear: goals.find((g) => g.student_id === id)?.goal_year ?? null,
           tasks: tasks.filter((r) => r.student_id === id).map(HIFZ_TASK_MAPS.taskFromDb),
           mistakes: mistakes.filter((r) => r.student_id === id).map(HIFZ_TASK_MAPS.mistakeFromDb),
         }, today);
