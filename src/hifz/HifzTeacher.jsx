@@ -10,9 +10,9 @@ import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
-import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, describeRange, describeAmount } from "./quran.js";
+import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract } from "./engine.js";
-import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, describeAyahs, nextTasksToSet, previewNext } from "./tasks.js";
+import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, nextTasksToSet, previewNext } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -110,6 +110,11 @@ const teacherCss = `
   .ht-plan-step { border: 1px solid #E1EDF8; border-radius: 14px; padding: 14px; background: #F9FBFE; }
   .ht-plan-step h4 { margin: 0 0 10px; font-size: 15px; color: #123B67; }
   .ht-plan-step .hz-field:first-of-type { margin-top: 10px; }
+  .ht-juz { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .ht-juz > span { font-size: 13px; font-weight: 700; color: #567493; margin-right: 4px; }
+  .ht-juz .hz-chip { min-width: 64px; }
+  .ht-juz .hz-select { width: auto; min-width: 96px; min-height: 40px; }
+  .ht-juz .hz-btn { min-height: 40px; }
   @media (max-width: 520px) { .ht-row-actions .hz-btn { flex: 1 1 auto; } }
 `;
 
@@ -129,7 +134,8 @@ function PortionFields({ value, onChange }) {
 const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeAmount(r.end - r.start)} · ${describeAyahs([r.start, r.end])}`;
 
 // ---------- the student's Hifz plan ----------
-// Where the Hifz started, what was memorised before (page to page), and how
+// Where the student starts Hifz, what was memorised before (page to page or
+// whole juz from the front or back), and how
 // Short and Long Muraja'ah work. New, Short and Long portions are worked out
 // from this (tasks.js: suggestPortion). The target year is the student's own.
 
@@ -141,15 +147,31 @@ const NEW_AMOUNTS = [
   { units: 60, label: "2 pages" },
 ];
 
-const PATHS = [
-  { direction: "forward", label: "From Al-Baqarah", hint: "Front to back, page 2 onward" },
-  { direction: "juz_reverse", label: "From An-Naba", hint: "Juz 30 first, then Juz 29, 28 …" },
-];
+const JUZ_COUNTS = Array.from({ length: 30 }, (_, i) => i + 1);
 
-function ProfileEditor({ profile, onSave, onCancel, busy }) {
+// Which way New Hifz goes from the start, in words.
+function pathNote(plan) {
+  if (plan.direction !== "juz_reverse") return "New Hifz goes on from here to the end of the Quran.";
+  const j = juzOfPage(unitToPage(plan.startUnit));
+  if (j === 1) return "New Hifz goes to the end of Juz 1.";
+  return `New Hifz goes to the end of Juz ${j}, then Juz ${j - 1}${j > 2 ? `, ${j - 2}` : ""}${j > 3 ? " …" : ""} towards the front.`;
+}
+
+function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
   const start = planOf(profile);
   const [plan, setPlan] = useState(() => ({ ...start, memorized: toSet(start.memorized), startUnit: start.startUnit ?? PATH_STARTS[start.direction] }));
-  const set = (patch) => setPlan((p) => ({ ...p, ...patch }));
+  // The direction isn't asked: a saved plan keeps its own until the start or
+  // the pages memorised before change, then it follows from them (directionFor,
+  // with completed New Hifz counted too).
+  const set = (patch) => setPlan((p) => {
+    const next = { ...p, ...patch };
+    if ("startUnit" in patch || "memorized" in patch) next.direction = directionFor(next.startUnit, memorizedRanges({ memorized: next.memorized }, tasks));
+    return next;
+  });
+  const [juzSide, setJuzSide] = useState("first");
+  const [juzCount, setJuzCount] = useState(1);
+  const juzRange = wholeJuz(juzSide, juzCount);
+  const juzName = juzSide === "last" ? (juzCount === 1 ? "Juz 30" : `Juz ${31 - juzCount}–30`) : juzCount === 1 ? "Juz 1" : `Juz 1–${juzCount}`;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [pagesError, setPagesError] = useState("");
@@ -166,14 +188,9 @@ function ProfileEditor({ profile, onSave, onCancel, busy }) {
       {profile?.fromLegacy && <div className="hz-note" style={{ marginTop: 0, marginBottom: 12 }}><Target size={18} aria-hidden="true" /><span>Filled in from the plan the student made themself. Check it and save.</span></div>}
 
       <div className="ht-plan-step">
-        <h4>1. Where did the Hifz start?</h4>
-        <div className="hz-options" style={{ marginTop: 0 }}>
-          {PATHS.map((p) => (
-            <button key={p.direction} type="button" className="hz-option" aria-pressed={plan.direction === p.direction}
-              onClick={() => set({ direction: p.direction, startUnit: PATH_STARTS[p.direction] })}>{p.label}<small>{p.hint}</small></button>
-          ))}
-        </div>
-        <PositionPicker label="Exact starting page" unit={plan.startUnit} allowLine={false} minPage={plan.direction === "forward" ? 2 : 1} onChange={(u) => set({ startUnit: u })} />
+        <h4>1. Where will the student start Hifz?</h4>
+        <PositionPicker label="Start" unit={plan.startUnit} allowLine={false} onChange={(u) => set({ startUnit: u })} />
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>{pathNote(plan)}</p>
       </div>
 
       <div className="ht-plan-step">
@@ -184,6 +201,17 @@ function ProfileEditor({ profile, onSave, onCancel, busy }) {
           <button type="button" className="hz-btn hz-btn-outline" onClick={addPages} disabled={!from}><Plus size={16} aria-hidden="true" />Add pages</button>
         </div>
         {pagesError && <div className="hz-error" role="alert" style={{ marginTop: 8 }}>{pagesError}</div>}
+        <div className="ht-juz">
+          <span>Or whole juz</span>
+          <div className="hz-chips" role="group" aria-label="From the front or the back">
+            <button type="button" className="hz-chip" aria-pressed={juzSide === "first"} onClick={() => setJuzSide("first")}>First</button>
+            <button type="button" className="hz-chip" aria-pressed={juzSide === "last"} onClick={() => setJuzSide("last")}>Last</button>
+          </div>
+          <select className="hz-select" aria-label="How many juz" value={juzCount} onChange={(e) => setJuzCount(+e.target.value)}>
+            {JUZ_COUNTS.map((n) => <option key={n} value={n}>{n} juz</option>)}
+          </select>
+          <button type="button" className="hz-btn hz-btn-outline" onClick={() => set({ memorized: toSet([...plan.memorized, juzRange]) })}><Plus size={16} aria-hidden="true" />Add {juzName}</button>
+        </div>
         <div className="ht-ranges" aria-label="Memorised before">
           {plan.memorized.length === 0 && <span style={{ background: "#EEF0F3", color: "#5B6B79", paddingRight: 12 }}>Nothing yet</span>}
           {plan.memorized.map((r) => (
@@ -550,7 +578,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         {editingProfile || needsProfile ? (
           <div style={{ marginTop: 16 }}>
             <h3 className="hz-h2" style={{ fontSize: 16 }}><Target size={18} aria-hidden="true" />Hifz plan</h3>
-            <ProfileEditor profile={data.profile} busy={busy} onCancel={data.hasProfile && !data.profile?.fromLegacy ? () => setEditingProfile(false) : null}
+            <ProfileEditor profile={data.profile} tasks={tasks} busy={busy} onCancel={data.hasProfile && !data.profile?.fromLegacy ? () => setEditingProfile(false) : null}
               onSave={(p) => run(() => repo.saveProfile(p)).then((ok) => ok && setEditingProfile(false))} />
           </div>
         ) : (

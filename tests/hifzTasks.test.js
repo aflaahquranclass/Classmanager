@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pageToUnit, UNITS_PER_PAGE } from "../src/hifz/quran.js";
-import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile, shortBefore, nextClassDay, nextTasksToSet, previewNext } from "../src/hifz/tasks.js";
+import { pageToUnit, UNITS_PER_PAGE, TOTAL_UNITS, wholeJuz } from "../src/hifz/quran.js";
+import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile, shortBefore, nextClassDay, nextTasksToSet, previewNext, directionFor, hifzPath } from "../src/hifz/tasks.js";
 import { loadHifz } from "../src/hifz/taskService.js";
 import { createHifzMemoryStore, createMemoryHifzRepo } from "../src/hifz/taskRepos.js";
 
@@ -180,4 +180,32 @@ test("tasks are generated from the plan for class days; done creates the next", 
   // The teacher's confirmed change is used instead.
   const drafted = nextTasksToSet({ tasks: doneNew, memorized: [pages(2, 158)], profile: plan, today: "2026-11-01", schedule: sched, drafts: { new: { start: pageToUnit(159), end: pageToUnit(159) + P / 2, taskDate: "2026-11-05", notes: "Half today" } } });
   assert.deepEqual([drafted[0].taskDate, drafted[0].end, drafted[0].notes], ["2026-11-05", pageToUnit(159) + P / 2, "Half today"]);
+});
+
+test("whole juz from the front or the back", () => {
+  assert.deepEqual(wholeJuz("first", 2), [0, pageToUnit(42)]); // Juz 1–2
+  assert.deepEqual(wholeJuz("last", 3), [pageToUnit(542), TOTAL_UNITS]); // Juz 28–30
+  assert.deepEqual(wholeJuz("last", 1), pages(582, 604));
+  assert.deepEqual(wholeJuz("first", 30), [0, TOTAL_UNITS]);
+});
+
+test("the way New Hifz goes follows from where the student starts", () => {
+  // Starting in Juz 30 (An-Naba): juz by juz towards the front.
+  assert.equal(directionFor(pageToUnit(582)), "juz_reverse");
+  assert.equal(directionFor(pageToUnit(590), [pages(582, 589)]), "juz_reverse");
+  // Juz 29–30 known, starting at Juz 28: on towards the front too.
+  assert.equal(directionFor(pageToUnit(542), [wholeJuz("last", 2)]), "juz_reverse");
+  assert.deepEqual(hifzPath({ startUnit: pageToUnit(542), direction: directionFor(pageToUnit(542), [wholeJuz("last", 2)]) }).slice(0, 2),
+    [pages(542, 561), pages(522, 541)]);
+  // From Al-Baqarah (even with Juz 30 known), or after Juz 1–2: on to the end.
+  assert.equal(directionFor(pageToUnit(2)), "forward");
+  assert.equal(directionFor(pageToUnit(2), [wholeJuz("last", 1)]), "forward");
+  assert.equal(directionFor(pageToUnit(42), [wholeJuz("first", 2)]), "forward");
+  assert.equal(directionFor(pageToUnit(2), [wholeJuz("first", 2)]), "forward");
+  // Juz 30 known but not Juz 29, starting in Juz 28: Juz 29 still lies ahead.
+  assert.equal(directionFor(pageToUnit(542), [wholeJuz("last", 1)]), "forward");
+  // Starting at Juz 28 with Juz 29–30 known: the first Short Muraja'ah is the end of Juz 29, not Juz 27.
+  const j28 = { direction: "juz_reverse", startUnit: pageToUnit(542), shortPages: 1 };
+  assert.deepEqual(shortBefore(pageToUnit(542), [wholeJuz("last", 2)], j28), { start: pageToUnit(581), end: pageToUnit(582) });
+  assert.deepEqual(shortBefore(pageToUnit(545), [wholeJuz("last", 2), pages(542, 544)], j28), { start: pageToUnit(544), end: pageToUnit(545) });
 });

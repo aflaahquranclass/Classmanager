@@ -13,9 +13,9 @@
 //   { memorized: [[s, e], …], direction: "forward" | "juz_reverse", startUnit,
 //     newUnits, shortPages, longStartUnit, longMode: "juz" | "pages", longPages }
 //   newUnits: how much New Hifz a day (half-line units; 30 = a page).
-//   direction/startUnit: where the Hifz started (Al-Baqarah onward, or
-//   An-Naba juz by juz towards the front); it orders New Hifz and tells which
-//   pages were memorised most recently.
+//   direction/startUnit: where the Hifz starts and which way it goes (on to
+//   the end, or juz by juz towards the front; see directionFor); it orders
+//   New Hifz and tells which pages were memorised most recently.
 // goalYear: the year the student wants to finish by (the student sets it).
 // mistake: { id, page, line, verseKey, position, wordText, note, taskId, correctedAt, createdAt }
 
@@ -73,6 +73,16 @@ export const taskPages = (t) => {
 export const PATH_STARTS = { forward: pageToUnit(2), juz_reverse: pageToUnit(582) };
 export const DEFAULT_PLAN = { memorized: [], direction: "forward", startUnit: null, newUnits: UNITS_PER_PAGE, shortPages: 1, longStartUnit: null, longMode: "juz", longPages: 2 };
 export const planOf = (profile) => ({ ...DEFAULT_PLAN, ...(profile || {}) });
+
+// Which way New Hifz goes from where the student starts: on to the end of the
+// Quran, or juz by juz towards the front (the usual Juz Amma path) when there
+// is nothing left after the start's juz — it's in Juz 30, or everything after
+// it is memorised already (e.g. Juz 29–30 known, starting in Juz 28).
+export function directionFor(startUnit, memorized = []) {
+  const juz = juzOfPage(unitToPage(startUnit));
+  if (juz === 30) return "juz_reverse";
+  return unitsOf(subtract([[juzEndUnit(juz), TOTAL_UNITS]], memorized)) === 0 ? "juz_reverse" : "forward";
+}
 
 // The New Hifz path in order (see engine.newHifzSequence).
 export const hifzPath = (profile) => {
@@ -219,6 +229,13 @@ export function shortBefore(newStart, memorized, profile = null) {
       const before = pos ? takeFirst(path, pos)[0].filter(([s, e]) => e > s) : [];
       const last = before[before.length - 1];
       if (last && last[1] !== newStart) end = last[1];
+      else if (!last) {
+        // The very start of the path, at the start of a juz (e.g. Juz 28 with
+        // Juz 29–30 memorised before): the end of the juz after it, if known.
+        const j = juzOfPage(unitToPage(newStart));
+        const after = juzEndUnit(j + 1);
+        if (j < 30 && newStart === pageToUnit(JUZ_START_PAGES[j - 1]) && memorized.some(([s, e]) => s < after && e >= after)) end = after;
+      }
     }
     if (end <= 0) return null;
     // On the An-Naba path, stay inside the juz (the juz before it isn't memorised yet).

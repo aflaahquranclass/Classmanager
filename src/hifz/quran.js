@@ -54,6 +54,13 @@ export function juzOfPage(page) {
 export const juzStartUnit = (juz) => pageToUnit(JUZ_START_PAGES[juz - 1]);
 export const juzEndUnit = (juz) => (juz >= 30 ? TOTAL_UNITS : juzStartUnit(juz + 1));
 
+// A number of whole juz from the front or the back of the Mushaf as one range:
+// first 2 → Juz 1–2, last 3 → Juz 28–30.
+export function wholeJuz(side, count) {
+  const n = Math.max(1, Math.min(30, Math.round(count)));
+  return side === "last" ? [juzStartUnit(31 - n), TOTAL_UNITS] : [0, juzEndUnit(n)];
+}
+
 // Surahs that appear on pages firstPage..lastPage. Page-level data only, so a
 // surah is taken to end on the page before the next surah starts (or on the
 // same page when both start on it).
