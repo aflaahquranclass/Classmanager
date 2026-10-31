@@ -4,7 +4,7 @@
 // filled in for each student.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Send, Search, Smartphone, MessageSquare, Mail, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight, Save, Users, Check } from "lucide-react";
+import { Send, Search, Smartphone, MessageSquare, Mail, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight, Save, Users, Check, X } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
@@ -73,6 +73,44 @@ function NameCheck({ rows, setName, onConfirm, saving }) {
   );
 }
 
+// Everyone the message will go to, to double-check before sending, with a
+// button to take someone off. rows: recipients; onRemove(row).
+function RecipientTable({ rows, onRemove, removedCount, onPutBack }) {
+  return (
+    <>
+      <div className="nt-meta" style={{ margin: "16px 0 6px" }}>
+        <span className="nt-label" style={{ margin: 0 }}>Getting this message ({rows.length})</span>
+        {removedCount > 0 && <span>{removedCount} taken off · <button type="button" className="nt-link" onClick={onPutBack}>Put back</button></span>}
+      </div>
+      {rows.length ? (
+        <div className="nt-rec-wrap">
+          <table className="nt-rec">
+            <thead><tr><th>#</th><th>Name</th><th>Student ID</th><th>Class</th><th>Phone</th><th>Email</th><th>Portal login</th><th aria-label="Remove"></th></tr></thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={r.key}>
+                  <td className="nt-rec-n">{i + 1}</td>
+                  <td>{r.name}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{r.studentCode || "—"}</td>
+                  <td>{r.kind === "Teacher" ? "Teacher" : r.className || "—"}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{r.phone || "—"}</td>
+                  <td style={{ overflowWrap: "anywhere" }}>{r.email || "—"}</td>
+                  <td>{r.kind === "Teacher" ? "—" : r.user_id ? "Yes" : <span className="nt-rec-no">Not yet</span>}</td>
+                  <td>
+                    <button type="button" className="nt-rec-x" aria-label={`Take ${r.name} off`} title="Take off" onClick={() => onRemove(r)}><X size={15} aria-hidden="true" /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="nt-meta" style={{ margin: 0 }}><span>No one yet.</span></div>
+      )}
+    </>
+  );
+}
+
 // templates: saved [{ id, name, en, dv }]; automatic: the same shape.
 // start: { id, lang, n } — open with this template (from the Templates tab).
 export function SendTab({ students, teachers, classes, templates, setTemplates, automatic, dvNames, monthKey, showToast, onSent, start }) {
@@ -84,6 +122,7 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
   const [audience, setAudience] = useState("classes");
   const [classSet, setClassSet] = useState({}); // class name → true
   const [picked, setPicked] = useState({}); // `s:<id>` | `t:<id>` → true
+  const [removed, setRemoved] = useState({}); // taken off from the table (all students, classes, all teachers)
   const [filter, setFilter] = useState("");
   const [filterClass, setFilterClass] = useState("");
   const [numbersText, setNumbersText] = useState("");
@@ -139,7 +178,7 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
 
   // ---- Who gets it ----
   const people = useMemo(() => [
-    ...students.map((s) => ({ key: `s:${s.id}`, kind: "Student", student_id: s.id, user_id: s.userId || null, name: s.name, phone: s.phone || null, email: s.email || null, className: s.className || "" })),
+    ...students.map((s) => ({ key: `s:${s.id}`, kind: "Student", student_id: s.id, user_id: s.userId || null, name: s.name, studentCode: s.studentCode || "", phone: s.phone || null, email: s.email || null, className: s.className || "" })),
     ...teachers.map((t) => ({ key: `t:${t.id}`, kind: "Teacher", teacher_id: t.id, user_id: t.userId || null, name: t.name, phone: t.phone || null, email: t.email || null, className: "" })),
   ].sort((a, b) => a.name.localeCompare(b.name)), [students, teachers]);
 
@@ -148,7 +187,7 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
     return [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map((name) => ({ name, count: students.filter((s) => s.className === name).length }));
   }, [classes, students]);
 
-  const recipients = useMemo(() => {
+  const audienceRecipients = useMemo(() => {
     if (audience === "numbers") {
       const nums = [...new Set(numbersText.split(/[\s,;]+/).map((n) => n.trim()).filter(Boolean))];
       return nums.map((n) => ({ key: `n:${n}`, kind: "Number", user_id: null, name: n, phone: n }));
@@ -158,6 +197,11 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
     if (audience === "classes") return people.filter((p) => p.kind === "Student" && classSet[p.className]);
     return people.filter((p) => picked[p.key]);
   }, [audience, people, classSet, picked, numbersText]);
+  const recipients = useMemo(() => audienceRecipients.filter((r) => !removed[r.key]), [audienceRecipients, removed]);
+  const removedCount = audienceRecipients.length - recipients.length;
+  const chooseAudience = (key) => { setAudience(key); setRemoved({}); };
+  // From the table: under Choose students it's unticked, otherwise taken off.
+  const removeRecipient = (r) => (audience === "people" ? setPicked((cur) => ({ ...cur, [r.key]: false })) : setRemoved((cur) => ({ ...cur, [r.key]: true })));
 
   const shown = people.filter((p) => {
     const q = filter.trim().toLowerCase();
@@ -241,7 +285,7 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
     });
     setSending(false);
     if (!res.ok) { showToast(res.message); return; }
-    setTitle(""); setEn(""); setDv(""); setTemplateId(""); setPicked({}); setNumbersText(""); setPreviewIdx(0);
+    setTitle(""); setEn(""); setDv(""); setTemplateId(""); setPicked({}); setRemoved({}); setNumbersText(""); setPreviewIdx(0);
     showToast(`Sent to ${recipients.length}.${res.message ? " " + res.message : ""}`);
     onSent();
   };
@@ -326,14 +370,14 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
           <div className="nt-step"><span>2</span>Who gets it</div>
           <div className="nt-chips" role="radiogroup" aria-label="Who gets it">
             {AUDIENCES.map((a) => (
-              <button key={a.key} type="button" role="radio" aria-checked={audience === a.key} className={`nt-chip ${audience === a.key ? "nt-chip-on" : ""}`} onClick={() => setAudience(a.key)}>{a.label}</button>
+              <button key={a.key} type="button" role="radio" aria-checked={audience === a.key} className={`nt-chip ${audience === a.key ? "nt-chip-on" : ""}`} onClick={() => chooseAudience(a.key)}>{a.label}</button>
             ))}
           </div>
 
           {audience === "classes" && (
             <>
               <div className="nt-meta" style={{ margin: "12px 0 6px" }}>
-                <span>{Object.values(classSet).filter(Boolean).length} of {classOptions.length} classes · {recipients.length} students</span>
+                <span>{Object.values(classSet).filter(Boolean).length} of {classOptions.length} classes · {audienceRecipients.length} students</span>
                 <span>
                   <button type="button" className="nt-link" onClick={() => setClassSet(Object.fromEntries(classOptions.map((c) => [c.name, true])))}>Select all</button>{" · "}
                   <button type="button" className="nt-link" onClick={() => setClassSet({})}>None</button>
@@ -389,6 +433,10 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
               <textarea id="nt-numbers" className="lc-input nt-textarea" style={{ minHeight: "80px" }} value={numbersText} placeholder="7771234, 9601234 (one per line or separated by commas)" onChange={(e) => setNumbersText(e.target.value)} />
               <div className="nt-meta"><span>Phone numbers get SMS only. Student details aren't filled in for them.</span></div>
             </>
+          )}
+
+          {audience !== "numbers" && (audienceRecipients.length > 0 || audience === "people") && (
+            <RecipientTable rows={recipients} onRemove={removeRecipient} removedCount={removedCount} onPutBack={() => setRemoved({})} />
           )}
         </div>
 

@@ -111,6 +111,16 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
         .nt-person:first-child { border-top: none; }
         .nt-person input { width: 17px; height: 17px; accent-color: ${TP.blue}; flex: none; }
         .nt-person-sub { color: ${TP.secondaryText}; font-size: 12px; }
+        .nt-rec-wrap { max-height: 360px; overflow: auto; border: 1px solid ${TP.border}; border-radius: 12px; }
+        .nt-rec { width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13px; color: #1B2733; }
+        .nt-rec th { position: sticky; top: 0; background: #F7FBFE; text-align: left; color: ${TP.secondaryText}; font-weight: 600; font-size: 12px; padding: 8px 10px; border-bottom: 1px solid #E3EEF8; white-space: nowrap; }
+        .nt-rec td { padding: 7px 10px; border-bottom: 1px solid #F0F5FA; vertical-align: middle; }
+        .nt-rec tr:last-child td { border-bottom: none; }
+        .nt-rec-n { color: ${TP.secondaryText}; font-variant-numeric: tabular-nums; }
+        .nt-rec-no { color: #8A5A00; }
+        .nt-rec-x { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid ${TP.border}; border-radius: 8px; background: #FFFFFF; color: #A32020; cursor: pointer; }
+        .nt-rec-x:hover { background: #FDECEC; }
+        .nt-rec-x:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 1px; }
         .nt-search { display: flex; align-items: center; gap: 8px; border: 1px solid ${TP.border}; border-radius: 10px; padding: 0 11px; color: ${TP.secondaryText}; background: #FFFFFF; }
         .nt-search input { border: none; outline: none; font: inherit; font-size: 14px; min-height: 40px; flex: 1; min-width: 0; background: transparent; }
         .nt-names { max-height: 340px; overflow: auto; border: 1px solid ${TP.border}; border-radius: 12px; }

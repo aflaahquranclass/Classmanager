@@ -41,7 +41,7 @@ export const TEMPLATES = [
 
 // Student details that can go into a message written under Send or a saved
 // template, filled in for each student.
-export const MESSAGE_PLACEHOLDERS = ["name", "student_id", "class", "teacher", "days", "time", "fee", "month"];
+export const MESSAGE_PLACEHOLDERS = ["name", "student_id", "class", "teacher", "days", "time", "fee", "month", "login", "link"];
 
 // The text of a message in the chosen language — "en", "dv" or "both"
 // (Dhivehi first, then English) — each part filled in separately so the
@@ -65,7 +65,7 @@ export const DEFAULT_TEMPLATE_BODIES = {
 export const PLACEHOLDER_LABELS = {
   name: "Student name", student_id: "Student ID", class: "Class", class_type: "Class type chosen", teacher: "Teacher",
   days: "Class days", time: "Class time", fee: "Monthly fee", month: "Month",
-  password: "One-time password", link: "Portal link",
+  password: "One-time password", link: "Portal link", login: "Login details",
 };
 
 // Email subject lines, in the template's language.
@@ -141,6 +141,14 @@ function guessClassType(student) {
 const CLASS_WORDS_DV = { hifz: "ޙިފްޡު", thilawa: "ތިލާވަތު", tilawa: "ތިލާވަތު", tajweed: "ތަޖްވީދު", foundation: "ފައުންޑޭޝަން", class: "ކްލާސް", weekend: "ހަފްތާ ބަންދު" };
 const classNameDv = (name) => name.replace(/[A-Za-z]+/g, (w) => CLASS_WORDS_DV[w.toLowerCase()] || w).replace(/\s{2,}/g, " ").trim();
 
+// {login}: where and with what the student signs in. Passwords aren't kept
+// (only Supabase Auth has them), so it's the portal link and Student ID; empty
+// for someone without a Student ID.
+function loginDetails(code, dv) {
+  if (!code) return "";
+  return dv ? `ދަރިވަރުންގެ ޕޯޓަލް: ${STUDENT_PORTAL_LINK}\nސްޓޫޑެންޓް އައިޑީ: ${code}` : `Student portal: ${STUDENT_PORTAL_LINK}\nStudent ID: ${code}`;
+}
+
 // student: { name, studentCode, className, fee, schedule: { days, startTime, endTime } }
 // ctx: { teacherName, monthKey ("2026-10"), dvNames: { [englishName]: thaana }, password,
 //        classType: { category, ageGroup } (website registrations),
@@ -164,6 +172,7 @@ export function fillTemplate(body, student, ctx = {}) {
     month: m ? (dv ? `${MONTHS_DV[m - 1]} ${y}` : `${MONTHS_EN[m - 1]} ${y}`) : "",
     password: ctx.password || "",
     link: STUDENT_PORTAL_LINK,
+    login: loginDetails(student.studentCode, dv),
   };
   return body.replace(/\{(\w+)\}/g, (all, key) => (key in values ? values[key] : all)).replace(/[ \t]{2,}/g, " ").trim();
 }

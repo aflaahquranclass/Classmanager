@@ -97,3 +97,10 @@ test("a Dhivehi message of just {name} still gets the Dhivehi name", () => {
   assert.equal(messageText("dv", "", "{name}", (t, l) => fillTemplate(t, s, { dv: l === "dv" })), "އަޙްމަދު");
   assert.equal(messageText("en", "{name}", "", (t, l) => fillTemplate(t, s, { dv: l === "dv" })), "Ahmed");
 });
+
+test("{login} is the portal link and Student ID, in the message's language", () => {
+  assert.equal(fillTemplate("Login:\n{login}", student), "Login:\nStudent portal: https://students.aflaahqc.com\nStudent ID: AQC-012");
+  assert.equal(fillTemplate("{login}", student, { dv: true }), "ދަރިވަރުންގެ ޕޯޓަލް: https://students.aflaahqc.com\nސްޓޫޑެންޓް އައިޑީ: AQC-012");
+  assert.equal(fillTemplate("{login}", { ...student, studentCode: "" }), "");
+  assert.equal(fillTemplate("{link}", student), "https://students.aflaahqc.com");
+});
