@@ -12,7 +12,7 @@ import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract } from "./engine.js";
-import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext } from "./tasks.js";
+import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskGroups } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -69,6 +69,7 @@ const teacherCss = `
   .ht-rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
   .ht-row { border: 1px solid #E1EDF8; border-radius: 14px; background: #F7FAFD; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
   .ht-row-done { background: linear-gradient(160deg, #ECFAF4, #FFFFFF 60%); border-color: #9FD9BE; }
+  .ht-done-next { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: #156B45; }
   .ht-row-open { box-shadow: 0 0 0 2px #176FD1; }
   .ht-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .ht-row-head b { color: #123B67; }
@@ -460,7 +461,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
 
   if (!data) return <div className="ht">{error ? <div className="hz-error" role="alert">{error}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
 
-  const { stats, streak, todayTasks, overdue, upcoming, today, mistakes, openMistakes, memorized, tasks } = data;
+  const { stats, streak, today, mistakes, openMistakes, memorized, tasks } = data;
   const marking = tasks.find((t) => t.id === markingId) || null;
   const openMarking = (t) => { setSelectedKey(null); setMarkStep("mark"); setMarkingId(t.id); };
   function closeMarking() { setMarkingId(null); setSelectedKey(null); setMarkStep("mark"); }
@@ -587,10 +588,42 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
     );
   };
 
+  const groups = teacherTaskGroups(tasks, today);
+  // Approved today: stays in its place, green, with the next one (set for a
+  // later day) under it to check or change.
+  const finishedRow = (t) => {
+    const { title, Icon } = ACTIVITY_INFO[t.activity];
+    const count = mistakesForTask(t, mistakes).length;
+    const next = groups.next[t.activity];
+    return (
+      <li key={t.id} className={`ht-row ht-row-done ${markingId === t.id ? "ht-row-open" : ""}`}>
+        <div className="ht-row-head">
+          <Icon size={18} aria-hidden="true" /><b>{title}</b>
+          <span className="hz-muted">{fmtDay(t.taskDate)}</span>
+          <span className="hz-badge hz-badge-completed"><CheckCircle2 size={13} aria-hidden="true" /> Finished today</span>
+          {count > 0 && <span className="hz-mistake-badge"><Highlighter size={12} aria-hidden="true" />{count}</span>}
+        </div>
+        <PortionText task={t} />
+        {next && editingId === next.id ? (
+          <div className="ht-next">
+            <div className="ht-next-head"><ArrowRight size={16} aria-hidden="true" />Change the next {title}</div>
+            <EditTask task={next} busy={busy} onCancel={() => setEditingId(null)}
+              onSave={(d) => run(() => repo.updateTask(next.id, d)).then((ok) => ok && setEditingId(null))} />
+          </div>
+        ) : next && <div className="ht-done-next"><ArrowRight size={14} aria-hidden="true" />Next: {fmtDay(next.taskDate)} · {portionSummary(next)}</div>}
+        <div className="ht-row-actions">
+          <button className="hz-btn hz-btn-outline" onClick={() => openMarking(t)}><Highlighter size={15} aria-hidden="true" />Listen & mark</button>
+          {next && editingId !== next.id && <button className="hz-btn hz-btn-outline" onClick={() => setEditingId(next.id)}><Pencil size={15} aria-hidden="true" />Change next</button>}
+          <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => run(() => repo.setTaskDone(t.id, false))}><Undo2 size={15} aria-hidden="true" />Not done</button>
+        </div>
+      </li>
+    );
+  };
   const taskRow = (t) => {
     const { title, Icon } = ACTIVITY_INFO[t.activity];
     const confirmed = drafts[t.activity];
     const count = mistakesForTask(t, mistakes).length;
+    if (t.completedAt) return finishedRow(t);
     if (editingId === t.id) {
       return (
         <li key={t.id} className="ht-row ht-row-open">
@@ -673,17 +706,16 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
             ? <>Set automatically from the Hifz plan for the class days{student.schedule?.days?.length ? ` (${student.schedule.days.join(", ")})` : ""}. When the student finishes a task you see “Student finished”. Listen, then approve it and the next one is set; the student is notified.</>
             : "Save the Hifz plan above to start. The tasks are then set automatically for the class days."}
         </p>
-        {/* Done tasks leave the teacher's list straight away; the student keeps them as history. */}
+        {/* New Hifz, Short, Long Muraja'ah always in that order; approved today stays green in its place until tomorrow. */}
         {(() => {
-          const open = (list) => list.filter((t) => !t.completedAt);
           const doneCount = tasks.filter((t) => t.completedAt).length;
-          const any = open(todayTasks).length + overdue.length + open(upcoming).length;
+          const any = groups.today.length + groups.overdue.length + groups.upcoming.length;
           return (
             <>
               {!any && planReady && <p className="hz-muted" style={{ margin: 0 }}>Setting the next tasks…</p>}
-              {group(`Today · ${fmtDate(today)}`, open(todayTasks))}
-              {group("Not finished from earlier days", overdue)}
-              {group("Coming up", open(upcoming))}
+              {group(`Today · ${fmtDate(today)}`, groups.today)}
+              {group("Not finished from earlier days", groups.overdue)}
+              {group("Coming up", groups.upcoming)}
               {doneCount > 0 && <p className="hz-muted" style={{ margin: "14px 0 0" }}>{doneCount} done task{doneCount === 1 ? "" : "s"} below in History.</p>}
             </>
           );
