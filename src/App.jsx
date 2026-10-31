@@ -16,7 +16,7 @@ import { AdminReviews, usePendingReviewCount } from "./reviews/ReviewsAdmin.jsx"
 import { AdminRegistrations, usePendingRegistrationCount } from "./registrations/RegistrationsAdmin.jsx";
 import { usePendingInfoCount } from "./registrations/InfoUpdatesAdmin.jsx";
 import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
-import { ProgramPicker, hasProgram } from "./thilawa/programs.jsx";
+import { ProgramPicker, inProgramSection } from "./thilawa/programs.jsx";
 import { hideSplash, LogoLoader } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
@@ -3484,13 +3484,13 @@ export default function App() {
 
             {section === "hifz" && (
               <Suspense fallback={<LogoLoader label="Loading Hifz…" />}>
-                <TeacherHifz teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && hasProgram(s, "hifz"))} />
+                <TeacherHifz teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "hifz"))} />
               </Suspense>
             )}
 
             {section === "thilawa" && (
               <Suspense fallback={<LogoLoader label="Loading Thilawa…" />}>
-                <TeacherThilawa teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && hasProgram(s, "thilawa"))} />
+                <TeacherThilawa teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "thilawa"))} />
               </Suspense>
             )}
 

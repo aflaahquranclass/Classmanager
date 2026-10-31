@@ -16,6 +16,7 @@ import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, describeAyahs, nex
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
+import ClassBrowser from "../thilawa/ClassBrowser.jsx";
 
 const teacherCss = `
   .ht { display: flex; flex-direction: column; gap: 18px; }
@@ -529,7 +530,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
   return (
     <div className="ht">
       <style>{HIFZ_CSS}{teacherCss}</style>
-      {onBack && <div><button className="hz-btn hz-btn-ghost" onClick={onBack}><ChevronLeft size={18} aria-hidden="true" />All Hifz students</button></div>}
+      {onBack && <div><button className="hz-btn hz-btn-ghost" onClick={onBack}><ChevronLeft size={18} aria-hidden="true" />{student.className || "Back"}</button></div>}
       {error && <div className="hz-error" role="alert">{error}</div>}
 
       <section className="hz-card" aria-label="Memorization">
@@ -592,6 +593,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
 export function TeacherHifz({ students, teacherId }) {
   const [openId, setOpenId] = useState(null);
   const [query, setQuery] = useState("");
+  const [openClass, setOpenClass] = useState(null); // class whose students are shown
   const [overview, setOverview] = useState(null);
   const [error, setError] = useState("");
   const ids = useMemo(() => students.map((s) => s.id), [students]);
@@ -625,9 +627,6 @@ export function TeacherHifz({ students, teacherId }) {
 
   const opened = students.find((s) => s.id === openId);
   const repo = useMemo(() => (opened ? createSupabaseHifzRepo(supabase, opened.id, teacherId) : null), [opened, teacherId]);
-  const shown = students
-    .filter((s) => !query.trim() || `${s.name} ${s.studentCode}`.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div>
@@ -641,18 +640,19 @@ export function TeacherHifz({ students, teacherId }) {
               <div style={{ fontSize: "20px", fontWeight: 700, color: "#123B67" }}>Hifz</div>
               <div className="hz-muted">Set each student's New Hifz, Short and Long Muraja'ah, and mark mistakes on the Mushaf.</div>
             </div>
-            {students.length > 6 && (
-              <label className="ht-search"><Search size={16} aria-hidden="true" />
-                <input className="hz-input" type="search" placeholder="Search students" aria-label="Search students" value={query} onChange={(e) => setQuery(e.target.value)} />
-              </label>
-            )}
           </div>
           {error && <div className="hz-error" role="alert">{error}</div>}
           {students.length === 0 ? (
             <div className="hz-card hz-muted">None of your students are enrolled in Hifz. The admin chooses Hifz, Thilawa or both when adding a student.</div>
           ) : (
-            <div className="ht-grid">
-              {shown.map((s) => {
+            <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={setOpenClass} gridClass="ht-grid"
+              summary={(list) => {
+                const os = list.map((s) => overview?.[s.id]).filter(Boolean);
+                const behind = os.filter((o) => o.overdue.length > 0).length;
+                const noStart = os.filter((o) => !o.hasProfile).length;
+                return <>{behind > 0 && <span className="hz-badge hz-badge-partial">{behind} not finished</span>}{noStart > 0 && <span className="hz-badge hz-badge-empty">{noStart} starting point not set</span>}</>;
+              }}
+              renderStudent={(s) => {
                 const o = overview?.[s.id];
                 const doneToday = o?.todayTasks.filter((t) => t.completedAt).length ?? 0;
                 return (
@@ -674,8 +674,7 @@ export function TeacherHifz({ students, teacherId }) {
                     </div>
                   </button>
                 );
-              })}
-            </div>
+              }} />
           )}
         </div>
       )}

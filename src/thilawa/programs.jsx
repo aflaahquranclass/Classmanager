@@ -7,7 +7,7 @@ const CHOICES = [
   { value: ["hifz", "thilawa"], label: "Both", hint: "Hifz and Thilawa" },
 ];
 
-export const hasProgram = (student, key) => (student?.programs?.length ? student.programs : ["hifz"]).includes(key);
+export { hasProgram, classProgram, inProgramSection, groupByClass } from "./programRules.js";
 export const programsLabel = (programs) => CHOICES.find((c) => c.value.join() === [...(programs || ["hifz"])].sort().join())?.label || "Hifz";
 
 // Registration class → the program it starts on (the admin can change it).

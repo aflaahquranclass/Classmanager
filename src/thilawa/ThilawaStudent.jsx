@@ -4,7 +4,7 @@
 // Uses the .hz-* styles from HifzTracker.jsx plus the .th-* styles below.
 
 import { useState, useEffect } from "react";
-import { BookOpenCheck, Target, AudioLines, Gauge, Flame, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Pencil, X, AlertTriangle, Trophy, ArrowRight, Circle, CalendarDays } from "lucide-react";
+import { BookOpenCheck, Target, AudioLines, Gauge, Flame, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Pencil, X, AlertTriangle, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
 import MushafPage, { useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
 import { addDays } from "../hifz/engine.js";
@@ -129,6 +129,40 @@ function GoalEditor({ repo, settings, today, pagesLeft, onSaved, onCancel }) {
   );
 }
 
+// ---------- corrections from the teacher ----------
+// The words the teacher marked in the reading or lesson they listened to last.
+// The student ticks each one off once they've fixed it.
+export function Corrections({ repo, data, refresh }) {
+  const { busy, error, run } = useAction(refresh);
+  const [showing, setShowing] = useState(false);
+  const [page, setPage] = useState(null);
+  const a = data?.lastChecked;
+  if (!a) return null;
+  const list = data.corrections;
+  const marks = list;
+  const at = page ?? list[0]?.page ?? a.fromPage;
+  return (
+    <section className="hz-card th-reader-card" aria-label="Corrections from your teacher">
+      <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Corrections from your teacher</h2>
+      <p className="hz-muted" style={{ marginTop: 0 }}>{a.kind === "lesson" ? "Lesson" : "Reading"} · {describePages(a.fromPage, a.toPage)} · listened {fmtWhen(a.checkedAt)}</p>
+      {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
+      {list.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No words to correct. MashaAllah!</p> : (
+        <ul className="hz-list">
+          {list.map((m) => (
+            <li key={m.id}>
+              <span className="hz-ar hz-mark" lang="ar">{m.wordText || "—"}</span>
+              <div>Page {m.page} · Ayah {m.verseKey}</div>
+              <button className="hz-tick" disabled={busy} onClick={() => run(() => repo.setMistakeTicked(m.id, true))} aria-label={`Tick off ${m.wordText || "this word"} as fixed`} title="Fixed it"><CheckCircle2 size={22} aria-hidden="true" /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button className="hz-btn hz-btn-outline" style={{ marginTop: 12 }} onClick={() => setShowing((v) => !v)}><BookOpen size={16} aria-hidden="true" />{showing ? "Hide the Mushaf" : "Show in the Mushaf"}</button>
+      {showing && <div style={{ marginTop: 12 }}><Reader from={a.fromPage} to={a.toPage} page={at} onPage={setPage} marks={marks} /></div>}
+    </section>
+  );
+}
+
 // ---------- Thilawa tracker ----------
 
 export function ThilawaTracker({ repo, data, refresh, onGo }) {
@@ -140,6 +174,7 @@ export function ThilawaTracker({ repo, data, refresh, onGo }) {
   if (!settings || editingGoal) {
     return (
       <div className="hz">
+        {!editingGoal && <Corrections repo={repo} data={data} refresh={refresh} />}
         <GoalEditor repo={repo} settings={settings} today={today} pagesLeft={pagesLeft}
           onCancel={settings ? () => setEditingGoal(false) : null}
           onSaved={() => { setEditingGoal(false); refresh(); }} />
@@ -148,6 +183,8 @@ export function ThilawaTracker({ repo, data, refresh, onGo }) {
   }
   return (
     <div className="hz">
+      <Corrections repo={repo} data={data} refresh={refresh} />
+
       <section className="hz-card" aria-label="Khatam progress">
         <div className="hz-row">
           <h2 className="hz-h2" style={{ margin: 0 }}><BookOpenCheck size={22} aria-hidden="true" />Khatam Progress</h2>
@@ -236,7 +273,7 @@ export function ThilawaTracker({ repo, data, refresh, onGo }) {
 
 // Shows the Madinah Mushaf one page at a time between `from` and `to`.
 // With onTick/onUntick each page can be ticked as read today.
-function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer }) {
+function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [] }) {
   const read = readToday?.has(page);
   // Like a printed Mushaf: the next page is to the left.
   const next = () => { if (page < to) onPage(page + 1); };
@@ -250,7 +287,7 @@ function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, foo
         <div className="th-reader-title">{pageLabel(page)}{to > from && <small>Page {page - from + 1} of {to - from + 1}</small>}</div>
         <button className="hz-btn hz-btn-outline" disabled={page <= from} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
-      <div {...swipe}><MushafPage page={page} /></div>
+      <div {...swipe}><MushafPage page={page} marks={marks} /></div>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
         : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => onTick(page)}><Circle size={18} aria-hidden="true" />I've read this page</button>)}
@@ -281,20 +318,27 @@ export function AssignedReading({ repo, data, refresh }) {
   const { assignments, today, reading } = data;
   const toggle = (a) => run(() => (a.completedAt ? reopenAssignment(repo, a, reading) : completeAssignment(repo, a, today)));
 
+  const marksOf = (a) => data.mistakes.filter((m) => m.assignmentId === a.id && !m.correctedAt && !m.tickedAt);
+  const listenedLabel = (a) => {
+    const n = data.mistakes.filter((m) => m.assignmentId === a.id && !m.correctedAt).length;
+    return `Teacher listened${n ? ` · ${n} word${n === 1 ? "" : "s"} to correct` : " · no corrections"}`;
+  };
   if (open) {
-    const a = assignments.find((x) => x.id === open) || null;
+    const a = [...assignments, ...data.lessons].find((x) => x.id === open) || null;
     if (!a) { setOpen(null); return null; }
+    const lesson = a.kind === "lesson";
     return (
       <div className="hz">
         <section className="hz-card th-reader-card" aria-label="Reading from your teacher">
           <div className="hz-row" style={{ marginBottom: 10 }}>
-            <h2 className="hz-h2" style={{ margin: 0 }}><ListChecks size={22} aria-hidden="true" />{describePages(a.fromPage, a.toPage)}</h2>
+            <h2 className="hz-h2" style={{ margin: 0 }}><ListChecks size={22} aria-hidden="true" />{lesson ? "Lesson · " : ""}{describePages(a.fromPage, a.toPage)}</h2>
             <button className="hz-btn hz-btn-ghost" onClick={() => setOpen(null)}><ChevronLeft size={18} aria-hidden="true" />All readings</button>
           </div>
           {a.instructions && <div className="th-instr" style={{ marginBottom: 12 }}>{a.instructions}</div>}
           {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
-          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage}
-            footer={a.completedAt
+          {a.checkedAt && <div className="hz-muted" style={{ marginBottom: 10 }}><Highlighter size={14} aria-hidden="true" /> {listenedLabel(a)}. Marked words are highlighted.</div>}
+          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage} marks={marksOf(a)}
+            footer={lesson ? null : a.completedAt
               ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />Done · tap to undo</button>
               : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />I've finished this reading</button>} />
         </section>
@@ -325,6 +369,9 @@ export function AssignedReading({ repo, data, refresh }) {
                       <span>{a.toPage - a.fromPage + 1} page{a.toPage === a.fromPage ? "" : "s"}</span>
                       {a.dueDate && <span className={late ? "th-due-late" : undefined}><CalendarDays size={13} aria-hidden="true" /> {late ? "Was due" : "Due"} {fmtDate(a.dueDate)}</span>}
                       {a.completedAt && <span className="hz-badge hz-badge-completed">Done {fmtWhen(a.completedAt)}</span>}
+                      {a.completedAt && (a.checkedAt
+                        ? <span className="hz-badge hz-badge-empty"><Highlighter size={12} aria-hidden="true" /> {listenedLabel(a)}</span>
+                        : <span className="hz-badge hz-badge-pending"><Clock size={12} aria-hidden="true" /> Waiting for your teacher to listen</span>)}
                     </div>
                   </div>
                   <button className="hz-btn hz-btn-outline" onClick={() => { setOpen(a.id); setPage(a.fromPage); }}>Read</button>
@@ -334,6 +381,28 @@ export function AssignedReading({ repo, data, refresh }) {
           </div>
         )}
       </section>
+
+      {data.lessons.length > 0 && (
+        <section className="hz-card" aria-label="Lessons with your teacher">
+          <h2 className="hz-h2"><BookOpen size={22} aria-hidden="true" />Lessons with your teacher</h2>
+          <div className="th-list">
+            {data.lessons.map((l) => (
+              <article key={l.id} className="th-item">
+                <div className="th-item-body">
+                  <span className="th-item-title">{describePages(l.fromPage, l.toPage)}</span>
+                  <div className="th-meta">
+                    <span><CalendarDays size={13} aria-hidden="true" /> {fmtWhen(l.createdAt)}</span>
+                    {l.checkedAt
+                      ? <span className="hz-badge hz-badge-empty"><Highlighter size={12} aria-hidden="true" /> {listenedLabel(l)}</span>
+                      : <span className="hz-badge hz-badge-pending">In progress</span>}
+                  </div>
+                </div>
+                <button className="hz-btn hz-btn-outline" onClick={() => { setOpen(l.id); setPage(marksOf(l)[0]?.page ?? l.fromPage); }}>Open</button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

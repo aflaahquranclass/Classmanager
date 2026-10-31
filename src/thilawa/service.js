@@ -7,21 +7,33 @@ import { khatamProgress, completedCounts, readingStreak, recentPace, goalCheck, 
 export const browserTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 export async function loadThilawa(repo, now = new Date()) {
-  const [settings, reading, assignments, assessments, notes] = await Promise.all([
-    repo.getSettings(), repo.listReading(), repo.listAssignments(), repo.listAssessments(), repo.listNotes(),
+  const [settings, reading, assignments, assessments, notes, mistakes] = await Promise.all([
+    repo.getSettings(), repo.listReading(), repo.listAssignments(), repo.listAssessments(), repo.listNotes(), repo.listMistakes?.() ?? [],
   ]);
-  return summarizeThilawa({ settings, reading, assignments, assessments, notes }, now);
+  return summarizeThilawa({ settings, reading, assignments, assessments, notes, mistakes }, now);
 }
 
-export function summarizeThilawa({ settings, reading, assignments, assessments, notes }, now = new Date()) {
+export function summarizeThilawa({ settings, reading, assignments, assessments, notes, mistakes = [] }, now = new Date()) {
   const today = localDate(now, settings?.timezone || browserTimezone());
   const progress = khatamProgress(reading);
   const pace = recentPace(reading, today);
+  const readings = assignments.filter((a) => a.kind !== "lesson");
+  const lessons = assignments.filter((a) => a.kind === "lesson").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  // The reading or lesson the teacher listened to last, and the words marked
+  // in it that the student hasn't fixed yet (ticked) and the teacher hasn't cleared.
+  const lastChecked = assignments.filter((a) => a.checkedAt).sort((a, b) => (a.checkedAt < b.checkedAt ? 1 : -1))[0] || null;
+  const corrections = lastChecked ? mistakes.filter((m) => m.assignmentId === lastChecked.id && !m.correctedAt && !m.tickedAt) : [];
   return {
     settings,
     today,
     reading,
-    assignments: [...assignments].sort((a, b) => (!!a.completedAt - !!b.completedAt) || (a.createdAt < b.createdAt ? 1 : -1)),
+    assignments: [...readings].sort((a, b) => (!!a.completedAt - !!b.completedAt) || (a.createdAt < b.createdAt ? 1 : -1)),
+    lessons,
+    mistakes,
+    // Readings the student finished that the teacher hasn't listened to yet.
+    toListen: readings.filter((a) => a.completedAt && !a.checkedAt).sort((a, b) => (a.completedAt < b.completedAt ? -1 : 1)),
+    lastChecked,
+    corrections,
     assessments,
     notes: [...notes].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     progress,
@@ -32,7 +44,7 @@ export function summarizeThilawa({ settings, reading, assignments, assessments, 
     levels: latestLevels(assessments),
     nextFreePage: nextFreePage(reading),
     readToday: pagesOn(reading, today),
-    openAssignments: assignments.filter((a) => !a.completedAt).length,
+    openAssignments: readings.filter((a) => !a.completedAt).length,
   };
 }
 

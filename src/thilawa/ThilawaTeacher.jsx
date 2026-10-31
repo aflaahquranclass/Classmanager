@@ -1,9 +1,10 @@
-// Teacher portal: Thilawa. The teacher sees their Thilawa students' khatam
-// progress, sets their Tajweed and fluency levels, sets reading for them to
+// Teacher portal: Thilawa. The teacher listens to the reading their students
+// finish (or holds a lesson straight in the Mushaf) and marks the words to
+// correct, sets Tajweed and fluency levels, sets reading for the students to
 // tick off, and keeps notes (shared with the student or kept private).
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { BookOpenCheck, Trophy, ListChecks, StickyNote, ChevronLeft, Trash2, Eye, EyeOff, Search, Flame, History, Plus } from "lucide-react";
+import { BookOpenCheck, Trophy, ListChecks, StickyNote, ChevronLeft, Trash2, Eye, EyeOff, Flame, History, Plus, Highlighter, BookOpen, CheckCircle2 } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS } from "../HifzTracker.jsx";
@@ -12,6 +13,8 @@ import { TOTAL_PAGES, describePages, levelLabel } from "./engine.js";
 import { summarizeThilawa, loadThilawa } from "./service.js";
 import { createSupabaseThilawaRepo, selectAll, THILAWA_MAPS } from "./repos.js";
 import { LevelMeter, thilawaCss, fmtDate } from "./ThilawaStudent.jsx";
+import ClassBrowser from "./ClassBrowser.jsx";
+import ListenScreen from "./ListenScreen.jsx";
 
 const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 const surahEndPage = (i) => (i + 1 < SURAHS.length ? Math.max(SURAHS[i].startPage, SURAHS[i + 1].startPage - 1) : TOTAL_PAGES);
@@ -91,6 +94,12 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
   const [note, setNote] = useState("");
   const [shared, setShared] = useState(true);
 
+  // Listen & mark: the reading or lesson open full screen, and today's lesson form.
+  const [listenId, setListenId] = useState(null);
+  const [lessonFrom, setLessonFrom] = useState("");
+  const [lessonTo, setLessonTo] = useState("");
+  const pickLessonSurah = (i) => { setLessonFrom(String(SURAHS[i].startPage)); setLessonTo(String(surahEndPage(i))); };
+
   if (!data) {
     return <div className="tt">{error ? <div className="hz-error" role="alert">{error.message}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
   }
@@ -112,31 +121,102 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
     if (!note.trim()) return;
     run("notes", async () => { await repo.addNote({ body: note, visibleToStudent: shared }); setNote(""); });
   };
+  const startLesson = () => {
+    const a = Math.round(+lessonFrom);
+    const b = Math.round(+(lessonTo || lessonFrom));
+    if (!(a >= 1 && a <= TOTAL_PAGES && b >= a && b <= TOTAL_PAGES)) { setError({ where: "listen", message: `Pages must be between 1 and ${TOTAL_PAGES}, with the last page not before the first.` }); return; }
+    run("listen", async () => {
+      const lesson = await repo.addAssignment({ fromPage: a, toPage: b, kind: "lesson" });
+      setLessonFrom(""); setLessonTo("");
+      setListenId(lesson.id);
+    });
+  };
   const remove = async (where, what, fn) => {
     if (await confirmDialog({ title: `Delete this ${what}?`, message: "This can't be undone.", confirmLabel: "Delete", danger: true })) run(where, fn);
   };
 
-  const { progress, streak, settings, goal, assignments, assessments, notes, reading } = data;
+  const { streak, assignments, assessments, notes, reading, toListen, lessons, mistakes } = data;
   const recent = [...reading].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)).slice(0, 8);
+  const listening = [...assignments, ...lessons].find((a) => a.id === listenId) || null;
+  const toCorrect = (a) => mistakes.filter((m) => m.assignmentId === a.id && !m.correctedAt).length;
+  // Readings and lessons already listened to, newest first.
+  const listened = [...assignments, ...lessons].filter((a) => a.checkedAt).sort((a, b) => (a.checkedAt < b.checkedAt ? 1 : -1)).slice(0, 6);
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
   return (
     <div className="tt">
       <style>{teacherCss()}</style>
-      {onBack && <div><button className="hz-btn hz-btn-ghost" onClick={onBack}><ChevronLeft size={18} aria-hidden="true" />All Thilawa students</button></div>}
+      {onBack && <div><button className="hz-btn hz-btn-ghost" onClick={onBack}><ChevronLeft size={18} aria-hidden="true" />{student.className || "Back"}</button></div>}
       {errorIn("top")}
 
-      <section className="hz-card" aria-label="Khatam progress">
-        <div className="hz-row">
-          <h2 className="hz-h2" style={{ margin: 0 }}><BookOpenCheck size={22} aria-hidden="true" />{student.name} <span className="hz-muted" style={{ fontWeight: 400 }}>{student.studentCode}</span></h2>
-          <span className="hz-big">{progress.percent}%</span>
-        </div>
-        <div className="hz-bar" style={{ margin: "12px 0" }} role="progressbar" aria-label="Khatam progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}><div style={{ width: `${progress.percent}%` }} /></div>
-        <div className="hz-kv">
-          <div><span>Pages read (this khatam)</span><strong>{progress.count} / {TOTAL_PAGES}</strong></div>
-          <div><span>Khatams completed</span><strong>{progress.khatams}</strong></div>
-          <div><span>Khatam goal</span><strong>{settings ? `${fmtDate(settings.goalDate)}${goal?.passed ? " (passed)" : ""}` : "Not set yet"}</strong></div>
+      {listening && <ListenScreen student={student} assignment={listening} mistakes={mistakes} repo={repo} refresh={async () => { await refresh(); onChanged?.(); }} onClose={() => setListenId(null)} />}
+
+      <section className="hz-card" aria-label={student.name}>
+        <h2 className="hz-h2" style={{ margin: 0 }}><BookOpenCheck size={22} aria-hidden="true" />{student.name} <span className="hz-muted" style={{ fontWeight: 400 }}>{student.studentCode}</span></h2>
+        <div className="hz-kv" style={{ marginTop: 12 }}>
+          <div><span>Waiting to listen</span><strong>{toListen.length}</strong></div>
+          <div><span>Readings not done</span><strong>{data.openAssignments}</strong></div>
+          <div><span>Lessons</span><strong>{lessons.length}</strong></div>
           <div><span>Streak</span><strong><Flame size={14} aria-hidden="true" /> {streak.current} day{streak.current === 1 ? "" : "s"}{streak.lastActive ? ` · last read ${fmtDate(streak.lastActive)}` : ""}</strong></div>
         </div>
+      </section>
+
+      <section className="hz-card" aria-label="Listen and mark">
+        <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Listen & Mark</h2>
+        {toListen.length === 0
+          ? <p className="hz-muted" style={{ marginTop: 0 }}>No finished reading waiting. When {student.name} finishes a reading you set, it shows here and you're notified.</p>
+          : (
+            <ul className="tt-rows" style={{ marginBottom: 14 }}>
+              {toListen.map((a) => (
+                <li key={a.id}>
+                  <div><b>{describePages(a.fromPage, a.toPage)}</b><small>Finished {fmtWhen(a.completedAt)}{a.instructions ? ` · ${a.instructions}` : ""}</small></div>
+                  <button className="hz-btn hz-btn-primary" onClick={() => setListenId(a.id)}><Highlighter size={15} aria-hidden="true" />Listen & mark</button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+        <h3 className="hz-h2" style={{ fontSize: 15, margin: "6px 0 8px" }}><BookOpen size={18} aria-hidden="true" />Today's lesson</h3>
+        <p className="hz-muted" style={{ marginTop: 0 }}>Open the Mushaf at the pages you're reading in class today and mark as you listen. {student.name} sees the words to correct.</p>
+        <div className="tt-form">
+          <div className="hz-field tt-wide">
+            <label htmlFor="tt-lesson-surah">Whole surah (fills the pages)</label>
+            <select id="tt-lesson-surah" className="hz-select" value="" onChange={(e) => e.target.value !== "" && pickLessonSurah(+e.target.value)}>
+              <option value="">Choose a surah…</option>
+              {SURAHS.map((x, i) => <option key={x.number} value={i}>{x.number}. {x.name} (p. {x.startPage})</option>)}
+            </select>
+          </div>
+          <div className="hz-field">
+            <label htmlFor="tt-lesson-from">From page</label>
+            <input id="tt-lesson-from" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={lessonFrom} onChange={(e) => setLessonFrom(e.target.value)} placeholder="e.g. 582" />
+          </div>
+          <div className="hz-field">
+            <label htmlFor="tt-lesson-to">To page</label>
+            <input id="tt-lesson-to" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={lessonTo} onChange={(e) => setLessonTo(e.target.value)} placeholder="Same page" />
+          </div>
+        </div>
+        {errorIn("listen")}
+        <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+          <button className="hz-btn hz-btn-primary" disabled={busy || !lessonFrom} onClick={startLesson}><BookOpen size={18} aria-hidden="true" />Open Mushaf</button>
+        </div>
+
+        {listened.length > 0 && (
+          <>
+            <h3 className="hz-h2" style={{ fontSize: 15, margin: "16px 0 8px" }}><History size={18} aria-hidden="true" />Listened</h3>
+            <ul className="tt-rows">
+              {listened.map((a) => {
+                const n = toCorrect(a);
+                return (
+                  <li key={a.id}>
+                    <div><b>{describePages(a.fromPage, a.toPage)}</b> <span className="hz-badge hz-badge-empty">{a.kind === "lesson" ? "Lesson" : "Reading"}</span>
+                      <small>{fmtWhen(a.checkedAt)} · {n ? `${plural(n, "word")} to correct` : "No corrections"}</small></div>
+                    <button className="hz-btn hz-btn-outline" onClick={() => setListenId(a.id)}>Open</button>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </section>
 
       <section className="hz-card" aria-label="Tajweed and fluency levels">
@@ -186,7 +266,7 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
 
       <section className="hz-card" aria-label="Set reading">
         <h2 className="hz-h2"><ListChecks size={22} aria-hidden="true" />Set Reading</h2>
-        <p className="hz-muted" style={{ marginTop: 0 }}>The student sees this under Teacher's Reading, reads it and ticks it. Ticked pages count towards their khatam.</p>
+        <p className="hz-muted" style={{ marginTop: 0 }}>The student sees this under Teacher's Reading, reads it and ticks it. You're notified when it's done, to listen and mark.</p>
         <div className="tt-form">
           <div className="hz-field tt-wide">
             <label htmlFor="tt-surah">Whole surah (fills the pages)</label>
@@ -226,9 +306,11 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
                 <div>
                   <b>{describePages(a.fromPage, a.toPage)}</b>{" "}
                   <span className={`hz-badge ${a.completedAt ? "hz-badge-completed" : "hz-badge-pending"}`}>{a.completedAt ? `Done ${fmtWhen(a.completedAt)}` : "Not done yet"}</span>
+                  {a.checkedAt && <> <span className="hz-badge hz-badge-empty"><CheckCircle2 size={12} aria-hidden="true" /> Listened{toCorrect(a) ? ` · ${toCorrect(a)} to correct` : ""}</span></>}
                   {a.instructions && <small>{a.instructions}</small>}
                   <small>Set {fmtWhen(a.createdAt)}{a.dueDate ? ` · due ${fmtDate(a.dueDate)}` : ""}</small>
                 </div>
+                {a.completedAt && <button className="hz-btn hz-btn-outline" onClick={() => setListenId(a.id)}><Highlighter size={15} aria-hidden="true" />{a.checkedAt ? "Open" : "Listen & mark"}</button>}
                 <button className="tt-icon-btn" aria-label="Delete this reading" disabled={busy} onClick={() => remove("reading", "reading", () => repo.deleteAssignment(a.id))}><Trash2 size={16} aria-hidden="true" /></button>
               </li>
             ))}
@@ -281,6 +363,7 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
 export function TeacherThilawa({ students, teacherId }) {
   const [openId, setOpenId] = useState(null);
   const [query, setQuery] = useState("");
+  const [openClass, setOpenClass] = useState(null); // class whose students are shown
   const [overview, setOverview] = useState(null); // studentId → summary
   const [error, setError] = useState("");
   const ids = useMemo(() => students.map((s) => s.id), [students]);
@@ -312,9 +395,6 @@ export function TeacherThilawa({ students, teacherId }) {
 
   const opened = students.find((s) => s.id === openId);
   const repo = useMemo(() => (opened ? createSupabaseThilawaRepo(supabase, opened.id, teacherId) : null), [opened, teacherId]);
-  const shown = students
-    .filter((s) => !query.trim() || `${s.name} ${s.studentCode}`.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div>
@@ -326,26 +406,27 @@ export function TeacherThilawa({ students, teacherId }) {
           <div className="hz-row">
             <div>
               <div style={{ fontSize: "20px", fontWeight: 700, color: "#123B67" }}>Thilawa</div>
-              <div className="hz-muted">Students reading by looking. Open a student to set their levels and reading, and to keep notes.</div>
+              <div className="hz-muted">Students reading by looking. Open a student to listen and mark, set their levels and reading, and keep notes.</div>
             </div>
-            {students.length > 6 && (
-              <label className="tt-search"><Search size={16} aria-hidden="true" />
-                <input className="hz-input" type="search" placeholder="Search students" aria-label="Search students" value={query} onChange={(e) => setQuery(e.target.value)} />
-              </label>
-            )}
           </div>
           {error && <div className="hz-error" role="alert">{error}</div>}
           {students.length === 0 ? (
             <div className="hz-card hz-muted">None of your students are enrolled in Thilawa yet. The admin chooses Hifz, Thilawa or both when adding a student.</div>
           ) : (
-            <div className="tt-grid">
-              {shown.map((s) => {
+            <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={setOpenClass} gridClass="tt-grid"
+              summary={(list) => {
+                const os = list.map((s) => overview?.[s.id]).filter(Boolean);
+                const listen = os.reduce((n, o) => n + o.toListen.length, 0);
+                const open = os.reduce((n, o) => n + o.openAssignments, 0);
+                return <>{listen > 0 && <span className="hz-badge hz-badge-partial">{listen} to listen</span>}{open > 0 && <span className="hz-badge hz-badge-pending">{open} reading{open === 1 ? "" : "s"} open</span>}</>;
+              }}
+              renderStudent={(s) => {
                 const o = overview?.[s.id];
                 const last = o?.levels.latest;
                 return (
                   <button key={s.id} type="button" className="tt-card" onClick={() => setOpenId(s.id)}>
                     <div className="tt-card-head"><b>{s.name}</b><span>{s.studentCode}</span></div>
-                    {[["Khatam", o?.progress.percent], ["Tajweed", last?.tajweed], ["Fluency", last?.fluency]].map(([label, v]) => (
+                    {[["Tajweed", last?.tajweed], ["Fluency", last?.fluency]].map(([label, v]) => (
                       <div key={label} className="tt-mini">
                         <span>{label}</span>
                         <div className={`hz-bar hz-bar-sm ${label === "Tajweed" ? "th-bar-tajweed" : label === "Fluency" ? "th-bar-fluency" : ""}`}><div style={{ width: `${v ?? 0}%` }} /></div>
@@ -355,16 +436,15 @@ export function TeacherThilawa({ students, teacherId }) {
                     <div className="tt-tags">
                       {o ? (
                         <>
+                          {o.toListen.length > 0 && <span className="hz-badge hz-badge-partial">{o.toListen.length} to listen</span>}
                           {o.openAssignments > 0 && <span className="hz-badge hz-badge-pending">{o.openAssignments} reading{o.openAssignments === 1 ? "" : "s"} open</span>}
                           {o.streak.current > 0 && <span className="hz-badge hz-badge-completed">{o.streak.current}-day streak</span>}
-                          {!o.settings && <span className="hz-badge hz-badge-empty">No goal yet</span>}
                         </>
                       ) : <span className="hz-muted">Loading…</span>}
                     </div>
                   </button>
                 );
-              })}
-            </div>
+              }} />
           )}
         </div>
       )}

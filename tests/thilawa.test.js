@@ -92,3 +92,64 @@ test("student ticks pages and set reading; teacher-only actions are refused", as
   await assert.rejects(other.deleteReading(t.reading[0].id));
   assert.equal((await other.listReading()).length, 0);
 });
+
+test("class name decides the teacher section; other classes follow the admin's choice", async () => {
+  const { inProgramSection, groupByClass } = await import("../src/thilawa/programRules.js");
+  const s = (className, programs) => ({ name: "A", className, programs });
+  assert.equal(inProgramSection(s("Thilawa Class B12", ["hifz"]), "thilawa"), true);
+  assert.equal(inProgramSection(s("Thilawa Class B12", ["hifz"]), "hifz"), false);
+  assert.equal(inProgramSection(s("Hifz Class B05  (21:30)", ["thilawa"]), "hifz"), true);
+  assert.equal(inProgramSection(s("Hifz Class B05  (21:30)", ["thilawa"]), "thilawa"), false);
+  assert.equal(inProgramSection(s("PC Sausan", ["hifz", "thilawa"]), "thilawa"), true);
+  assert.equal(inProgramSection(s("PC Sausan", ["hifz"]), "thilawa"), false);
+  const groups = groupByClass([
+    { name: "Zaid", className: "Hifz Class B10 (20:15)" }, { name: "Ali", className: "Hifz Class B10 (20:15)" },
+    { name: "Musa", className: "Hifz Class B09 (21:30)" }, { name: "Isa", className: "" },
+  ]);
+  assert.deepEqual(groups.map((g) => [g.name, g.students.map((x) => x.name)]), [
+    ["Hifz Class B09 (21:30)", ["Musa"]], ["Hifz Class B10 (20:15)", ["Ali", "Zaid"]], ["No class", ["Isa"]],
+  ]);
+});
+
+test("finished reading waits for the teacher; marks show to the student until ticked", async () => {
+  const store = createThilawaMemoryStore();
+  const teacher = createMemoryThilawaRepo(store, "s1", { teacherId: "t1" });
+  const student = createMemoryThilawaRepo(store, "s1", { asStudent: true });
+  const reading = await teacher.addAssignment({ fromPage: 582, toPage: 583 });
+  let d = await loadThilawa(student);
+  assert.equal(d.openAssignments, 1);
+  assert.equal(d.toListen.length, 0);
+
+  await completeAssignment(student, d.assignments[0], d.today);
+  d = await loadThilawa(teacher);
+  assert.deepEqual(d.toListen.map((a) => a.id), [reading.id]);
+
+  await teacher.addMistake({ assignmentId: reading.id, page: 582, line: 3, verseKey: "78:2", position: 2, wordText: "ٱلنَّبَإِ" });
+  await assert.rejects(student.addMistake({ assignmentId: reading.id, page: 582, verseKey: "78:3", position: 1 }), /Only the teacher/);
+  await teacher.setAssignmentChecked(reading.id, true);
+  d = await loadThilawa(student);
+  assert.equal(d.toListen.length, 0);
+  assert.equal(d.lastChecked.id, reading.id);
+  assert.deepEqual(d.corrections.map((m) => m.verseKey), ["78:2"]);
+
+  await student.setMistakeTicked(d.corrections[0].id, true);
+  d = await loadThilawa(student);
+  assert.equal(d.corrections.length, 0);
+});
+
+test("a lesson is done when made, isn't set reading, and its marks replace the last ones", async () => {
+  const store = createThilawaMemoryStore();
+  const teacher = createMemoryThilawaRepo(store, "s1", { teacherId: "t1" });
+  const first = await teacher.addAssignment({ fromPage: 10, toPage: 10, kind: "lesson" });
+  await teacher.addMistake({ assignmentId: first.id, page: 10, verseKey: "2:70", position: 1 });
+  await teacher.setAssignmentChecked(first.id, true);
+  const second = await teacher.addAssignment({ fromPage: 11, toPage: 11, kind: "lesson" });
+  assert.ok(second.completedAt);
+  await teacher.addMistake({ assignmentId: second.id, page: 11, verseKey: "2:77", position: 3 });
+  await teacher.setAssignmentChecked(second.id, true);
+  const d = await loadThilawa(teacher);
+  assert.equal(d.openAssignments, 0);
+  assert.equal(d.assignments.length, 0);
+  assert.equal(d.lessons.length, 2);
+  assert.deepEqual(d.corrections.map((m) => m.verseKey), ["2:77"]);
+});
