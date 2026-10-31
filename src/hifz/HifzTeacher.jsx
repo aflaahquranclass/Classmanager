@@ -12,7 +12,7 @@ import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract } from "./engine.js";
-import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, nextTasksToSet, previewNext } from "./tasks.js";
+import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -106,10 +106,23 @@ const teacherCss = `
   .ht-ranges span { display: inline-flex; align-items: center; gap: 6px; background: #E4F1FC; color: #1D5FA8; border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 13px; font-weight: 600; }
   .ht-ranges button { border: none; background: transparent; color: inherit; cursor: pointer; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
   .ht-ranges button:hover { background: #CFE4F8; }
-  .ht-plan { display: flex; flex-direction: column; gap: 14px; }
+  .ht-plan { display: flex; flex-direction: column; gap: 10px; }
   .ht-plan-step { border: 1px solid #E1EDF8; border-radius: 14px; padding: 14px; background: #F9FBFE; }
   .ht-plan-step h4 { margin: 0 0 10px; font-size: 15px; color: #123B67; }
   .ht-plan-step .hz-field:first-of-type { margin-top: 10px; }
+  .ht-plan-step-open { background: #FFFFFF; border-color: #9FC3EA; box-shadow: 0 8px 22px rgba(23,111,209,0.08); }
+  .ht-plan-step-open .hz-wiz-nav { margin-top: 16px; }
+  .ht-wiz-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; font-weight: 700; color: #567493; }
+  .ht-wiz-head > span { white-space: nowrap; }
+  .ht-wiz-head .hz-wiz-steps { flex: 1 1 160px; margin: 0; }
+  .ht-wiz-sum { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; cursor: pointer; border: 1px solid #E1EDF8; border-radius: 14px; background: #F9FBFE; padding: 10px 14px; transition: border-color 0.2s, background 0.2s; }
+  .ht-wiz-sum:hover { border-color: #9FC3EA; background: #FFFFFF; }
+  .ht-wiz-sum:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
+  .ht-wiz-sum > div { flex: 1; min-width: 0; }
+  .ht-wiz-sum small { display: block; font-size: 12px; font-weight: 600; color: #567493; }
+  .ht-wiz-sum b { display: block; margin-top: 2px; font-size: 14px; color: #123B67; overflow-wrap: anywhere; }
+  .ht-wiz-check { flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: #DDF5E9; color: #156B45; }
+  .ht-wiz-change { flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: #176FD1; }
   .ht-juz { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .ht-juz > span { font-size: 13px; font-weight: 700; color: #567493; margin-right: 4px; }
   .ht-juz .hz-chip { min-width: 64px; }
@@ -178,92 +191,159 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
   const addPages = () => {
     const a = Math.round(+from);
     const b = Math.round(+(to || from));
-    if (!(a >= 1 && b >= a && b <= 604)) { setPagesError("Pages go from 1 to 604, and the last page can't be before the first."); return; }
+    if (!(a >= 1 && b >= a && b <= 604)) { setPagesError("Pages go from 1 to 604, and the last page can't be before the first."); return false; }
     set({ memorized: toSet([...plan.memorized, [pageToUnit(a), pageToUnit(b + 1)]]) });
     setFrom(""); setTo(""); setPagesError("");
+    return true;
   };
   const longStart = plan.longStartUnit ?? plan.memorized[0]?.[0] ?? pageToUnit(1);
+  const save = () => onSave({ ...plan, longStartUnit: longStart });
+
+  // One question at a time: the next appears once the one before is answered
+  // (Next), answered ones stay as a short summary to tap and change. A saved
+  // plan opens with every answer shown, so it's quick to change one thing.
+  const steps = [
+    {
+      title: "Where will the student start Hifz?",
+      summary: `${ayahName(ayahAtLine(plan.startUnit))} · p. ${unitToPage(plan.startUnit)} · ${plan.direction === "juz_reverse" ? "juz by juz towards the front" : "on to the end"}`,
+      body: (
+        <>
+          <PositionPicker label="Start" unit={plan.startUnit} allowLine={false} onChange={(u) => set({ startUnit: u })} />
+          <p className="hz-muted" style={{ margin: "8px 0 0" }}>{pathNote(plan)}</p>
+        </>
+      ),
+    },
+    {
+      title: "Pages memorised before",
+      summary: plan.memorized.length ? `${plan.memorized.map(describeRange).join(", ")} · ${describeAmount(unitsOf(plan.memorized))}` : "Nothing yet",
+      body: (
+        <>
+          <div className="hz-grid3">
+            <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="From page" aria-label="From page" value={from} onChange={(e) => setFrom(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
+            <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="To page" aria-label="To page" value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
+            <button type="button" className="hz-btn hz-btn-outline" onClick={addPages} disabled={!from}><Plus size={16} aria-hidden="true" />Add pages</button>
+          </div>
+          {pagesError && <div className="hz-error" role="alert" style={{ marginTop: 8 }}>{pagesError}</div>}
+          <div className="ht-juz">
+            <span>Or whole juz</span>
+            <div className="hz-chips" role="group" aria-label="From the front or the back">
+              <button type="button" className="hz-chip" aria-pressed={juzSide === "first"} onClick={() => setJuzSide("first")}>First</button>
+              <button type="button" className="hz-chip" aria-pressed={juzSide === "last"} onClick={() => setJuzSide("last")}>Last</button>
+            </div>
+            <select className="hz-select" aria-label="How many juz" value={juzCount} onChange={(e) => setJuzCount(+e.target.value)}>
+              {JUZ_COUNTS.map((n) => <option key={n} value={n}>{n} juz</option>)}
+            </select>
+            <button type="button" className="hz-btn hz-btn-outline" onClick={() => set({ memorized: toSet([...plan.memorized, juzRange]) })}><Plus size={16} aria-hidden="true" />Add {juzName}</button>
+          </div>
+          <div className="ht-ranges" aria-label="Memorised before">
+            {plan.memorized.length === 0 && <span style={{ background: "#EEF0F3", color: "#5B6B79", paddingRight: 12 }}>Nothing yet</span>}
+            {plan.memorized.map((r) => (
+              <span key={r.join("-")}>{describeRange(r)}
+                <button type="button" aria-label={`Remove ${describeRange(r)}`} onClick={() => set({ memorized: subtract(plan.memorized, [r]) })}><X size={14} aria-hidden="true" /></button>
+              </span>
+            ))}
+          </div>
+          <p className="hz-muted" style={{ margin: "8px 0 0" }}>{describeAmount(unitsOf(plan.memorized))} memorised before. Completed New Hifz tasks are added automatically.</p>
+        </>
+      ),
+    },
+    {
+      title: "New Hifz: how much a day?",
+      summary: `${describeAmount(plan.newUnits)} a day`,
+      body: (
+        <>
+          <div className="hz-options" style={{ marginTop: 0 }}>
+            {NEW_AMOUNTS.map((o) => (
+              <button key={o.units} type="button" className="hz-option" aria-pressed={plan.newUnits === o.units} onClick={() => set({ newUnits: o.units })}>{o.label}</button>
+            ))}
+          </div>
+          <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each class day the next {describeAmount(plan.newUnits)} of the Hifz path is set.</p>
+        </>
+      ),
+    },
+    {
+      title: "Short Muraja'ah: how many pages a day?",
+      summary: `${plan.shortPages} page${plan.shortPages === 1 ? "" : "s"} a day`,
+      body: (
+        <>
+          <div className="hz-chips">
+            {[1, 2, 3, 4, 5, 6].map((n) => <button key={n} type="button" className="hz-chip" style={{ minWidth: 52 }} aria-pressed={plan.shortPages === n} onClick={() => set({ shortPages: n })}>{n}</button>)}
+            <input className="hz-input" style={{ width: 110 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Short Muraja'ah pages"
+              value={plan.shortPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ shortPages: Math.min(40, v) }); }} />
+          </div>
+          <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each day it revises the {plan.shortPages} most recently memorised page{plan.shortPages === 1 ? "" : "s"} of the Hifz path.</p>
+        </>
+      ),
+    },
+    {
+      title: "Long Muraja'ah",
+      summary: `From p. ${unitToPage(longStart)} · ${plan.longMode === "pages" ? `${plan.longPages} page${plan.longPages === 1 ? "" : "s"} a day` : "to the end of the juz each day"}`,
+      body: (
+        <>
+          <PositionPicker label="Start from" unit={longStart} allowLine={false} onChange={(u) => set({ longStartUnit: u })} />
+          <div className="hz-field">
+            <span>How much a day?</span>
+            <div className="hz-options" style={{ marginTop: 0 }}>
+              <button type="button" className="hz-option" aria-pressed={plan.longMode === "juz"} onClick={() => set({ longMode: "juz" })}>To the end of the juz<small>One juz a day</small></button>
+              <button type="button" className="hz-option" aria-pressed={plan.longMode === "pages"} onClick={() => set({ longMode: "pages" })}>A number of pages<small>{plan.longPages} page{plan.longPages === 1 ? "" : "s"} a day</small></button>
+            </div>
+            {plan.longMode === "pages" && (
+              <input className="hz-input" style={{ maxWidth: 160 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Long Muraja'ah pages a day"
+                value={plan.longPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ longPages: Math.min(40, v) }); }} />
+            )}
+          </div>
+          <p className="hz-muted" style={{ margin: "8px 0 0" }}>Goes through the memorised pages from here, then starts again from the beginning.</p>
+        </>
+      ),
+    },
+  ];
+  const last = steps.length - 1;
+  const [open, setOpen] = useState(profile ? null : 0);
+  const [reached, setReached] = useState(profile ? last : 0);
+  const go = (i) => { setOpen(i); setReached((r) => Math.max(r, i)); };
+  // Pages typed but not added yet count when moving on.
+  const next = () => { if (open === 1 && from && !addPages()) return; go(open + 1); };
+  const openRef = useRef(null);
+  const moved = useRef(false);
+  useEffect(() => {
+    if (moved.current) openRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    moved.current = true;
+  }, [open]);
+
   return (
     <div className="ht-plan">
-      {profile?.fromLegacy && <div className="hz-note" style={{ marginTop: 0, marginBottom: 12 }}><Target size={18} aria-hidden="true" /><span>Filled in from the plan the student made themself. Check it and save.</span></div>}
+      {profile?.fromLegacy && <div className="hz-note" style={{ marginTop: 0, marginBottom: 0 }}><Target size={18} aria-hidden="true" /><span>Filled in from the plan the student made themself. Check it and save.</span></div>}
 
-      <div className="ht-plan-step">
-        <h4>1. Where will the student start Hifz?</h4>
-        <PositionPicker label="Start" unit={plan.startUnit} allowLine={false} onChange={(u) => set({ startUnit: u })} />
-        <p className="hz-muted" style={{ margin: "8px 0 0" }}>{pathNote(plan)}</p>
+      <div className="ht-wiz-head">
+        <span>{open != null ? `Step ${open + 1} of ${steps.length}` : "All answered · tap one to change it"}</span>
+        <div className="hz-wiz-steps" aria-hidden="true">{steps.map((st, i) => <span key={st.title} className={i <= reached ? "on" : ""} />)}</div>
       </div>
 
-      <div className="ht-plan-step">
-        <h4>2. Pages memorised before</h4>
-        <div className="hz-grid3">
-          <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="From page" aria-label="From page" value={from} onChange={(e) => setFrom(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
-          <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="To page" aria-label="To page" value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
-          <button type="button" className="hz-btn hz-btn-outline" onClick={addPages} disabled={!from}><Plus size={16} aria-hidden="true" />Add pages</button>
-        </div>
-        {pagesError && <div className="hz-error" role="alert" style={{ marginTop: 8 }}>{pagesError}</div>}
-        <div className="ht-juz">
-          <span>Or whole juz</span>
-          <div className="hz-chips" role="group" aria-label="From the front or the back">
-            <button type="button" className="hz-chip" aria-pressed={juzSide === "first"} onClick={() => setJuzSide("first")}>First</button>
-            <button type="button" className="hz-chip" aria-pressed={juzSide === "last"} onClick={() => setJuzSide("last")}>Last</button>
+      {steps.slice(0, reached + 1).map((st, i) => (i === open ? (
+        <div key={st.title} ref={openRef} className="ht-plan-step ht-plan-step-open hz-wiz-body">
+          <h4>{i + 1}. {st.title}</h4>
+          {st.body}
+          <div className="hz-wiz-nav">
+            {i > 0 ? <button className="hz-btn hz-btn-outline" onClick={() => setOpen(i - 1)}><ChevronLeft size={16} aria-hidden="true" />Back</button> : <span />}
+            {i < last
+              ? <button className="hz-btn hz-btn-primary" onClick={next}>Next<ArrowRight size={16} aria-hidden="true" /></button>
+              : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={save}>Save plan</button>}
           </div>
-          <select className="hz-select" aria-label="How many juz" value={juzCount} onChange={(e) => setJuzCount(+e.target.value)}>
-            {JUZ_COUNTS.map((n) => <option key={n} value={n}>{n} juz</option>)}
-          </select>
-          <button type="button" className="hz-btn hz-btn-outline" onClick={() => set({ memorized: toSet([...plan.memorized, juzRange]) })}><Plus size={16} aria-hidden="true" />Add {juzName}</button>
         </div>
-        <div className="ht-ranges" aria-label="Memorised before">
-          {plan.memorized.length === 0 && <span style={{ background: "#EEF0F3", color: "#5B6B79", paddingRight: 12 }}>Nothing yet</span>}
-          {plan.memorized.map((r) => (
-            <span key={r.join("-")}>{describeRange(r)}
-              <button type="button" aria-label={`Remove ${describeRange(r)}`} onClick={() => set({ memorized: subtract(plan.memorized, [r]) })}><X size={14} aria-hidden="true" /></button>
-            </span>
-          ))}
-        </div>
-        <p className="hz-muted" style={{ margin: "8px 0 0" }}>{describeAmount(unitsOf(plan.memorized))} memorised before. Completed New Hifz tasks are added automatically.</p>
-      </div>
+      ) : (
+        <button key={st.title} type="button" className="ht-wiz-sum" onClick={() => setOpen(i)} aria-label={`${i + 1}. ${st.title}: ${st.summary}. Change`}>
+          <span className="ht-wiz-check"><Check size={15} aria-hidden="true" /></span>
+          <div><small>{i + 1}. {st.title}</small><b>{st.summary}</b></div>
+          <span className="ht-wiz-change"><Pencil size={14} aria-hidden="true" />Change</span>
+        </button>
+      )))}
 
-      <div className="ht-plan-step">
-        <h4>3. New Hifz: how much a day?</h4>
-        <div className="hz-options" style={{ marginTop: 0 }}>
-          {NEW_AMOUNTS.map((o) => (
-            <button key={o.units} type="button" className="hz-option" aria-pressed={plan.newUnits === o.units} onClick={() => set({ newUnits: o.units })}>{o.label}</button>
-          ))}
+      {open !== last && (reached === last || onCancel) && (
+        <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 4 }}>
+          {onCancel && <button className="hz-btn hz-btn-outline" onClick={onCancel}>Cancel</button>}
+          {reached === last && <button className="hz-btn hz-btn-primary" disabled={busy} onClick={save}>Save plan</button>}
         </div>
-        <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each class day the next {describeAmount(plan.newUnits)} of the Hifz path is set.</p>
-      </div>
-
-      <div className="ht-plan-step">
-        <h4>4. Short Muraja'ah: how many pages a day?</h4>
-        <div className="hz-chips">
-          {[1, 2, 3, 4, 5, 6].map((n) => <button key={n} type="button" className="hz-chip" style={{ minWidth: 52 }} aria-pressed={plan.shortPages === n} onClick={() => set({ shortPages: n })}>{n}</button>)}
-          <input className="hz-input" style={{ width: 110 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Short Muraja'ah pages"
-            value={plan.shortPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ shortPages: Math.min(40, v) }); }} />
-        </div>
-        <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each day it revises the {plan.shortPages} most recently memorised page{plan.shortPages === 1 ? "" : "s"} of the Hifz path.</p>
-      </div>
-
-      <div className="ht-plan-step">
-        <h4>5. Long Muraja'ah</h4>
-        <PositionPicker label="Start from" unit={longStart} allowLine={false} onChange={(u) => set({ longStartUnit: u })} />
-        <div className="hz-field">
-          <span>How much a day?</span>
-          <div className="hz-options" style={{ marginTop: 0 }}>
-            <button type="button" className="hz-option" aria-pressed={plan.longMode === "juz"} onClick={() => set({ longMode: "juz" })}>To the end of the juz<small>One juz a day</small></button>
-            <button type="button" className="hz-option" aria-pressed={plan.longMode === "pages"} onClick={() => set({ longMode: "pages" })}>A number of pages<small>{plan.longPages} page{plan.longPages === 1 ? "" : "s"} a day</small></button>
-          </div>
-          {plan.longMode === "pages" && (
-            <input className="hz-input" style={{ maxWidth: 160 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Long Muraja'ah pages a day"
-              value={plan.longPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ longPages: Math.min(40, v) }); }} />
-          )}
-        </div>
-        <p className="hz-muted" style={{ margin: "8px 0 0" }}>Goes through the memorised pages from here, then starts again from the beginning.</p>
-      </div>
-
-      <div className="hz-wiz-nav" style={{ justifyContent: "flex-end" }}>
-        {onCancel && <button className="hz-btn hz-btn-outline" onClick={onCancel}>Cancel</button>}
-        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave({ ...plan, longStartUnit: longStart })}>Save plan</button>
-      </div>
+      )}
     </div>
   );
 }
