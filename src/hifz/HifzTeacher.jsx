@@ -147,8 +147,8 @@ function PortionFields({ value, onChange }) {
 const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeAmount(r.end - r.start)} · ${describeAyahs([r.start, r.end])}`;
 
 // ---------- the student's Hifz plan ----------
-// Where the student starts Hifz, what was memorised before (page to page or
-// whole juz from the front or back), and how
+// What was memorised before (page to page or whole juz from the front or
+// back), where the student starts Hifz, and how
 // Short and Long Muraja'ah work. New, Short and Long portions are worked out
 // from this (tasks.js: suggestPortion). The target year is the student's own.
 
@@ -204,16 +204,6 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
   // plan opens with every answer shown, so it's quick to change one thing.
   const steps = [
     {
-      title: "Where will the student start Hifz?",
-      summary: `${ayahName(ayahAtLine(plan.startUnit))} · p. ${unitToPage(plan.startUnit)} · ${plan.direction === "juz_reverse" ? "juz by juz towards the front" : "on to the end"}`,
-      body: (
-        <>
-          <PositionPicker label="Start" unit={plan.startUnit} allowLine={false} onChange={(u) => set({ startUnit: u })} />
-          <p className="hz-muted" style={{ margin: "8px 0 0" }}>{pathNote(plan)}</p>
-        </>
-      ),
-    },
-    {
       title: "Pages memorised before",
       summary: plan.memorized.length ? `${plan.memorized.map(describeRange).join(", ")} · ${describeAmount(unitsOf(plan.memorized))}` : "Nothing yet",
       body: (
@@ -244,6 +234,16 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
             ))}
           </div>
           <p className="hz-muted" style={{ margin: "8px 0 0" }}>{describeAmount(unitsOf(plan.memorized))} memorised before. Completed New Hifz tasks are added automatically.</p>
+        </>
+      ),
+    },
+    {
+      title: "Where will the student start Hifz?",
+      summary: `${ayahName(ayahAtLine(plan.startUnit))} · p. ${unitToPage(plan.startUnit)} · ${plan.direction === "juz_reverse" ? "juz by juz towards the front" : "on to the end"}`,
+      body: (
+        <>
+          <PositionPicker label="Start" unit={plan.startUnit} allowLine={false} onChange={(u) => set({ startUnit: u })} />
+          <p className="hz-muted" style={{ margin: "8px 0 0" }}>{pathNote(plan)}</p>
         </>
       ),
     },
@@ -302,7 +302,7 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
   const [reached, setReached] = useState(profile ? last : 0);
   const go = (i) => { setOpen(i); setReached((r) => Math.max(r, i)); };
   // Pages typed but not added yet count when moving on.
-  const next = () => { if (open === 1 && from && !addPages()) return; go(open + 1); };
+  const next = () => { if (open === 0 && from && !addPages()) return; go(open + 1); };
   const openRef = useRef(null);
   const moved = useRef(false);
   useEffect(() => {
