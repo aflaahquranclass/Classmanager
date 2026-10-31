@@ -9,9 +9,9 @@ import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { hasThaana, thaanaChange } from "./thaanaKeyboard.js";
-import { createNotification, loadEmailStatus, loadNameChecks, confirmNames } from "./smsSend.js";
+import { createNotification, loadEmailStatus, loadNameChecks, confirmNames, forgetPassword } from "./smsSend.js";
 import { nameToThaana } from "../exams/thaanaNames.js";
-import { fillTemplate, smsParts, messageText } from "./templates.js";
+import { fillTemplate, smsParts, messageText, PASSWORD_WORDING } from "./templates.js";
 import { saveMessageTemplate } from "./messageTemplates.js";
 import { MessageFields, LanguageSwitch } from "./MessageFields.jsx";
 
@@ -123,6 +123,7 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
   const [classSet, setClassSet] = useState({}); // class name → true
   const [picked, setPicked] = useState({}); // `s:<id>` | `t:<id>` → true
   const [removed, setRemoved] = useState({}); // taken off from the table (all students, classes, all teachers)
+  const [madeLogins, setMadeLogins] = useState({}); // student id → user id of a portal login made here
   const [filter, setFilter] = useState("");
   const [filterClass, setFilterClass] = useState("");
   const [numbersText, setNumbersText] = useState("");
@@ -178,9 +179,9 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
 
   // ---- Who gets it ----
   const people = useMemo(() => [
-    ...students.map((s) => ({ key: `s:${s.id}`, kind: "Student", student_id: s.id, user_id: s.userId || null, name: s.name, studentCode: s.studentCode || "", phone: s.phone || null, email: s.email || null, className: s.className || "" })),
+    ...students.map((s) => ({ key: `s:${s.id}`, kind: "Student", student_id: s.id, user_id: madeLogins[s.id] || s.userId || null, name: s.name, studentCode: s.studentCode || "", phone: s.phone || null, email: s.email || null, className: s.className || "" })),
     ...teachers.map((t) => ({ key: `t:${t.id}`, kind: "Teacher", teacher_id: t.id, user_id: t.userId || null, name: t.name, phone: t.phone || null, email: t.email || null, className: "" })),
-  ].sort((a, b) => a.name.localeCompare(b.name)), [students, teachers]);
+  ].sort((a, b) => a.name.localeCompare(b.name)), [students, teachers, madeLogins]);
 
   const classOptions = useMemo(() => {
     const names = new Set([...classes.map((c) => c.name), ...students.map((s) => s.className)].filter(Boolean));
@@ -245,10 +246,42 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
     showToast(`${rows.length} name${rows.length === 1 ? "" : "s"} confirmed.`);
   };
 
-  const personalise = (r) => {
+  // {password}: students without a portal login get one, with a new
+  // one-time password, when it's sent (see send). passwords: student id →
+  // the new password, or "own" / "none" (PASSWORD_WORDING).
+  const wantsPassword = /\{password\}/.test(raw);
+  const newLogins = recipients.filter((r) => r.student_id && !r.user_id && r.studentCode);
+  const previewPassword = (r) => (!r.student_id ? "" : r.user_id ? "own" : r.studentCode ? "later" : "none");
+
+  const personalise = (r, passwords) => {
     const s = r.student_id ? studentsById.get(r.student_id) || {} : r.teacher_id ? { name: r.name } : {};
     const teacherName = teachers.find((t) => t.id === s.teacherId)?.name || "";
-    return messageText(lang, en, dv, (text, l) => fillTemplate(text, s, { teacherName, monthKey, dvNames: dvNamesNow, dv: l === "dv" }));
+    const pw = passwords ? passwords[r.student_id] || (r.user_id ? "own" : "none") : previewPassword(r);
+    return messageText(lang, en, dv, (text, l) => fillTemplate(text, s, {
+      teacherName, monthKey, dvNames: dvNamesNow, dv: l === "dv",
+      password: r.student_id ? PASSWORD_WORDING[pw]?.[l] ?? pw : "",
+    }));
+  };
+
+  // Makes portal logins for the students in newLogins, just before sending.
+  // Who has a login is checked again first, so no one's password is ever
+  // reset from here. Returns { passwords, userIds }, or null if the check failed.
+  const makeLogins = async () => {
+    const ids = newLogins.map((r) => r.student_id);
+    const { data: fresh, error } = await supabase.from("students").select("id, user_id").in("id", ids);
+    if (error || !fresh) return null;
+    const passwords = {}, userIds = {};
+    for (const row of fresh) {
+      if (row.user_id) { passwords[row.id] = "own"; userIds[row.id] = row.user_id; continue; }
+      const { data } = await supabase.functions.invoke("student-login", { body: { student_id: row.id } });
+      passwords[row.id] = data?.password || "none";
+    }
+    const made = Object.keys(passwords).filter((id) => !["own", "none"].includes(passwords[id]));
+    if (made.length) {
+      const { data: rows } = await supabase.from("students").select("id, user_id").in("id", made);
+      for (const row of rows || []) if (row.user_id) userIds[row.id] = row.user_id;
+    }
+    return { passwords, userIds };
   };
   const idx = Math.min(previewIdx, Math.max(recipients.length - 1, 0));
   const previewFor = recipients[idx];
@@ -266,6 +299,8 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
     if (!raw.trim()) { showToast(lang === "both" ? "Write the English and Dhivehi message first." : "Write a message first."); return; }
     if (!recipients.length) { showToast("Choose who should get it."); return; }
     if (!useInApp && !useSms && !useEmail) { showToast("Pick App, SMS or Email."); return; }
+    const loginsToMake = wantsPassword ? newLogins.length : 0;
+    if (loginsToMake && !useSms && !useEmail) { showToast("New one-time passwords need SMS or Email — turn one on."); return; }
     if (uncheckedNames && !(await confirmDialog({
       title: "Some Dhivehi names aren't checked",
       message: `${uncheckedNames} name${uncheckedNames === 1 ? " hasn't" : "s haven't"} been checked in step 3. Send with the spelling shown there anyway?`,
@@ -274,19 +309,29 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
     const how = [useInApp && "in the app", useSms && "by SMS", useEmail && "by email"].filter(Boolean).join(", ").replace(/, ([^,]*)$/, " and $1");
     if (!(await confirmDialog({
       title: "Send this message?",
-      message: `To ${recipients.length} ${recipients.length === 1 ? "person" : "people"} ${how}.${useSms ? ` Each SMS is ${parts} part${parts === 1 ? "" : "s"}.` : ""}`,
+      message: `To ${recipients.length} ${recipients.length === 1 ? "person" : "people"} ${how}.${useSms ? ` Each SMS is ${parts} part${parts === 1 ? "" : "s"}.` : ""}${loginsToMake ? ` ${loginsToMake} student${loginsToMake === 1 ? "" : "s"} without a portal login will be given one with a new one-time password.` : ""}`,
       confirmLabel: "Send", danger: false,
     }))) return;
     setSending(true);
+    let logins = { passwords: {}, userIds: {} };
+    if (loginsToMake) {
+      logins = await makeLogins();
+      if (!logins) { setSending(false); showToast("Couldn't check who has a portal login. Nothing was sent."); return; }
+      setMadeLogins((cur) => ({ ...cur, ...logins.userIds }));
+    }
+    const to = recipients.map((r) => (logins.userIds[r.student_id] ? { ...r, user_id: logins.userIds[r.student_id] } : r));
     const res = await createNotification({
       title: title.trim(), body: raw, audience, audienceLabel: audienceLabel(),
       inApp: useInApp, sms: useSms, email: useEmail,
-      recipients: personal ? recipients.map((r) => ({ ...r, body: personalise(r) })) : recipients,
+      recipients: personal ? to.map((r) => ({ ...r, body: personalise(r, logins.passwords) })) : to,
     });
+    const newPasswords = Object.values(logins.passwords).filter((p) => !["own", "none"].includes(p));
+    if (res.ok) await forgetPassword(res.id, newPasswords);
     setSending(false);
-    if (!res.ok) { showToast(res.message); return; }
+    const failed = Object.values(logins.passwords).filter((p) => p === "none").length;
+    if (!res.ok) { showToast(newPasswords.length ? `${res.message} ${newPasswords.length} portal login${newPasswords.length === 1 ? " was" : "s were"} made but the message wasn’t sent — give them a new password from Students → Edit.` : res.message); return; }
     setTitle(""); setEn(""); setDv(""); setTemplateId(""); setPicked({}); setRemoved({}); setNumbersText(""); setPreviewIdx(0);
-    showToast(`Sent to ${recipients.length}.${res.message ? " " + res.message : ""}`);
+    showToast(`Sent to ${recipients.length}.${res.message ? " " + res.message : ""}${newPasswords.length ? ` ${newPasswords.length} new portal login${newPasswords.length === 1 ? "" : "s"} made.` : ""}${failed ? ` ${failed} login${failed === 1 ? "" : "s"} couldn't be made — they got “ask the class office”.` : ""}`);
     onSent();
   };
 
@@ -335,6 +380,9 @@ export function SendTab({ students, teachers, classes, templates, setTemplates, 
           )}
 
           <MessageFields lang={lang} en={en} dv={dv} setEn={setEn} setDv={setDv} />
+          {wantsPassword && (
+            <div className="nt-meta"><span>One-time password: students without a portal login{recipients.length ? ` (${newLogins.length} of those chosen)` : ""} get a new login and password when you send. Anyone who already signs in keeps their own password — it isn't changed.</span></div>
+          )}
 
           <label className="nt-label" htmlFor="nt-title">Title <span style={{ textTransform: "none", fontWeight: 400 }}>(optional — shown in the app and as the email subject)</span></label>
           <input id="nt-title" className={`lc-input ${hasThaana(title) || lang === "dv" ? "nt-dv" : ""}`} dir="auto" value={title} maxLength={120} placeholder="e.g. Class cancelled tomorrow" onChange={(e) => setTitle(e.target.value)} />

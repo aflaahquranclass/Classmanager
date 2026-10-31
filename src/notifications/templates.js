@@ -41,7 +41,7 @@ export const TEMPLATES = [
 
 // Student details that can go into a message written under Send or a saved
 // template, filled in for each student.
-export const MESSAGE_PLACEHOLDERS = ["name", "student_id", "class", "teacher", "days", "time", "fee", "month", "login", "link"];
+export const MESSAGE_PLACEHOLDERS = ["name", "student_id", "class", "teacher", "days", "time", "fee", "month", "login", "link", "password"];
 
 // The text of a message in the chosen language — "en", "dv" or "both"
 // (Dhivehi first, then English) — each part filled in separately so the
@@ -148,6 +148,16 @@ function loginDetails(code, dv) {
   if (!code) return "";
   return dv ? `ދަރިވަރުންގެ ޕޯޓަލް: ${STUDENT_PORTAL_LINK}\nސްޓޫޑެންޓް އައިޑީ: ${code}` : `Student portal: ${STUDENT_PORTAL_LINK}\nStudent ID: ${code}`;
 }
+
+// {password} in a message from Send: a student without a portal login is
+// given one with a new one-time password as it's sent. Anyone who already
+// signs in keeps their own password, so they get "own" instead; "none" when a
+// login couldn't be made; "later" stands in for it in the preview.
+export const PASSWORD_WORDING = {
+  own: { en: "(the password you chose)", dv: "(ތިޔަ ހަދާފައިވާ ޕާސްވޯޑް)" },
+  none: { en: "(ask the class office)", dv: "(ކްލާސް އޮފީހުން ސާފުކުރައްވާ)" },
+  later: { en: "•••••••• (made when you send)", dv: "•••••••• (ފޮނުވާއިރު ހެދޭނެ)" },
+};
 
 // student: { name, studentCode, className, fee, schedule: { days, startTime, endTime } }
 // ctx: { teacherName, monthKey ("2026-10"), dvNames: { [englishName]: thaana }, password,

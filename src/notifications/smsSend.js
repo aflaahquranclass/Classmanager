@@ -107,21 +107,23 @@ export async function createNotification({ title = "", body, audience, audienceL
 // Once a message with a one-time password has gone out by SMS or email (and
 // nothing is left to send), the password is masked in the saved copy so it
 // isn't kept in the notification history. Still-pending messages keep it,
-// since they need it when they're sent.
+// since they need it when they're sent. passwords: one, or a list (Send).
 const UNSENT = ["pending", "failed", "sending"];
-async function forgetPassword(notificationId, password) {
-  if (!notificationId || !password) return;
+export async function forgetPassword(notificationId, passwords) {
+  const list = [].concat(passwords || []).filter(Boolean);
+  if (!notificationId || !list.length) return;
   const { data: recs } = await supabase.from("notification_recipients")
     .select("id, body, sms_status, email_status").eq("notification_id", notificationId);
   if (!recs?.length) return;
   const done = recs.every((r) => !UNSENT.includes(r.sms_status) && !UNSENT.includes(r.email_status));
   const delivered = recs.some((r) => r.sms_status === "sent" || r.email_status === "sent");
   if (!done || !delivered) return;
-  const mask = (text) => (text || "").split(password).join("••••••••");
-  await Promise.all(recs.filter((r) => r.body?.includes(password))
+  const has = (text) => list.some((p) => text?.includes(p));
+  const mask = (text) => list.reduce((t, p) => t.split(p).join("••••••••"), text || "");
+  await Promise.all(recs.filter((r) => has(r.body))
     .map((r) => supabase.from("notification_recipients").update({ body: mask(r.body) }).eq("id", r.id)));
   const { data: note } = await supabase.from("notifications").select("body").eq("id", notificationId).maybeSingle();
-  if (note?.body?.includes(password)) await supabase.from("notifications").update({ body: mask(note.body) }).eq("id", notificationId);
+  if (has(note?.body)) await supabase.from("notifications").update({ body: mask(note.body) }).eq("id", notificationId);
 }
 
 // Welcome message for one student: SMS to their phone and email to their

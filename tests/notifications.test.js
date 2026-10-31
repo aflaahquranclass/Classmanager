@@ -104,3 +104,12 @@ test("{login} is the portal link and Student ID, in the message's language", () 
   assert.equal(fillTemplate("{login}", { ...student, studentCode: "" }), "");
   assert.equal(fillTemplate("{link}", student), "https://students.aflaahqc.com");
 });
+
+import { PASSWORD_WORDING, MESSAGE_PLACEHOLDERS } from "../src/notifications/templates.js";
+
+test("{password} can be inserted under Send, with wording for those who already sign in", () => {
+  assert.ok(MESSAGE_PLACEHOLDERS.includes("password"));
+  assert.equal(fillTemplate("Password: {password}", student, { password: "Ab3dEf7h" }), "Password: Ab3dEf7h");
+  assert.equal(fillTemplate("Password: {password}", student, { password: PASSWORD_WORDING.own.en }), "Password: (the password you chose)");
+  for (const w of Object.values(PASSWORD_WORDING)) assert.ok(w.en && hasThaana(w.dv));
+});
