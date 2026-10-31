@@ -5,11 +5,11 @@
 // The student's portal updates live and they get a phone notification.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Undo2, Check, History } from "lucide-react";
+import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
-import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, PortionText, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
+import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract } from "./engine.js";
 import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskGroups } from "./tasks.js";
@@ -68,13 +68,41 @@ const teacherCss = `
   .ht-hist-icon { flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: #DDF5E9; color: #156B45; }
   .ht-rows { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
   .ht-row { border: 1px solid #E1EDF8; border-radius: 14px; background: #F7FAFD; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
-  .ht-row-done { background: linear-gradient(160deg, #ECFAF4, #FFFFFF 60%); border-color: #9FD9BE; }
-  .ht-done-next { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: #156B45; }
   .ht-row-open { box-shadow: 0 0 0 2px #176FD1; }
   .ht-row-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .ht-row-head b { color: #123B67; }
   .ht-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .ht-row-actions .hz-btn { min-height: 38px; padding: 0 12px; font-size: 13px; }
+  .ht-task { display: flex; align-items: flex-start; gap: 12px; border: 1px solid #E1EDF8; border-radius: 14px; background: #FFFFFF; padding: 14px; transition: border-color 0.2s, box-shadow 0.2s; }
+  .ht-task:hover { border-color: #C9DDF2; box-shadow: 0 6px 16px rgba(18,59,103,0.06); }
+  .ht-task-open { box-shadow: 0 0 0 2px #176FD1; }
+  .ht-task-tile { flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; }
+  .ht-tile-new { background: #E4F1FC; color: #176FD1; }
+  .ht-tile-short { background: #E0F4F6; color: #0A7F96; }
+  .ht-tile-long { background: #ECE9FA; color: #5B4BB7; }
+  .ht-tile-done { background: #DDF5E9; color: #156B45; }
+  .ht-task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .ht-task-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
+  .ht-task-top b { font-size: 15px; color: #123B67; }
+  .ht-task-date { font-size: 13px; color: #567493; }
+  .ht-task-tags { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+  .ht-task-portion { font-size: 14px; color: #567493; }
+  .ht-task-portion b { font-size: 15px; color: #123B67; margin-right: 8px; }
+  .ht-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+  .ht-task-actions > .hz-btn { min-height: 38px; padding: 0 14px; font-size: 13px; }
+  .ht-task-links { display: inline-flex; align-items: center; flex-wrap: wrap; margin-left: auto; }
+  .ht-task-links .hz-btn { min-height: 34px; padding: 0 8px; font-size: 13px; font-weight: 600; color: #567493; }
+  .ht-task-links .hz-btn:hover { color: #176FD1; }
+  .ht-task-done { background: #F7FCFA; border-color: #CDEBDC; }
+  .ht-task-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
+  .ht-task-next { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: #156B45; }
+  @media (max-width: 520px) {
+    .ht-task { padding: 12px; gap: 10px; }
+    .ht-task-tile { width: 34px; height: 34px; border-radius: 10px; }
+    .ht-task-actions > .hz-btn { flex: 1 1 0; padding: 0 10px; white-space: nowrap; }
+    .ht-task-actions > .hz-btn svg { display: none; }
+    .ht-task-links { margin-left: -8px; }
+  }
   .ht-group { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: #567493; text-transform: uppercase; letter-spacing: 0.04em; }
   .ht-markbar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #123B67; color: #FFFFFF; border-radius: 14px; padding: 10px 12px; box-shadow: 0 12px 30px rgba(13,40,70,0.35); }
   .ht-markbar .hz-ar { color: #FFD9CF; font-size: 26px; }
@@ -589,41 +617,53 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
   };
 
   const groups = teacherTaskGroups(tasks, today);
+  // One short line for a portion: "p. 158 · 1 page · Al-A'raf 58 – 67".
+  const portionLine = (t) => (
+    <div className="ht-task-portion"><b>{describeRange([t.start, t.end])}</b>{describeAmount(t.end - t.start)} · {describeAyahs([t.start, t.end])}</div>
+  );
   // Approved today: stays in its place, green, with the next one (set for a
   // later day) under it to check or change.
-  const finishedRow = (t) => {
-    const { title, Icon } = ACTIVITY_INFO[t.activity];
+  const finishedRow = (t, showDate) => {
+    const { title } = ACTIVITY_INFO[t.activity];
     const count = mistakesForTask(t, mistakes).length;
     const next = groups.next[t.activity];
     return (
-      <li key={t.id} className={`ht-row ht-row-done ${markingId === t.id ? "ht-row-open" : ""}`}>
-        <div className="ht-row-head">
-          <Icon size={18} aria-hidden="true" /><b>{title}</b>
-          <span className="hz-muted">{fmtDay(t.taskDate)}</span>
-          <span className="hz-badge hz-badge-completed"><CheckCircle2 size={13} aria-hidden="true" /> Finished today</span>
-          {count > 0 && <span className="hz-mistake-badge"><Highlighter size={12} aria-hidden="true" />{count}</span>}
-        </div>
-        <PortionText task={t} />
-        {next && editingId === next.id ? (
-          <div className="ht-next">
-            <div className="ht-next-head"><ArrowRight size={16} aria-hidden="true" />Change the next {title}</div>
-            <EditTask task={next} busy={busy} onCancel={() => setEditingId(null)}
-              onSave={(d) => run(() => repo.updateTask(next.id, d)).then((ok) => ok && setEditingId(null))} />
+      <li key={t.id} className={`ht-task ht-task-done ${markingId === t.id ? "ht-task-open" : ""}`}>
+        <span className="ht-task-tile ht-tile-done"><Check size={20} aria-hidden="true" /></span>
+        <div className="ht-task-main">
+          <div className="ht-task-top">
+            <b>{title}</b>{showDate && <span className="ht-task-date">{fmtDay(t.taskDate)}</span>}
+            <span className="ht-task-tags">
+              {count > 0 && <span className="hz-mistake-badge" title="Words marked"><Highlighter size={12} aria-hidden="true" />{count}</span>}
+              <span className="hz-badge hz-badge-completed">Finished</span>
+            </span>
           </div>
-        ) : next && <div className="ht-done-next"><ArrowRight size={14} aria-hidden="true" />Next: {fmtDay(next.taskDate)} · {portionSummary(next)}</div>}
-        <div className="ht-row-actions">
-          <button className="hz-btn hz-btn-outline" onClick={() => openMarking(t)}><Highlighter size={15} aria-hidden="true" />Listen & mark</button>
-          {next && editingId !== next.id && <button className="hz-btn hz-btn-outline" onClick={() => setEditingId(next.id)}><Pencil size={15} aria-hidden="true" />Change next</button>}
-          <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => run(() => repo.setTaskDone(t.id, false))}><Undo2 size={15} aria-hidden="true" />Not done</button>
+          {portionLine(t)}
+          {next && editingId === next.id ? (
+            <div className="ht-next" style={{ marginTop: 6 }}>
+              <div className="ht-next-head"><ArrowRight size={16} aria-hidden="true" />Change the next {title}</div>
+              <EditTask task={next} busy={busy} onCancel={() => setEditingId(null)}
+                onSave={(d) => run(() => repo.updateTask(next.id, d)).then((ok) => ok && setEditingId(null))} />
+            </div>
+          ) : (
+            <div className="ht-task-foot">
+              {next && <span className="ht-task-next"><ArrowRight size={13} aria-hidden="true" />Next · {fmtDay(next.taskDate)} · {describeRange([next.start, next.end])}</span>}
+              <span className="ht-task-links">
+                {next && <button className="hz-btn hz-btn-ghost" onClick={() => setEditingId(next.id)}>Change next</button>}
+                <button className="hz-btn hz-btn-ghost" onClick={() => openMarking(t)}>Mushaf</button>
+                <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => run(() => repo.setTaskDone(t.id, false))}>Undo</button>
+              </span>
+            </div>
+          )}
         </div>
       </li>
     );
   };
-  const taskRow = (t) => {
+  const taskRow = (t, showDate) => {
     const { title, Icon } = ACTIVITY_INFO[t.activity];
     const confirmed = drafts[t.activity];
     const count = mistakesForTask(t, mistakes).length;
-    if (t.completedAt) return finishedRow(t);
+    if (t.completedAt) return finishedRow(t, showDate);
     if (editingId === t.id) {
       return (
         <li key={t.id} className="ht-row ht-row-open">
@@ -634,39 +674,39 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
       );
     }
     return (
-      <li key={t.id} className={`ht-row ${t.completedAt ? "ht-row-done" : ""} ${markingId === t.id ? "ht-row-open" : ""}`}>
-        <div className="ht-row-head">
-          <Icon size={18} aria-hidden="true" /><b>{title}</b>
-          <span className="hz-muted">{fmtDay(t.taskDate)}</span>
-          {t.studentDoneAt && !t.completedAt
-            ? <span className="hz-badge hz-badge-submitted" title={`Finished ${fmtDate(t.studentDoneAt.slice(0, 10))}`}><CheckCheck size={13} aria-hidden="true" /> Student finished · listen & approve</span>
-            : <span className={`hz-badge ${t.completedAt ? "hz-badge-completed" : t.taskDate < today ? "hz-badge-partial" : "hz-badge-pending"}`}>{t.completedAt ? "Done" : t.taskDate < today ? "Not done" : "To do"}</span>}
-          {count > 0 && <span className="hz-mistake-badge"><Highlighter size={12} aria-hidden="true" />{count}</span>}
+      <li key={t.id} className={`ht-task ${markingId === t.id ? "ht-task-open" : ""}`}>
+        <span className={`ht-task-tile ht-tile-${t.activity}`}><Icon size={20} aria-hidden="true" /></span>
+        <div className="ht-task-main">
+          <div className="ht-task-top">
+            <b>{title}</b>{showDate && <span className="ht-task-date">{fmtDay(t.taskDate)}</span>}
+            <span className="ht-task-tags">
+              {count > 0 && <span className="hz-mistake-badge" title="Words marked"><Highlighter size={12} aria-hidden="true" />{count}</span>}
+              {t.studentDoneAt
+                ? <span className="hz-badge hz-badge-submitted" title={`Finished ${fmtDate(t.studentDoneAt.slice(0, 10))}`}><CheckCheck size={13} aria-hidden="true" /> Student finished</span>
+                : t.taskDate < today && <span className="hz-badge hz-badge-partial">Late</span>}
+            </span>
+          </div>
+          {portionLine(t)}
+          {t.notes && <div className="hz-task-notes" style={{ marginTop: 4 }}>{t.notes}</div>}
+          <div className="ht-task-actions">
+            <button className="hz-btn hz-btn-primary" onClick={() => openMarking(t)}><Highlighter size={15} aria-hidden="true" />Listen & mark</button>
+            <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => markDone(t)}><CheckCircle2 size={15} aria-hidden="true" />Approve</button>
+            <span className="ht-task-links">
+              <button className="hz-btn hz-btn-ghost" aria-expanded={nextOpen === t.id} onClick={() => setNextOpen(nextOpen === t.id ? null : t.id)}>Next task</button>
+              <button className="hz-btn hz-btn-ghost" onClick={() => setEditingId(t.id)}>Change</button>
+              <button className="hz-btn hz-btn-ghost" aria-label={`Delete ${title} for ${fmtDay(t.taskDate)}`} title="Delete" onClick={() => remove("task", () => repo.deleteTask(t.id))}><Trash2 size={15} aria-hidden="true" /></button>
+            </span>
+          </div>
+          {confirmed && nextOpen !== t.id && <div className="ht-task-next" style={{ color: "#567493" }}>Next (confirmed) · {fmtDay(confirmed.taskDate)} · {describeRange([confirmed.start, confirmed.end])}</div>}
+          {nextOpen === t.id && markingId !== t.id && nextBox(t)}
         </div>
-        <PortionText task={t} />
-        {t.notes && <div className="hz-task-notes">{t.notes}</div>}
-        <div className="ht-row-actions">
-          <button className="hz-btn hz-btn-primary" onClick={() => openMarking(t)}>
-            <Highlighter size={15} aria-hidden="true" />Listen & mark
-          </button>
-          <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => (t.completedAt ? run(() => repo.setTaskDone(t.id, false)) : markDone(t))}>
-            {t.completedAt ? <><Undo2 size={15} aria-hidden="true" />Not done</> : <><CheckCircle2 size={15} aria-hidden="true" />Approve</>}
-          </button>
-          <button className="hz-btn hz-btn-outline" aria-expanded={nextOpen === t.id} onClick={() => setNextOpen(nextOpen === t.id ? null : t.id)}>
-            <ArrowRight size={15} aria-hidden="true" />Next task
-          </button>
-          <button className="hz-btn hz-btn-outline" onClick={() => setEditingId(t.id)}><Pencil size={15} aria-hidden="true" />Change</button>
-          <button className="hz-btn hz-btn-ghost" aria-label={`Delete ${title} for ${fmtDay(t.taskDate)}`} onClick={() => remove("task", () => repo.deleteTask(t.id))}><Trash2 size={15} aria-hidden="true" /></button>
-        </div>
-        {confirmed && nextOpen !== t.id && <div className="hz-muted" style={{ fontSize: 13 }}>Next (confirmed): {fmtDay(confirmed.taskDate)} · {portionSummary(confirmed)}</div>}
-        {nextOpen === t.id && markingId !== t.id && nextBox(t)}
       </li>
     );
   };
-  const group = (label, list) => list.length > 0 && (
+  const group = (label, list, showDate = true) => list.length > 0 && (
     <>
       <div className="ht-group">{label}</div>
-      <ul className="ht-rows">{list.map(taskRow)}</ul>
+      <ul className="ht-rows">{list.map((t) => taskRow(t, showDate))}</ul>
     </>
   );
 
@@ -703,7 +743,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />Tasks</h2>
         <p className="hz-muted" style={{ marginTop: 0 }}>
           {planReady
-            ? <>Set automatically from the Hifz plan for the class days{student.schedule?.days?.length ? ` (${student.schedule.days.join(", ")})` : ""}. When the student finishes a task you see “Student finished”. Listen, then approve it and the next one is set; the student is notified.</>
+            ? <>Set from the Hifz plan · {student.schedule?.days?.length === 7 ? "every day" : student.schedule?.days?.length ? student.schedule.days.join(", ") : "class days"}</>
             : "Save the Hifz plan above to start. The tasks are then set automatically for the class days."}
         </p>
         {/* New Hifz, Short, Long Muraja'ah always in that order; approved today stays green in its place until tomorrow. */}
@@ -713,10 +753,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
           return (
             <>
               {!any && planReady && <p className="hz-muted" style={{ margin: 0 }}>Setting the next tasks…</p>}
-              {group(`Today · ${fmtDate(today)}`, groups.today)}
+              {group(`Today · ${fmtDate(today)}`, groups.today, false)}
               {group("Not finished from earlier days", groups.overdue)}
               {group("Coming up", groups.upcoming)}
-              {doneCount > 0 && <p className="hz-muted" style={{ margin: "14px 0 0" }}>{doneCount} done task{doneCount === 1 ? "" : "s"} below in History.</p>}
+              {doneCount > 0 && <p className="hz-muted" style={{ margin: "14px 0 0" }}>{doneCount} done · see History below</p>}
             </>
           );
         })()}
