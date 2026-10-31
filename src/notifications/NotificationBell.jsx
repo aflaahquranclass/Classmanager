@@ -128,7 +128,7 @@ export function NotificationBell({ className = "", onDark = false }) {
         .nb-dv { font-family: ${THAANA_FONT}; line-height: 1.8; }
         .nb-item-title { font-weight: 600; font-size: 14px; color: #1B2733; display: flex; align-items: center; gap: 6px; }
         .nb-dot { width: 8px; height: 8px; border-radius: 50%; background: ${TP.blue}; flex: none; }
-        .nb-item-body { font-size: 14px; color: #33475B; white-space: pre-wrap; margin-top: 2px; line-height: 1.45; overflow-wrap: anywhere; }
+        .nb-item-body { unicode-bidi: plaintext; text-align: start; font-size: 14px; color: #33475B; white-space: pre-wrap; margin-top: 2px; line-height: 1.45; overflow-wrap: anywhere; }
         .nb-item-when { font-size: 12px; color: ${TP.secondaryText}; margin-top: 4px; }
         .nb-push { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: #F3F9FD; border-bottom: 1px solid #E3EEF8; font-size: 13px; color: #33475B; line-height: 1.4; }
         .nb-push svg { flex: none; color: ${TP.blue}; }

@@ -76,3 +76,24 @@ test("portal login template fills name, Student ID, password and link", () => {
   assert.match(out, /One-time password: Ab7kP2mQ/);
   assert.match(out, /https:\/\/students\.aflaahqc\.com/);
 });
+
+import { messageText } from "../src/notifications/templates.js";
+
+test("messageText picks the language, Both puts Dhivehi first", () => {
+  assert.equal(messageText("en", "Hello {name}", "ހެލޯ {name}"), "Hello {name}");
+  assert.equal(messageText("dv", "Hello {name}", "ހެލޯ {name}"), "ހެލޯ {name}");
+  assert.equal(messageText("both", " Hello ", "ހެލޯ"), "ހެލޯ\n\nHello");
+  assert.equal(messageText("both", "Hello", ""), "Hello");
+});
+
+test("Both fills each part in its own language", () => {
+  const s = { name: "Ahmed", fee: 300 };
+  const text = messageText("both", "Fee {fee}", "ފީ {fee}", (t) => fillTemplate(t, s));
+  assert.equal(text, "ފީ -/300 ރުފިޔާ\n\nFee MVR 300");
+});
+
+test("a Dhivehi message of just {name} still gets the Dhivehi name", () => {
+  const s = { name: "Ahmed" };
+  assert.equal(messageText("dv", "", "{name}", (t, l) => fillTemplate(t, s, { dv: l === "dv" })), "އަޙްމަދު");
+  assert.equal(messageText("en", "{name}", "", (t, l) => fillTemplate(t, s, { dv: l === "dv" })), "Ahmed");
+});

@@ -39,12 +39,18 @@ export const TEMPLATES = [
   },
 ];
 
-// The admin's own templates, saved as key "custom:<name>" next to the
-// built-in ones above. They can be picked in New message and deleted.
-export const CUSTOM_PREFIX = "custom:";
-export const isCustomKey = (key) => key.startsWith(CUSTOM_PREFIX);
-export const customName = (key) => key.slice(CUSTOM_PREFIX.length);
-export const CUSTOM_PLACEHOLDERS = ["name", "student_id", "class", "teacher", "days", "time", "fee", "month"];
+// Student details that can go into a message written under Send or a saved
+// template, filled in for each student.
+export const MESSAGE_PLACEHOLDERS = ["name", "student_id", "class", "teacher", "days", "time", "fee", "month"];
+
+// The text of a message in the chosen language — "en", "dv" or "both"
+// (Dhivehi first, then English) — each part filled in separately so the
+// Dhivehi part gets Dhivehi details and the English part English ones.
+// fill(text, "en" | "dv").
+export function messageText(lang, en, dv, fill = (t) => t) {
+  const parts = lang === "en" ? [["en", en]] : lang === "dv" ? [["dv", dv]] : [["dv", dv], ["en", en]];
+  return parts.map(([l, t]) => [l, (t || "").trim()]).filter(([, t]) => t).map(([l, t]) => fill(t, l)).join("\n\n");
+}
 
 // Where students sign in; filled in as {link}.
 export const STUDENT_PORTAL_LINK = "https://students.aflaahqc.com";
@@ -137,9 +143,11 @@ const classNameDv = (name) => name.replace(/[A-Za-z]+/g, (w) => CLASS_WORDS_DV[w
 
 // student: { name, studentCode, className, fee, schedule: { days, startTime, endTime } }
 // ctx: { teacherName, monthKey ("2026-10"), dvNames: { [englishName]: thaana }, password,
-//        classType: { category, ageGroup } (website registrations) }
+//        classType: { category, ageGroup } (website registrations),
+//        dv: true / false — the message's language when the caller knows it
+//        (a Dhivehi message may be just "{name}") }
 export function fillTemplate(body, student, ctx = {}) {
-  const dv = hasThaana(body);
+  const dv = ctx.dv ?? hasThaana(body);
   const sched = student.schedule || {};
   const days = (sched.days || []).map((d) => (dv ? DAYS_DV : DAYS_EN)[d] || d);
   const [y, m] = (ctx.monthKey || "").split("-").map(Number);

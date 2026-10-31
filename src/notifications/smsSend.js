@@ -18,6 +18,25 @@ export async function loadDvNames() {
   return Object.fromEntries((data || []).filter((r) => r.dv?.trim()).map((r) => [r.key.slice(5), r.dv]));
 }
 
+// Name rows from Admin → Language for checking names before a Dhivehi
+// message: { [englishName]: { dv, verified } } — dv is the saved correction
+// ("" = the automatic spelling), verified the Dhivehi spelling last confirmed.
+export async function loadNameChecks() {
+  const { data } = await supabase.from("report_translations").select("key, dv, verified_dv").like("key", "name:%");
+  return Object.fromEntries((data || []).map((r) => [r.key.slice(5), { dv: r.dv || "", verified: r.verified_dv || "" }]));
+}
+
+// Confirms Dhivehi spellings of names: [{ name, dv, auto }] where auto is the
+// automatic spelling (saved as "" when it's kept, like Admin → Language).
+export async function confirmNames(rows) {
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("report_translations").upsert(rows.map((r) => ({
+    key: `name:${r.name.trim()}`, en: "", dv: r.dv === r.auto ? "" : r.dv,
+    verified_dv: r.dv, verified_at: now, updated_at: now,
+  })), { onConflict: "key" });
+  return !error;
+}
+
 // Sends the notification's pending / failed SMS; returns a line for a toast.
 export async function sendPendingSms(notificationId) {
   const { data, error } = await supabase.functions.invoke("send-sms", { body: { action: "send", notification_id: notificationId } });
