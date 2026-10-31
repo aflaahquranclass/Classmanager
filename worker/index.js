@@ -22,6 +22,7 @@ const json = (data, status = 200) =>
 
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const hasThaana = (s) => /[ހ-޿]/.test(s || "");
+const CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
 const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s || "");
 
 function emailHtml(subject, body, siteUrl) {
@@ -68,7 +69,18 @@ async function handleEmail(request, env, { sb }) {
 
   const [note] = await (await sb(`/rest/v1/notifications?id=eq.${notification_id}&select=title,body`)).json();
   if (!note) return json({ error: "Notification not found" }, 404);
-  const pending = await (await sb(`/rest/v1/notification_recipients?notification_id=eq.${notification_id}&email_status=in.(pending,failed)&select=id,name,email,body`)).json();
+  // Claim the pending / failed rows by marking them "sending" in one update,
+  // so a second click at the same time finds nothing left to send and
+  // nobody gets the email twice. Rows left "sending" for over 10 minutes (a
+  // send that was cut off) are claimed again.
+  const stale = new Date(Date.now() - CLAIM_TIMEOUT_MS).toISOString();
+  const claimable = `or=(email_status.in.(pending,failed),and(email_status.eq.sending,email_claimed_at.lt."${stale}"))`;
+  const claimed = await sb(`/rest/v1/notification_recipients?notification_id=eq.${notification_id}&${claimable}&select=id,name,email,body`, {
+    method: "PATCH", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ email_status: "sending", email_error: null, email_claimed_at: new Date().toISOString() }),
+  });
+  if (!claimed.ok) return json({ error: "Couldn't read the emails to send" }, 502);
+  const pending = await claimed.json();
 
   const update = (ids, fields) => ids.length && sb(`/rest/v1/notification_recipients?id=in.(${ids.join(",")})`, { method: "PATCH", body: JSON.stringify(fields) });
   const subject = note.title || "Aflaah Quran Class";

@@ -213,10 +213,12 @@ function ResponseBox({ resp, students, showToast, onClose, onStudentUpdated, onD
       showToast(error.code === "23505" ? `ID card ${resp.nic} is already on ${taken ? `${taken.studentCode} ${taken.name}` : "another student"}.` : `Couldn’t save: ${error.message}`);
       return;
     }
-    await supabase.from("student_info_updates").update({ status: "saved", student_id: s.id, reviewed_at: new Date().toISOString() }).eq("id", resp.id);
+    const { error: markErr } = await supabase.from("student_info_updates").update({ status: "saved", student_id: s.id, reviewed_at: new Date().toISOString() }).eq("id", resp.id);
     setBusy(false);
     onStudentUpdated?.(data);
-    showToast(`Saved on ${data.student_code || ""} ${data.name}.`);
+    showToast(markErr
+      ? `Saved on ${data.student_code || ""} ${data.name}, but the response couldn’t be marked as saved — dismiss it by hand.`
+      : `Saved on ${data.student_code || ""} ${data.name}.`);
     onDone();
   };
 

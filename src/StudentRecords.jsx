@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { maldivesMonth } from "./dates.js";
 import { CalendarCheck, Wallet, CheckCircle2, XCircle, Repeat2, Ban, ChevronLeft, ChevronRight, RotateCw, Clock, AlertTriangle, Landmark, Copy, Check, Upload, FileText, X, Hourglass } from "lucide-react";
 import { TP, monthLabel, shiftMonth, fmtMoney } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
@@ -11,8 +12,7 @@ import { BANK, SLIP_STATUS, SLIP_ACCEPT, SLIP_MAX_BYTES, slipUrl, submitSlip, is
 const REFRESH_MS = 60_000;
 
 const pad = (n) => String(n).padStart(2, "0");
-const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
-const currentMonthKey = () => todayKey().slice(0, 7);
+const currentMonthKey = maldivesMonth;
 const fmtDate = (key) => new Date(`${key}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 const fmtTime = (d) => d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 

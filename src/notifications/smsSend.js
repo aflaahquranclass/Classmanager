@@ -82,7 +82,27 @@ export async function createNotification({ title = "", body, audience, audienceL
   // Phone notifications for in-app ones are sent by the database itself
   // (trigger push_new_notifications), so they go out from any screen.
   const [smsMsg, emailMsg] = await Promise.all([sms ? sendPendingSms(note.id) : "", email ? sendPendingEmail(note.id) : ""]);
-  return { ok: true, message: [smsMsg, emailMsg].filter(Boolean).join(" ") };
+  return { ok: true, id: note.id, message: [smsMsg, emailMsg].filter(Boolean).join(" ") };
+}
+
+// Once a message with a one-time password has gone out by SMS or email (and
+// nothing is left to send), the password is masked in the saved copy so it
+// isn't kept in the notification history. Still-pending messages keep it,
+// since they need it when they're sent.
+const UNSENT = ["pending", "failed", "sending"];
+async function forgetPassword(notificationId, password) {
+  if (!notificationId || !password) return;
+  const { data: recs } = await supabase.from("notification_recipients")
+    .select("id, body, sms_status, email_status").eq("notification_id", notificationId);
+  if (!recs?.length) return;
+  const done = recs.every((r) => !UNSENT.includes(r.sms_status) && !UNSENT.includes(r.email_status));
+  const delivered = recs.some((r) => r.sms_status === "sent" || r.email_status === "sent");
+  if (!done || !delivered) return;
+  const mask = (text) => (text || "").split(password).join("••••••••");
+  await Promise.all(recs.filter((r) => r.body?.includes(password))
+    .map((r) => supabase.from("notification_recipients").update({ body: mask(r.body) }).eq("id", r.id)));
+  const { data: note } = await supabase.from("notifications").select("body").eq("id", notificationId).maybeSingle();
+  if (note?.body?.includes(password)) await supabase.from("notifications").update({ body: mask(note.body) }).eq("id", notificationId);
 }
 
 // Welcome message for one student: SMS to their phone and email to their
@@ -101,11 +121,13 @@ export async function sendWelcome(student, teacherName, templateBody, dvNames) {
 export async function sendPortalLogin(student, password) {
   const tpl = (await loadTemplates()).portal_login?.body?.trim() || DEFAULT_TEMPLATE_BODIES.portal_login;
   const body = fillTemplate(tpl, student, { password, dvNames: await loadDvNames() });
-  return createNotification({
+  const result = await createNotification({
     title: "Aflaah Student Portal login", body, audience: "portal_login", audienceLabel: `Portal login — ${student.name}`,
     inApp: false, sms: !!student.phone, email: !!student.email,
     recipients: [{ student_id: student.id, name: student.name, phone: student.phone, email: student.email, body }],
   });
+  if (result.ok) await forgetPassword(result.id, password);
+  return result;
 }
 
 // Automatic welcome when a student is added, if the admin turned it on.
@@ -140,9 +162,11 @@ export async function registrationWelcomeText(student, teacherName, lang = "en")
 export async function sendRegistrationWelcome(student, text, password) {
   const body = text.split(STUDENT_ID_TAG).join(student.studentCode || "").split(PASSWORD_TAG).join(password || "(ask the class office)");
   const title = /[\u0780-\u07BF]/.test(body) ? "އަފްލާޙް ޤުރްއާން ކްލާހަށް މަރުޙަބާ" : "Welcome to Aflaah Quran Class";
-  return createNotification({
+  const result = await createNotification({
     title, body, audience: "welcome", audienceLabel: `Welcome — ${student.name}`,
     inApp: !!student.userId, sms: !!student.phone, email: !!student.email,
     recipients: [{ student_id: student.id, user_id: student.userId, name: student.name, phone: student.phone, email: student.email, body }],
   });
+  if (result.ok) await forgetPassword(result.id, password);
+  return result;
 }

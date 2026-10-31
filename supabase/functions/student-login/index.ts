@@ -67,8 +67,13 @@ Deno.serve(async (req) => {
     } else {
       // A login with this address already exists (e.g. left over from a
       // removed student): reuse it with the new password.
-      const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 });
-      const existing = list?.users.find((u) => u.email?.toLowerCase() === email);
+      let existing: { id: string } | undefined;
+      for (let page = 1; !existing; page += 1) {
+        const { data: list } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+        const users = list?.users ?? [];
+        existing = users.find((u) => u.email?.toLowerCase() === email);
+        if (users.length < 1000) break;
+      }
       if (!existing) return json({ error: error?.message ?? "Couldn't create the login" }, 400);
       userId = existing.id;
       const { error: updErr } = await admin.auth.admin.updateUserById(userId, attrs);

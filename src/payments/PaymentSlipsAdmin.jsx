@@ -11,6 +11,7 @@ import { TP, monthLabel, fmtMoney } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { createNotification } from "../notifications/smsSend.js";
 import { SLIP_BUCKET, SLIP_STATUS, isPdf } from "./slips.js";
+import { maldivesToday } from "../dates.js";
 
 const FILTERS = [
   { key: "pending", label: "Waiting" },
@@ -19,8 +20,6 @@ const FILTERS = [
   { key: "all", label: "All" },
 ];
 
-const pad = (n) => String(n).padStart(2, "0");
-const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 // Pending-slip count for the Finance tab badge.
@@ -82,7 +81,7 @@ export function AdminPaymentSlips({ students, showToast, onPaid, onCountChange }
       confirmLabel: "Verify & mark paid", danger: false,
     }))) return;
     setBusyId(slip.id);
-    const paidDate = todayKey();
+    const paidDate = maldivesToday();
     const pay = await supabase.from("payments").upsert(
       { student_id: slip.student_id, month: slip.month, paid: true, amount_paid: Number(slip.amount), paid_date: paidDate },
       { onConflict: "student_id,month" },

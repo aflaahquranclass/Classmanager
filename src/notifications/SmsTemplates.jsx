@@ -3,15 +3,16 @@
 // Dhivehi) and filled in per student: {name}, {class}, {fee}, … The same
 // text goes out by SMS and by email.
 
-import { useState, useEffect, useMemo, useRef } from "react";
-import { Save, Send, ChevronLeft, ChevronRight, Wallet, PartyPopper, Smartphone, Mail } from "lucide-react";
+import { useState, useEffect, useMemo, useRef, useId } from "react";
+import { Save, Send, ChevronLeft, ChevronRight, Wallet, PartyPopper, Smartphone, Mail, Trash2, Plus } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT } from "../exams/reportStrings.js";
 import { thaanaChange, hasThaana } from "./thaanaKeyboard.js";
-import { TEMPLATES, PLACEHOLDER_LABELS, DEFAULT_TEMPLATE_BODIES, fillTemplate, smsParts, reminderSubject } from "./templates.js";
+import { TEMPLATES, PLACEHOLDER_LABELS, DEFAULT_TEMPLATE_BODIES, CUSTOM_PREFIX, CUSTOM_PLACEHOLDERS, isCustomKey, customName, fillTemplate, smsParts, reminderSubject } from "./templates.js";
 import { loadTemplates, loadDvNames, createNotification, sendWelcome } from "./smsSend.js";
+import { maldivesMonth } from "../dates.js";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const monthLabel = (key) => { const [y, m] = key.split("-").map(Number); return `${MONTHS[m - 1]} ${y}`; };
@@ -20,7 +21,7 @@ const shiftMonth = (key, delta) => {
   const d = new Date(y, m - 1 + delta, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
-const thisMonth = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; };
+const thisMonth = maldivesMonth;
 
 const teacherNameOf = (teachers, s) => teachers.find((t) => t.id === s.teacherId)?.name || "";
 
@@ -44,15 +45,19 @@ function SmsPreview({ text }) {
   );
 }
 
-function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, showToast, onSaved, onSent }) {
+// def.custom: one of the admin's own templates — its name can be changed and
+// it can be deleted. takenNames: the other templates' names, kept unique.
+function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, showToast, onSaved, onSent, onDeleted, takenNames = [] }) {
   const [body, setBody] = useState(row?.body || DEFAULT_TEMPLATE_BODIES[def.key] || "");
+  const [name, setName] = useState(def.custom ? def.label : "");
   const [autoSend, setAutoSend] = useState(!!row?.auto_send);
-  const [dhivehi, setDhivehi] = useState(hasThaana(row?.body || DEFAULT_TEMPLATE_BODIES[def.key]) || (!row?.body && !DEFAULT_TEMPLATE_BODIES[def.key]));
+  const [dhivehi, setDhivehi] = useState(hasThaana(row?.body || DEFAULT_TEMPLATE_BODIES[def.key]) || (!def.custom && !row?.body && !DEFAULT_TEMPLATE_BODIES[def.key]));
   const [saving, setSaving] = useState(false);
   const [sendTo, setSendTo] = useState("");
   const [sending, setSending] = useState(false);
   const ref = useRef(null);
-  const changed = body !== (row?.body || DEFAULT_TEMPLATE_BODIES[def.key] || "") || autoSend !== !!row?.auto_send;
+  const uid = useId();
+  const changed = body !== (row?.body || DEFAULT_TEMPLATE_BODIES[def.key] || "") || autoSend !== !!row?.auto_send || (def.custom && (!row || name.trim() !== def.label));
 
   const insert = (key) => {
     const el = ref.current;
@@ -64,13 +69,28 @@ function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, show
   };
 
   const save = async () => {
+    const label = def.custom ? name.trim() : def.label;
+    if (def.custom && !label) { showToast("Give the template a name."); return; }
+    if (def.custom && takenNames.some((n) => n.toLowerCase() === label.toLowerCase())) { showToast(`There's already a template called “${label}”.`); return; }
     setSaving(true);
-    const next = { key: def.key, body, auto_send: autoSend, updated_at: new Date().toISOString() };
+    const next = { key: def.custom ? CUSTOM_PREFIX + label : def.key, body, auto_send: autoSend, updated_at: new Date().toISOString() };
     const { error } = await supabase.from("sms_templates").upsert(next, { onConflict: "key" });
+    // Renamed: the name is the key, so the old row goes.
+    if (!error && row && next.key !== def.key) await supabase.from("sms_templates").delete().eq("key", def.key);
     setSaving(false);
     if (error) { showToast("Couldn't save. Please try again."); return; }
-    onSaved(next);
-    showToast(`${def.label} saved.`);
+    onSaved(next, def.key);
+    showToast(`${label} saved.`);
+  };
+
+  const remove = async () => {
+    if (row && !(await confirmDialog({ title: `Delete “${def.label}”?`, message: "Messages already sent with it are kept.", confirmLabel: "Delete", danger: true }))) return;
+    if (row) {
+      const { error } = await supabase.from("sms_templates").delete().eq("key", def.key);
+      if (error) { showToast("Couldn't delete. Please try again."); return; }
+      showToast(`${def.label} deleted.`);
+    }
+    onDeleted(def.key);
   };
 
   // Welcome: send to one student now (e.g. someone added before this existed).
@@ -90,10 +110,17 @@ function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, show
   return (
     <div className="tp-card" style={{ marginBottom: "16px" }}>
       <div className="nt-lang">
-        <div>
-          <div className="nt-hist-title">{def.label}</div>
-          <div className="nt-meta" style={{ marginTop: "2px" }}><span>{def.hint}</span></div>
-        </div>
+        {def.custom ? (
+          <div style={{ flex: "1 1 220px" }}>
+            <label className="nt-label" htmlFor={`${uid}-name`}>Template name</label>
+            <input id={`${uid}-name`} className="lc-input" dir="auto" value={name} maxLength={60} placeholder="e.g. Class cancelled" onChange={(e) => setName(e.target.value)} />
+          </div>
+        ) : (
+          <div>
+            <div className="nt-hist-title">{def.label}</div>
+            <div className="nt-meta" style={{ marginTop: "2px" }}><span>{def.hint} Built in, so it can't be deleted.</span></div>
+          </div>
+        )}
         <span className="nt-lang-switch" role="group" aria-label={`${def.label} language`}>
           <button type="button" aria-pressed={!dhivehi} onClick={() => setDhivehi(false)}>English</button>
           <button type="button" className="nt-dv-btn" lang="dv" aria-pressed={dhivehi} onClick={() => setDhivehi(true)}>ދިވެހި</button>
@@ -102,9 +129,9 @@ function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, show
 
       <div className="nt-grid" style={{ marginBottom: 0 }}>
         <div>
-          <label className="nt-label" htmlFor={`tpl-${def.key}`}>Message</label>
+          <label className="nt-label" htmlFor={uid}>Message</label>
           <textarea
-            id={`tpl-${def.key}`}
+            id={uid}
             ref={ref}
             className={`lc-input nt-textarea ${dhivehi ? "nt-dv" : ""}`}
             style={{ minHeight: "140px" }}
@@ -133,6 +160,11 @@ function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, show
             <button type="button" className="tp-btn-gradient" disabled={!changed || saving || !body.trim()} onClick={save}>
               <Save size={16} aria-hidden="true" />{saving ? "Saving…" : changed ? "Save template" : "Saved"}
             </button>
+            {def.custom && (
+              <button type="button" className="tp-btn-outline" style={{ color: "#A32020" }} disabled={saving} onClick={remove}>
+                <Trash2 size={16} aria-hidden="true" />Delete
+              </button>
+            )}
           </div>
         </div>
 
@@ -166,22 +198,49 @@ export function SmsTemplates({ students, teachers, showToast, onSent }) {
   // Preview only: a made-up one-time password for {password}.
   const ctx = (s) => ({ teacherName: teacherNameOf(teachers, s), monthKey: thisMonth(), dvNames, password: "Ab7kP2mQ" });
 
+  // New, not yet saved templates: their temporary keys.
+  const [drafts, setDrafts] = useState([]);
+
   if (!templates) return <div className="lc-loading-row" style={{ marginBottom: "16px" }}><span className="lc-spinner"></span>Loading templates…</div>;
-  return TEMPLATES.map((def) => (
-    <TemplateCard
-      key={def.key}
-      def={def}
-      row={templates[def.key]}
-      sample={sample}
-      ctx={ctx}
-      students={students}
-      teachers={teachers}
-      dvNames={dvNames}
-      showToast={showToast}
-      onSaved={(row) => setTemplates((cur) => ({ ...cur, [row.key]: row }))}
-      onSent={onSent}
-    />
-  ));
+  const custom = Object.keys(templates).filter(isCustomKey).sort((a, b) => customName(a).localeCompare(customName(b)));
+  const cardProps = { sample, ctx, students, teachers, dvNames, showToast, onSent };
+  const customDef = (key, label) => ({ key, label, hint: "", placeholders: CUSTOM_PLACEHOLDERS, custom: true });
+  const otherNames = (key) => custom.filter((k) => k !== key).map(customName);
+  const onDeleted = (key) => {
+    setDrafts((cur) => cur.filter((k) => k !== key));
+    setTemplates((cur) => { const next = { ...cur }; delete next[key]; return next; });
+  };
+  // A rename changes the key: drop the old one (or the draft).
+  const onSaved = (row, oldKey) => {
+    setDrafts((cur) => cur.filter((k) => k !== oldKey));
+    setTemplates((cur) => { const next = { ...cur }; if (oldKey !== row.key) delete next[oldKey]; next[row.key] = row; return next; });
+  };
+
+  return (
+    <>
+      <div className="nt-lang">
+        <div>
+          <div className="nt-hist-title">Your templates</div>
+          <div className="nt-meta" style={{ marginTop: "2px" }}><span>Messages you send often. Pick one under New message; {"{name}"}, {"{fee}"} and the rest are filled in for each student.</span></div>
+        </div>
+        <button type="button" className="tp-btn-outline" onClick={() => setDrafts((cur) => [...cur, `draft:${Date.now()}`])}>
+          <Plus size={16} aria-hidden="true" />New template
+        </button>
+      </div>
+      {!custom.length && !drafts.length && <div className="tp-card nt-meta" style={{ marginBottom: "16px" }}><span>No templates of your own yet.</span></div>}
+      {drafts.map((key) => (
+        <TemplateCard key={key} def={customDef(key, "")} row={null} {...cardProps} takenNames={otherNames(key)} onSaved={onSaved} onDeleted={onDeleted} />
+      ))}
+      {custom.map((key) => (
+        <TemplateCard key={key} def={customDef(key, customName(key))} row={templates[key]} {...cardProps} takenNames={otherNames(key)} onSaved={onSaved} onDeleted={onDeleted} />
+      ))}
+
+      <div className="nt-hist-title" style={{ margin: "24px 0 10px" }}>Built-in templates</div>
+      {TEMPLATES.map((def) => (
+        <TemplateCard key={def.key} def={def} row={templates[def.key]} {...cardProps} onSaved={onSaved} />
+      ))}
+    </>
+  );
 }
 
 export function PaymentReminders({ students, teachers, showToast, onSent }) {

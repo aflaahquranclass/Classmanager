@@ -16,6 +16,7 @@ const SENDER_ID = Deno.env.get("MESSAGEOWL_SENDER_ID") ?? "";
 // MessageOwl REST endpoint — confirm against the API details when they arrive.
 const MESSAGEOWL_URL = Deno.env.get("MESSAGEOWL_URL") ?? "https://rest.msgowl.com/messages";
 const BATCH_SIZE = 50;
+const CLAIM_TIMEOUT_MS = 10 * 60 * 1000;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -69,8 +70,16 @@ Deno.serve(async (req) => {
   if (!note) return json({ error: "Notification not found" }, 404);
   const text = note.title ? `${note.title}\n${note.body}` : note.body;
 
+  // Claim the pending / failed rows by marking them "sending" in one update,
+  // so a second click (or a second admin) at the same time finds nothing left
+  // to send and nobody gets the SMS twice. Rows left "sending" for over 10
+  // minutes (a send that was cut off) are claimed again.
+  const stale = new Date(Date.now() - CLAIM_TIMEOUT_MS).toISOString();
   const { data: pending } = await admin.from("notification_recipients")
-    .select("id, phone, body").eq("notification_id", notification_id).in("sms_status", ["pending", "failed"]);
+    .update({ sms_status: "sending", sms_error: null, sms_claimed_at: new Date().toISOString() })
+    .eq("notification_id", notification_id)
+    .or(`sms_status.in.(pending,failed),and(sms_status.eq.sending,sms_claimed_at.lt."${stale}")`)
+    .select("id, phone, body");
 
   // A recipient's own wording (payment reminder, welcome) wins over the
   // shared text; recipients with the same text are sent together.

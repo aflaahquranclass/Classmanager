@@ -22,6 +22,7 @@ import { confirmDialog } from "../ConfirmDialog.jsx";
 import { registrationWelcomeText, sendRegistrationWelcome } from "../notifications/smsSend.js";
 import { InfoUpdates, infoCss } from "./InfoUpdatesAdmin.jsx";
 import { CATEGORIES, AGE_GROUPS, DAYS, FORMS, REG_BUCKET, categoryOf, ageGroupOf, formUrl, fmtTime, fmtDays, fmtMvr } from "./registrations.js";
+import { maldivesMonth } from "../dates.js";
 import { ProgramPicker, programsForCategory } from "../thilawa/programs.jsx";
 
 const SECTIONS = [
@@ -384,8 +385,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
       return;
     }
     if (cls.row) onClassCreated?.(cls.row);
-    const now = new Date();
-    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const monthKey = maldivesMonth();
     // A portal login is made only when the message gives its password.
     const needsLogin = sendWelcome && message.includes("{password}");
     const login = needsLogin ? await supabase.functions.invoke("student-login", { body: { student_id: studentId } }) : null;

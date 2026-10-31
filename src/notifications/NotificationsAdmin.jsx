@@ -10,9 +10,13 @@ import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { thaanaChange, hasThaana } from "./thaanaKeyboard.js";
-import { createNotification, sendPendingSms, sendPendingEmail, loadEmailStatus } from "./smsSend.js";
+import { createNotification, sendPendingSms, sendPendingEmail, loadEmailStatus, loadTemplates, loadDvNames } from "./smsSend.js";
 import { SmsTemplates, PaymentReminders } from "./SmsTemplates.jsx";
-import { smsParts } from "./templates.js";
+import { smsParts, fillTemplate, TEMPLATES, DEFAULT_TEMPLATE_BODIES, isCustomKey, customName } from "./templates.js";
+import { maldivesMonth } from "../dates.js";
+
+// Has {name}, {fee}, … to fill in for each recipient.
+const hasPlaceholders = (text) => /\{\w+\}/.test(text);
 
 const AUDIENCES = [
   { key: "everyone", label: "Everyone" },
@@ -23,7 +27,10 @@ const AUDIENCES = [
   { key: "numbers", label: "Phone numbers" },
 ];
 
-const STATUS_LABEL = { none: "—", pending: "Pending", sent: "Sent", failed: "Failed", no_phone: "No number", no_email: "No email" };
+// A recipient left "sending" this long was cut off mid-send and can be sent
+// again (same 10 minutes as send-sms and /api/email).
+const isStaleClaim = (at) => !at || Date.now() - new Date(at).getTime() > 10 * 60 * 1000;
+const STATUS_LABEL = { none: "—", pending: "Pending", sending: "Sending…", sent: "Sent", failed: "Failed", no_phone: "No number", no_email: "No email" };
 
 function fmtWhen(iso) {
   return new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -73,6 +80,9 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
   const [loadError, setLoadError] = useState(false);
   const [openId, setOpenId] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [templates, setTemplates] = useState(null); // { [key]: row } — reloaded when New message opens
+  const [dvNames, setDvNames] = useState({});
+  const [templateKey, setTemplateKey] = useState("");
 
   const people = useMemo(() => [
     ...students.map((s) => ({ key: `s:${s.id}`, kind: "Student", student_id: s.id, user_id: s.userId || null, name: s.name, phone: s.phone || null, email: s.email || null, className: s.className || "" })),
@@ -103,7 +113,6 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
   const useInApp = inApp && audience !== "numbers";
   const useSms = sms || audience === "numbers";
   const useEmail = email && audience !== "numbers";
-  const parts = smsParts(title ? `${title}\n${body}` : body);
 
   const audienceLabel = () => {
     if (audience === "class") return `Class: ${classKey}`;
@@ -116,7 +125,7 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
     setLoading(true);
     const { data, error } = await supabase
       .from("notifications")
-      .select("*, notification_recipients(id, name, phone, email, email_status, email_error, body, user_id, read_at, sms_status, sms_error, student_id, teacher_id)")
+      .select("*, notification_recipients(id, name, phone, email, email_status, email_error, email_claimed_at, body, user_id, read_at, sms_status, sms_error, sms_claimed_at, student_id, teacher_id)")
       .neq("audience", "admin_alert") // new slip / review alerts sent to admins (they live in the bell)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -131,7 +140,37 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
     setEmailStatus(await loadEmailStatus());
   }, []);
 
-  useEffect(() => { loadThaanaFont(); loadHistory(); loadSmsStatus(); }, [loadHistory, loadSmsStatus]);
+  useEffect(() => { loadThaanaFont(); loadHistory(); loadSmsStatus(); loadDvNames().then(setDvNames); }, [loadHistory, loadSmsStatus]);
+  useEffect(() => { if (tab === "compose") loadTemplates().then(setTemplates); }, [tab]);
+
+  // Templates to start a message from: your own first, then the built-in ones.
+  const templateOptions = useMemo(() => {
+    if (!templates) return [];
+    const own = Object.keys(templates).filter(isCustomKey).sort((a, b) => customName(a).localeCompare(customName(b)))
+      .map((key) => ({ key, label: customName(key), body: templates[key].body }));
+    const builtIn = TEMPLATES.map((d) => ({ key: d.key, label: d.label, body: templates[d.key]?.body || DEFAULT_TEMPLATE_BODIES[d.key] || "" }));
+    return [...own, ...builtIn].filter((t) => t.body.trim());
+  }, [templates]);
+
+  const applyTemplate = async (key) => {
+    const t = templateOptions.find((x) => x.key === key);
+    if (!t) { setTemplateKey(""); return; }
+    if (body.trim() && body !== t.body && !(await confirmDialog({ title: "Replace your message?", message: `The message box will be replaced with “${t.label}”.`, confirmLabel: "Replace", danger: false }))) return;
+    setTemplateKey(key);
+    setBody(t.body);
+    setDhivehi(hasThaana(t.body));
+  };
+
+  // Each recipient's own wording when the message has {name}, {fee}, …
+  const studentsById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
+  const personalise = (r) => {
+    const s = r.student_id ? studentsById.get(r.student_id) : r.teacher_id ? { name: r.name } : {};
+    const teacherName = teachers.find((t) => t.id === s?.teacherId)?.name || "";
+    return fillTemplate(body.trim(), s || {}, { teacherName, monthKey: maldivesMonth(), dvNames });
+  };
+  const personal = hasPlaceholders(body);
+  const preview = personal && recipients[0] ? personalise(recipients[0]) : body;
+  const parts = smsParts(title ? `${title}\n${preview}` : preview);
 
   const send = async () => {
     if (!body.trim()) { showToast("Write a message first."); return; }
@@ -149,11 +188,12 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
     setSending(true);
     const { ok: sent, message: smsMsg } = await createNotification({
       title: title.trim(), body: body.trim(), audience, audienceLabel: audienceLabel(),
-      inApp: useInApp, sms: useSms, email: useEmail, recipients,
+      inApp: useInApp, sms: useSms, email: useEmail,
+      recipients: personal ? recipients.map((r) => ({ ...r, body: personalise(r) })) : recipients,
     });
     setSending(false);
     if (!sent) { showToast(smsMsg); return; }
-    setTitle(""); setBody(""); setPicked({}); setNumbersText("");
+    setTitle(""); setBody(""); setPicked({}); setNumbersText(""); setTemplateKey("");
     showToast(`Sent to ${recipients.length}.${smsMsg ? " " + smsMsg : ""}`);
     loadHistory();
   };
@@ -270,6 +310,12 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
       {tab === "compose" && (
       <div className="nt-grid">
         <div className="tp-card">
+          <label className="nt-label" htmlFor="nt-template">Start from a template</label>
+          <select id="nt-template" className="lc-select" style={{ width: "100%", minHeight: "44px", marginBottom: "14px" }} value={templateKey} disabled={!templates} onChange={(e) => applyTemplate(e.target.value)}>
+            <option value="">{templates ? (templateOptions.length ? "Choose a template…" : "No templates yet") : "Loading templates…"}</option>
+            {templateOptions.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+
           <div className="nt-lang">
             <span className="nt-label" style={{ margin: 0 }}>Writing in</span>
             <span className="nt-lang-switch" role="group" aria-label="Writing language">
@@ -283,11 +329,18 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
           <input id="nt-title" className={`lc-input ${dhivehi ? "nt-dv" : ""}`} dir={dhivehi ? "rtl" : "auto"} lang={dhivehi ? "dv" : undefined} value={title} maxLength={120} placeholder={dhivehi ? "މިސާލު: މާދަމާ ކްލާސް ނުހިންގޭނެ" : "e.g. Class cancelled tomorrow"} onChange={(e) => thaanaChange(e, title, setTitle, dhivehi)} />
 
           <label className="nt-label" htmlFor="nt-body">Message</label>
-          <textarea id="nt-body" className={`lc-input nt-textarea ${dhivehi ? "nt-dv" : ""}`} dir={dhivehi ? "rtl" : "auto"} lang={dhivehi ? "dv" : undefined} value={body} placeholder={dhivehi ? "މެސެޖު ލިޔުއްވާ…" : "Write your message…"} onChange={(e) => thaanaChange(e, body, setBody, dhivehi)} />
+          <textarea id="nt-body" className={`lc-input nt-textarea ${dhivehi ? "nt-dv" : ""}`} dir={dhivehi ? "rtl" : "auto"} lang={dhivehi ? "dv" : undefined} value={body} placeholder={dhivehi ? "މެސެޖު ލިޔުއްވާ…" : "Write your message…"} onChange={(e) => { thaanaChange(e, body, setBody, dhivehi); setTemplateKey(""); }} />
           <div className="nt-meta">
-            <span>{(title ? title.length + 1 : 0) + body.length} characters</span>
+            <span>{(title ? title.length + 1 : 0) + preview.length} characters</span>
             {useSms && body && <span>{parts} SMS part{parts === 1 ? "" : "s"} per person</span>}
           </div>
+          {personal && (
+            <>
+              <span className="nt-label">Preview{recipients[0] ? ` — ${recipients[0].name}` : ""}</span>
+              <div className={`nt-detail-body ${hasThaana(preview) ? "nt-text" : ""}`} dir="auto" style={{ marginBottom: "4px" }}>{recipients[0] ? preview : "Choose who gets it to see their message."}</div>
+              <div className="nt-meta"><span>{"{name}"}, {"{fee}"} and the rest are filled in for each person.</span></div>
+            </>
+          )}
 
           <span className="nt-label">Send to</span>
           <div className="nt-chips" role="radiogroup" aria-label="Send to">
@@ -413,9 +466,9 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
           const inAppRecs = recs.filter((r) => r.user_id);
           const read = inAppRecs.filter((r) => r.read_at).length;
           const count = (s) => recs.filter((r) => r.sms_status === s).length;
-          const pending = count("pending") + count("failed");
+          const pending = count("pending") + count("failed") + recs.filter((r) => r.sms_status === "sending" && isStaleClaim(r.sms_claimed_at)).length;
           const eCount = (s) => recs.filter((r) => r.email_status === s).length;
-          const ePending = eCount("pending") + eCount("failed");
+          const ePending = eCount("pending") + eCount("failed") + recs.filter((r) => r.email_status === "sending" && isStaleClaim(r.email_claimed_at)).length;
           const open = openId === n.id;
           return (
             <div key={n.id} className="nt-row">

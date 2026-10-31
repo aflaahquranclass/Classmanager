@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus, Bell, Star, BookOpenCheck } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
+import { maldivesMonth, maldivesToday } from "./dates.js";
 import { AdminExamScheduler, TeacherScheduledExams, QuestionCard, Passage, examCss, questionKindLabel } from "./exams/ExamUI.jsx";
 import { examTypeLabel, questionRange } from "./exams/questions.js";
 import { confirmDialog, chooseDialog } from "./ConfirmDialog.jsx";
@@ -286,10 +287,7 @@ y:"#D9573A",
 // browsed. Payments are marked from this month onwards.
 const FINANCE_START_MONTH = "2026-10";
 
-function currentMonthKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
+const currentMonthKey = maldivesMonth;
 export function monthLabel(key) {
   const [y, m] = key.split("-").map(Number);
   return `${MONTH_NAMES[m - 1]} ${y}`;
@@ -1128,10 +1126,7 @@ export default function App() {
   // ---- Attendance & class records (teacher portal) ----
   const [attendanceView, setAttendanceView] = useState("day"); // day | calendar — Day view is the default landing view
   const [attendanceByDate, setAttendanceByDate] = useState({});
-  const [recordDate, setRecordDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
+  const [recordDate, setRecordDate] = useState(maldivesToday);
   const [openClassName, setOpenClassName] = useState(null); // which class is open in Day view; null = class list
   const [attDraft, setAttDraft] = useState({}); // unsaved present/absent picks for the open class
   const [attReschedule, setAttReschedule] = useState(null); // null | { type: "day" } | { type: "class", className }
@@ -1157,10 +1152,7 @@ export default function App() {
   const [examCandidate, setExamCandidate] = useState(null);
   const [scheduledExamsReload, setScheduledExamsReload] = useState(0);
   const [examStudentName, setExamStudentName] = useState("");
-  const [examDate, setExamDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
+  const [examDate, setExamDate] = useState(maldivesToday);
   const [examQuestions, setExamQuestions] = useState([{ id: 1, surah: "", ayah: "", questionType: EXAM_QUESTION_TYPES[0], result: "correct", remark: "" }]);
   const [examComments, setExamComments] = useState("");
   const [remarksDhivehi, setRemarksDhivehi] = useRemarkLanguage();
@@ -1259,14 +1251,8 @@ export default function App() {
   const [adminAttSearch, setAdminAttSearch] = useState("");
   const [adminAttClassId, setAdminAttClassId] = useState("");
   const [adminAttContactFilter, setAdminAttContactFilter] = useState("");
-  const [adminAttRangeStart, setAdminAttRangeStart] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-  });
-  const [adminAttRangeEnd, setAdminAttRangeEnd] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  });
+  const [adminAttRangeStart, setAdminAttRangeStart] = useState(() => `${maldivesMonth()}-01`);
+  const [adminAttRangeEnd, setAdminAttRangeEnd] = useState(maldivesToday);
   const [adminAttRecordsLoaded, setAdminAttRecordsLoaded] = useState(false);
   const [adminAttRecordsLoading, setAdminAttRecordsLoading] = useState(false);
   const [adminAllAttendance, setAdminAllAttendance] = useState([]); // flat rows: { date, studentId, status }
@@ -1676,6 +1662,7 @@ export default function App() {
       status: "status", rescheduledTo: "rescheduled_to", rescheduledStartTime: "rescheduled_start_time", rescheduledEndTime: "rescheduled_end_time",
       note: "note", recordType: "record_type", hifz: "hifz", shortMuraja: "short_muraja", longMuraja: "long_muraja", recorded: "recorded",
     };
+    let failedDates = 0;
     for (const { date } of entry.dates) {
       try {
         const { data: rows, error: fetchErr } = await supabase.from("attendance_records").select("*").eq("record_date", date);
@@ -1686,21 +1673,29 @@ export default function App() {
           fieldsToStrip.forEach((f) => { delete rec[f]; });
           const hasAnything = Object.values(rec).some((v) => v !== undefined && v !== null && v !== false);
           if (!hasAnything) {
-            await supabase.from("attendance_records").delete().eq("id", row.id);
+            const { error } = await supabase.from("attendance_records").delete().eq("id", row.id);
+            if (error) throw error;
           } else {
             const clearedCols = {};
             fieldsToStrip.forEach((f) => { clearedCols[dbFieldMap[f]] = f === "recorded" ? false : null; });
-            await supabase.from("attendance_records").update(clearedCols).eq("id", row.id);
+            const { error } = await supabase.from("attendance_records").update(clearedCols).eq("id", row.id);
+            if (error) throw error;
             nextData[row.student_id] = rec;
           }
         }
         setAttendanceByDate((prev) => ({ ...prev, [date]: nextData }));
-      } catch { /* continue with remaining dates */ }
+      } catch { failedDates += 1; /* continue with remaining dates */ }
     }
     setDeletingKey(null);
     setConfirmDelete(null);
     const scopeLabel = scope === "both" ? "attendance & class records" : scope === "attendance" ? "attendance" : "class records";
-    showToast(`Deleted ${scopeLabel} for ${month}`);
+    if (failedDates) {
+      // Reload so the overview shows what is really left.
+      setDataOverviewLoaded(false);
+      showToast(`Couldn't delete all ${scopeLabel} for ${month}: ${failedDates} of ${entry.dates.length} days failed. Please try again.`);
+    } else {
+      showToast(`Deleted ${scopeLabel} for ${month}`);
+    }
     loadDataOverview();
   };
 
@@ -1778,10 +1773,7 @@ export default function App() {
 
   const resetExamForm = () => {
     setExamStudentName("");
-    setExamDate(() => {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    });
+    setExamDate(maldivesToday());
     setExamQuestions([{ id: 1, surah: "", ayah: "", questionType: EXAM_QUESTION_TYPES[0], result: "correct", remark: "" }]);
     setExamComments("");
     setExamFinalResult(null);

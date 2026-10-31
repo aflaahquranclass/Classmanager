@@ -39,6 +39,13 @@ export const TEMPLATES = [
   },
 ];
 
+// The admin's own templates, saved as key "custom:<name>" next to the
+// built-in ones above. They can be picked in New message and deleted.
+export const CUSTOM_PREFIX = "custom:";
+export const isCustomKey = (key) => key.startsWith(CUSTOM_PREFIX);
+export const customName = (key) => key.slice(CUSTOM_PREFIX.length);
+export const CUSTOM_PLACEHOLDERS = ["name", "student_id", "class", "teacher", "days", "time", "fee", "month"];
+
 // Where students sign in; filled in as {link}.
 export const STUDENT_PORTAL_LINK = "https://students.aflaahqc.com";
 
