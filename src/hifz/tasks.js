@@ -6,7 +6,9 @@
 // recorded as already memorised (profile.memorized) plus every completed
 // New Hifz task.
 //
-// task:    { id, taskDate, activity, start, end, notes, completedAt, createdAt }
+// task:    { id, taskDate, activity, start, end, notes, completedAt, studentDoneAt, createdAt }
+//          studentDoneAt: the student says they've finished; completedAt: the
+//          teacher listened and approved (only then is it done and the next one set).
 // profile: the plan the teacher sets —
 //   { memorized: [[s, e], …], direction: "forward" | "juz_reverse", startUnit,
 //     newUnits, shortPages, longStartUnit, longMode: "juz" | "pages", longPages }
@@ -117,6 +119,8 @@ export function summarizeHifz({ profile, tasks, mistakes = [], goalYear = null }
     tasks: sorted,
     todayTasks: sorted.filter((t) => t.taskDate === today).sort(byActivity),
     overdue: sorted.filter((t) => t.taskDate < today && !t.completedAt).sort(byActivity),
+    // Finished by the student, waiting for the teacher to listen and approve.
+    toCheck: sorted.filter((t) => t.studentDoneAt && !t.completedAt).sort(byActivity),
     upcoming: sorted.filter((t) => t.taskDate > today).sort(byDateThenMade),
     recentDone: sorted.filter((t) => t.completedAt && t.taskDate < today).reverse().slice(0, 10),
     memorized,

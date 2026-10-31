@@ -67,6 +67,9 @@ export const HIFZ_CSS = `
   .hz-badge { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
   .hz-badge-completed { background: #DDF5E9; color: #156B45; }
   .hz-badge-partial { background: #FCF1DD; color: #9C6B12; }
+  .hz-badge-submitted { background: #E4EEFB; color: #1D5FA8; }
+  .hz-task-submitted { border-color: #9FC3EA; background: linear-gradient(160deg, #EEF5FD, #FFFFFF 60%); }
+  .hz-wait { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #1D5FA8; }
   .hz-badge-pending { background: #EAF3FC; color: #1D5FA8; }
   .hz-badge-empty { background: #EEF0F3; color: #5B6B79; }
   .hz-portion { font-size: 15px; color: ${TP.navy}; font-weight: 600; }
@@ -346,15 +349,16 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
   );
 }
 
-const statusOf = (task, today) => (task.completedAt ? "completed" : task.taskDate < today ? "partial" : "pending");
-const STATUS_LABEL = { completed: "Done", partial: "Not done yet", pending: "To do" };
+// submitted: the student has finished; it's done once the teacher approves.
+const statusOf = (task, today) => (task.completedAt ? "completed" : task.studentDoneAt ? "submitted" : task.taskDate < today ? "partial" : "pending");
+const STATUS_LABEL = { completed: "Done", submitted: "Finished", partial: "Not done yet", pending: "To do" };
 
 function StudentTaskCard({ task, today, mistakes, open, onOpen, onToggle, busy }) {
   const { title, Icon } = ACTIVITY_INFO[task.activity];
   const status = statusOf(task, today);
   const count = mistakesForTask(task, mistakes).length;
   return (
-    <article className={`hz-task ${status === "completed" ? "hz-task-done" : ""} ${open ? "hz-task-open" : ""}`} aria-label={title}>
+    <article className={`hz-task ${status === "completed" ? "hz-task-done" : status === "submitted" ? "hz-task-submitted" : ""} ${open ? "hz-task-open" : ""}`} aria-label={title}>
       <div className="hz-task-head">
         <span className="hz-task-icon">{status === "completed" ? <CheckCircle2 size={20} aria-hidden="true" /> : <Icon size={20} aria-hidden="true" />}</span>
         <span className="hz-task-title">{title}</span>
@@ -364,11 +368,12 @@ function StudentTaskCard({ task, today, mistakes, open, onOpen, onToggle, busy }
       <PortionText task={task} />
       {task.notes && <div className="hz-task-notes">{task.notes}</div>}
       {count > 0 && <span className="hz-mistake-badge"><Highlighter size={13} aria-hidden="true" />{count} mistake{count === 1 ? "" : "s"} to fix</span>}
+      {status === "submitted" && <span className="hz-wait"><Clock size={15} aria-hidden="true" />Waiting for your teacher to listen and approve</span>}
       <div className="hz-task-actions">
         <button className="hz-btn hz-btn-outline" onClick={onOpen} aria-expanded={open}><BookOpen size={17} aria-hidden="true" />{open ? "Close Mushaf" : "Open Mushaf"}</button>
-        {status === "completed"
+        {status === "completed" ? null : status === "submitted"
           ? <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => onToggle(task, false)}>Undo</button>
-          : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onToggle(task, true)}><CheckCircle2 size={17} aria-hidden="true" />Mark as done</button>}
+          : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onToggle(task, true)}><CheckCircle2 size={17} aria-hidden="true" />I've finished</button>}
       </div>
     </article>
   );
@@ -482,7 +487,7 @@ export default function HifzTracker({ repo, onSummary }) {
   const { stats, today, mistakes, tasks } = state;
   const toggle = async (task, done) => {
     setBusy(true);
-    try { await repo.setTaskDone(task.id, done); await refresh(); } catch (e) { setError(e.message); } finally { setBusy(false); }
+    try { await repo.setStudentDone(task.id, done); await refresh(); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const opened = tasks.find((t) => t.id === openId) || null;
   const toReader = () => setTimeout(() => document.getElementById("hz-reader")?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
@@ -532,9 +537,9 @@ export default function HifzTracker({ repo, onSummary }) {
         <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />Mistake your teacher marked</span>
       </div>
       <TaskReader task={opened} page={focusPage} mistakes={mistakes} />
-      {!opened.completedAt && (
+      {!opened.completedAt && !opened.studentDoneAt && (
         <button className="hz-btn hz-btn-primary" style={{ width: "100%", marginTop: 12 }} disabled={busy} onClick={() => toggle(opened, true)}>
-          <CheckCircle2 size={18} aria-hidden="true" />Mark {ACTIVITY_INFO[opened.activity].title} as done
+          <CheckCircle2 size={18} aria-hidden="true" />I've finished {ACTIVITY_INFO[opened.activity].title}
         </button>
       )}
     </section>

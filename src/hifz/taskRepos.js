@@ -1,14 +1,16 @@
 // Storage for teacher-planned Hifz (see tasks.js and the migration
 // 20261105_hifz_teacher_tasks.sql). One repo = one student's data, opened by
 // the student (portal) or their teacher. Row-level security decides who may
-// write what: students can only tick tasks and mistakes; everything else is the teacher's.
+// write what: students can only mark tasks finished and tick mistakes; everything else is the teacher's.
 //
 // Interface:
 //   getProfile() → profile | null          saveProfile(plan)   (see tasks.js: profile)
 //   getGoal() → goalYear | null            saveGoal(goalYear)  (the student's own target year)
 //   getLegacy() → { settings, rows } | null  (the student's old self-made plan)
 //   listTasks() → tasks                    addTasks([{ taskDate, activity, start, end, notes }])
-//   updateTask(id, patch)                  deleteTask(id)          setTaskDone(id, done)
+//   updateTask(id, patch)                  deleteTask(id)
+//   setTaskDone(id, done)                  (teacher: approved, the task is complete)
+//   setStudentDone(id, done)               (student: "I've finished", waits for the teacher)
 //   listMistakes() → mistakes              addMistake({ page, line, verseKey, position, wordText, taskId })
 //   setMistakeCorrected(id, corrected)     deleteMistake(id)
 //   setMistakeTicked(id, ticked)           (the student's own tick)
@@ -19,7 +21,7 @@ import { selectAll } from "../thilawa/repos.js";
 
 const taskFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, taskDate: r.task_date, activity: r.activity, start: r.start_unit, end: r.end_unit,
-  notes: r.notes || "", completedAt: r.completed_at, createdAt: r.created_at, updatedAt: r.updated_at,
+  notes: r.notes || "", completedAt: r.completed_at, studentDoneAt: r.student_done_at || null, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const mistakeFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, taskId: r.task_id, page: r.page, line: r.word_line, verseKey: r.verse_key, position: r.word_position,
@@ -80,6 +82,9 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
     },
     async updateTask(id, patch) { check(await supabase.from("hifz_tasks").update(taskPatchToDb(patch)).eq("id", id).eq("student_id", studentId)); },
     async deleteTask(id) { check(await supabase.from("hifz_tasks").delete().eq("id", id).eq("student_id", studentId)); },
+    async setStudentDone(id, done) {
+      check(await supabase.from("hifz_tasks").update({ student_done_at: done ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
+    },
     async setTaskDone(id, done) {
       check(await supabase.from("hifz_tasks").update({ completed_at: done ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
     },
@@ -115,7 +120,7 @@ export function createHifzMemoryStore() {
 }
 
 // asStudent: like row-level security for a signed-in student — read only,
-// except ticking tasks done and ticking off mistakes.
+// except marking tasks finished and ticking off mistakes.
 export function createMemoryHifzRepo(store, studentId, { asStudent = false, teacherId = null } = {}) {
   const clone = (x) => JSON.parse(JSON.stringify(x));
   const own = (r) => r.studentId === studentId;
@@ -137,7 +142,7 @@ export function createMemoryHifzRepo(store, studentId, { asStudent = false, teac
     async addTasks(rows) {
       teacherOnly();
       for (const t of rows) {
-        store.tasks.push({ notes: "", ...clone(t), id: `h${store.nextId++}`, studentId, teacherId, completedAt: null, createdAt: stamp() });
+        store.tasks.push({ notes: "", ...clone(t), id: `h${store.nextId++}`, studentId, teacherId, completedAt: null, studentDoneAt: null, createdAt: stamp() });
       }
       changed();
     },
@@ -148,7 +153,8 @@ export function createMemoryHifzRepo(store, studentId, { asStudent = false, teac
       changed();
     },
     async deleteTask(id) { teacherOnly(); find("tasks", id); store.tasks = store.tasks.filter((t) => t.id !== id); changed(); },
-    async setTaskDone(id, done) { find("tasks", id).completedAt = done ? stamp() : null; changed(); },
+    async setTaskDone(id, done) { teacherOnly(); find("tasks", id).completedAt = done ? stamp() : null; changed(); },
+    async setStudentDone(id, done) { find("tasks", id).studentDoneAt = done ? stamp() : null; changed(); },
     async listMistakes() { return clone(store.mistakes.filter(own)); },
     async addMistake(m) {
       teacherOnly();

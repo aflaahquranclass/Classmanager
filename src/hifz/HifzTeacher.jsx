@@ -5,7 +5,7 @@
 // The student's portal updates live and they get a phone notification.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, Highlighter, ArrowRight, Search, Flame, Target, X, Undo2, Check, History } from "lucide-react";
+import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Undo2, Check, History } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
@@ -497,7 +497,9 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         <div className="ht-row-head">
           <Icon size={18} aria-hidden="true" /><b>{title}</b>
           <span className="hz-muted">{fmtDay(t.taskDate)}</span>
-          <span className={`hz-badge ${t.completedAt ? "hz-badge-completed" : t.taskDate < today ? "hz-badge-partial" : "hz-badge-pending"}`}>{t.completedAt ? "Done" : t.taskDate < today ? "Not done" : "To do"}</span>
+          {t.studentDoneAt && !t.completedAt
+            ? <span className="hz-badge hz-badge-submitted" title={`Finished ${fmtDate(t.studentDoneAt.slice(0, 10))}`}><CheckCheck size={13} aria-hidden="true" /> Student finished · listen & approve</span>
+            : <span className={`hz-badge ${t.completedAt ? "hz-badge-completed" : t.taskDate < today ? "hz-badge-partial" : "hz-badge-pending"}`}>{t.completedAt ? "Done" : t.taskDate < today ? "Not done" : "To do"}</span>}
           {count > 0 && <span className="hz-mistake-badge"><Highlighter size={12} aria-hidden="true" />{count}</span>}
         </div>
         <PortionText task={t} />
@@ -507,7 +509,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
             <Highlighter size={15} aria-hidden="true" />Listen & mark
           </button>
           <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => (t.completedAt ? run(() => repo.setTaskDone(t.id, false)) : markDone(t))}>
-            {t.completedAt ? <><Undo2 size={15} aria-hidden="true" />Not done</> : <><CheckCircle2 size={15} aria-hidden="true" />Done</>}
+            {t.completedAt ? <><Undo2 size={15} aria-hidden="true" />Not done</> : <><CheckCircle2 size={15} aria-hidden="true" />Approve</>}
           </button>
           <button className="hz-btn hz-btn-outline" aria-expanded={nextOpen === t.id} onClick={() => setNextOpen(nextOpen === t.id ? null : t.id)}>
             <ArrowRight size={15} aria-hidden="true" />Next task
@@ -560,7 +562,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />Tasks</h2>
         <p className="hz-muted" style={{ marginTop: 0 }}>
           {planReady
-            ? <>Set automatically from the Hifz plan for the class days{student.schedule?.days?.length ? ` (${student.schedule.days.join(", ")})` : ""}. Mark a task done and the next one is set; the student is notified.</>
+            ? <>Set automatically from the Hifz plan for the class days{student.schedule?.days?.length ? ` (${student.schedule.days.join(", ")})` : ""}. When the student finishes a task you see “Student finished”. Listen, then approve it and the next one is set; the student is notified.</>
             : "Save the Hifz plan above to start. The tasks are then set automatically for the class days."}
         </p>
         {/* Done tasks leave the teacher's list straight away; the student keeps them as history. */}
@@ -649,8 +651,9 @@ export function TeacherHifz({ students, teacherId }) {
               summary={(list) => {
                 const os = list.map((s) => overview?.[s.id]).filter(Boolean);
                 const behind = os.filter((o) => o.overdue.length > 0).length;
+                const check = os.filter((o) => o.toCheck.length > 0).length;
                 const noStart = os.filter((o) => !o.hasProfile).length;
-                return <>{behind > 0 && <span className="hz-badge hz-badge-partial">{behind} not finished</span>}{noStart > 0 && <span className="hz-badge hz-badge-empty">{noStart} starting point not set</span>}</>;
+                return <>{check > 0 && <span className="hz-badge hz-badge-submitted"><CheckCheck size={12} aria-hidden="true" /> {check} to listen</span>}{behind > 0 && <span className="hz-badge hz-badge-partial">{behind} not finished</span>}{noStart > 0 && <span className="hz-badge hz-badge-empty">{noStart} starting point not set</span>}</>;
               }}
               renderStudent={(s) => {
                 const o = overview?.[s.id];
@@ -666,6 +669,7 @@ export function TeacherHifz({ students, teacherId }) {
                           {o.todayTasks.length > 0
                             ? <span className={`hz-badge ${doneToday === o.todayTasks.length ? "hz-badge-completed" : "hz-badge-pending"}`}>Today {doneToday}/{o.todayTasks.length} done</span>
                             : <span className="hz-badge hz-badge-empty">Nothing set today</span>}
+                          {o.toCheck.length > 0 && <span className="hz-badge hz-badge-submitted"><CheckCheck size={12} aria-hidden="true" /> {o.toCheck.length} finished · listen</span>}
                           {o.overdue.length > 0 && <span className="hz-badge hz-badge-partial">{o.overdue.length} not finished</span>}
                           {o.openMistakes.length > 0 && <span className="hz-mistake-badge"><Highlighter size={12} aria-hidden="true" />{o.openMistakes.length}</span>}
                           {!o.hasProfile && <span className="hz-badge hz-badge-empty">Starting point not set</span>}

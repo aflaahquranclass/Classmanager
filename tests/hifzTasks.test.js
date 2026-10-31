@@ -88,7 +88,7 @@ test("task pages, mistakes on a task, and the old plan as a starting point", () 
   assert.equal(legacy.goalYear, 2031);
 });
 
-test("teacher sets and changes tasks and mistakes; the student can only tick", async () => {
+test("teacher sets and changes tasks and mistakes; the student finishes, the teacher approves", async () => {
   const store = createHifzMemoryStore();
   const teacher = createMemoryHifzRepo(store, "s1", { teacherId: "t1" });
   const student = createMemoryHifzRepo(store, "s1", { asStudent: true });
@@ -106,8 +106,15 @@ test("teacher sets and changes tasks and mistakes; the student can only tick", a
   await teacher.addMistake({ page: 581, verseKey: "77:1", position: 1, wordText: "x", taskId: t.id });
   await assert.rejects(teacher.addMistake({ page: 581, verseKey: "77:1", position: 1 }));
 
-  await student.setTaskDone(t.id, true);
+  // The student finishing doesn't complete it: it waits for the teacher.
+  await assert.rejects(student.setTaskDone(t.id, true), /Only the teacher/);
+  await student.setStudentDone(t.id, true);
   s = await loadHifz(student, TODAY);
+  assert.equal(s.stats.memorizedUnits, 23 * P);
+  assert.deepEqual(s.toCheck.map((x) => x.id), [t.id]);
+  await teacher.setTaskDone(t.id, true);
+  s = await loadHifz(student, TODAY);
+  assert.equal(s.toCheck.length, 0);
   assert.equal(s.stats.memorizedUnits, 24 * P);
   assert.equal(s.openMistakes.length, 1);
 

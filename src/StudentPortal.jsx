@@ -379,7 +379,7 @@ export default function StudentPortal() {
   const percent = hasPlan ? summary.stats.percent : 0;
   const counts = hasPlan ? completedCounts(summary.memorized) : { surahs: 0, juz: 0 };
   const todayHifz = summary?.todayTasks || [];
-  const todayHifzDone = todayHifz.filter((t) => t.completedAt).length;
+  const todayHifzDone = todayHifz.filter((t) => t.completedAt || t.studentDoneAt).length;
   const stats = [
     { label: "Surah’s completed", Icon: BookOpen, value: <><CountUp value={counts.surahs} /> / {TOTAL_SURAHS}</> },
     { label: "Juz completed", Icon: Layers, value: <><CountUp value={counts.juz} /> / {TOTAL_JUZ}</> },
