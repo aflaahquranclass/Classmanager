@@ -5,14 +5,14 @@
 // The student's portal updates live and they get a phone notification.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History } from "lucide-react";
+import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
-import { unitsOf, toSet, subtract } from "./engine.js";
-import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskGroups } from "./tasks.js";
+import { unitsOf, toSet, subtract, localDate } from "./engine.js";
+import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -80,28 +80,39 @@ const teacherCss = `
   .ht-tile-new { background: #E4F1FC; color: #176FD1; }
   .ht-tile-short { background: #E0F4F6; color: #0A7F96; }
   .ht-tile-long { background: #ECE9FA; color: #5B4BB7; }
-  .ht-tile-done { background: #DDF5E9; color: #156B45; }
   .ht-task-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .ht-task-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 26px; }
   .ht-task-top b { font-size: 15px; color: #123B67; }
-  .ht-task-date { font-size: 13px; color: #567493; }
   .ht-task-tags { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
   .ht-task-portion { font-size: 14px; color: #567493; }
   .ht-task-portion b { font-size: 15px; color: #123B67; margin-right: 8px; }
   .ht-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
   .ht-task-actions > .hz-btn { min-height: 38px; padding: 0 14px; font-size: 13px; }
-  .ht-task-links { display: inline-flex; align-items: center; flex-wrap: wrap; margin-left: auto; }
-  .ht-task-links .hz-btn { min-height: 34px; padding: 0 8px; font-size: 13px; font-weight: 600; color: #567493; }
-  .ht-task-links .hz-btn:hover { color: #176FD1; }
-  .ht-task-done { background: #F7FCFA; border-color: #CDEBDC; }
-  .ht-task-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin-top: 2px; }
-  .ht-task-next { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: #156B45; }
+  .ht-task-more { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .hz-btn.ht-btn-small { min-height: 34px; padding: 0 11px; gap: 6px; white-space: nowrap; border-radius: 10px; font-size: 13px; font-weight: 600; background: #F3F8FD; color: #1D5FA8; border: 1px solid #DCEBF8; }
+  .hz-btn.ht-btn-small:hover { background: #E4F1FC; border-color: #B9D6F2; }
+  .hz-btn.ht-btn-icon { padding: 0; width: 34px; color: #8296A8; }
+  .hz-btn.ht-btn-icon:hover { color: #B4321F; background: #FDF1EE; border-color: #F4CFC6; }
+  .hz-btn.ht-btn-approve { background: linear-gradient(90deg, #17905A, #1FAA6B); color: #FFFFFF; box-shadow: 0 8px 18px rgba(23,144,90,0.28); }
+  .ht-task-ready { border-color: #9FC3EA; background: linear-gradient(160deg, #F1F7FE, #FFFFFF 70%); box-shadow: inset 4px 0 0 #176FD1; }
+  .ht-ready-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: #FFFFFF; background: #176FD1; border-radius: 999px; padding: 4px 10px; }
+  .ht-ready-note { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: #E8F2FC; color: #1452A8; font-size: 14px; }
+  .ht-day { font-size: 12px; font-weight: 600; color: #567493; background: #F0F4F8; border-radius: 999px; padding: 3px 9px; }
+  .ht-day-today { color: #1452A8; background: #E4F1FC; }
+  .ht-day-late { color: #8A5A00; background: #FCF1DD; }
+  .ht-hist li { align-items: center; }
+  .ht-hist li > div { flex: 1; }
+  .ht-hist-actions { flex-shrink: 0; display: inline-flex; gap: 6px; }
   @media (max-width: 520px) {
     .ht-task { padding: 12px; gap: 10px; }
     .ht-task-tile { width: 34px; height: 34px; border-radius: 10px; }
     .ht-task-actions > .hz-btn { flex: 1 1 0; padding: 0 10px; white-space: nowrap; }
     .ht-task-actions > .hz-btn svg { display: none; }
-    .ht-task-links { margin-left: -8px; }
+    .ht-task-more { flex: 1 1 100%; flex-wrap: nowrap; }
+    .ht-task-more .ht-btn-small:not(.ht-btn-icon) { flex: 1 1 0; }
+    .ht-hist li { flex-wrap: wrap; }
+    .ht-hist li > div { flex: 1 1 calc(100% - 40px); }
+    .ht-hist-actions { margin-left: 36px; }
   }
   .ht-group { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: #567493; text-transform: uppercase; letter-spacing: 0.04em; }
   .ht-markbar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #123B67; color: #FFFFFF; border-radius: 14px; padding: 10px 12px; box-shadow: 0 12px 30px rgba(13,40,70,0.35); }
@@ -402,7 +413,9 @@ function EditTask({ task, onSave, onCancel, busy, saveLabel = "Save changes", ca
 // ---------- history ----------
 // The student's done tasks, newest first, grouped by day (the student sees
 // the same history in their portal).
-function HistorySection({ tasks, mistakes }) {
+// Mushaf opens a done task's pages; Undo (for one approved today) puts it
+// back in the task list.
+function HistorySection({ tasks, mistakes, today, busy, onOpen, onUndo }) {
   const [shown, setShown] = useState(20);
   const done = tasks.filter((t) => t.completedAt).sort((a, b) => (a.taskDate < b.taskDate ? 1 : a.taskDate > b.taskDate ? -1 : a.completedAt < b.completedAt ? 1 : -1));
   const days = [];
@@ -422,14 +435,19 @@ function HistorySection({ tasks, mistakes }) {
                 {d.list.map((t) => {
                   const { title, Icon } = ACTIVITY_INFO[t.activity];
                   const marks = mistakes.filter((m) => m.taskId === t.id).length;
-                  const late = t.completedAt.slice(0, 10) > t.taskDate;
+                  const doneOn = localDate(new Date(t.completedAt), TIMEZONE);
+                  const late = doneOn > t.taskDate;
                   return (
                     <li key={t.id}>
                       <span className="ht-hist-icon"><Icon size={15} aria-hidden="true" /></span>
                       <div>
                         <b>{title}</b> · {portionSummary(t)}
-                        <small>Done {fmtDate(t.completedAt.slice(0, 10))}{late ? " (later than set)" : ""}{marks ? ` · ${marks} word${marks === 1 ? "" : "s"} marked` : ""}{t.notes ? ` · “${t.notes}”` : ""}</small>
+                        <small>Done {doneOn === today ? "today" : fmtDate(doneOn)}{late ? " (later than set)" : ""}{marks ? ` · ${marks} word${marks === 1 ? "" : "s"} marked` : ""}{t.notes ? ` · “${t.notes}”` : ""}</small>
                       </div>
+                      <span className="ht-hist-actions">
+                        <button className="hz-btn ht-btn-small" onClick={() => onOpen(t)}><BookOpenText size={14} aria-hidden="true" />Mushaf</button>
+                        {doneOn === today && <button className="hz-btn ht-btn-small" disabled={busy} onClick={() => onUndo(t)}><Undo2 size={14} aria-hidden="true" />Undo</button>}
+                      </span>
                     </li>
                   );
                 })}
@@ -510,6 +528,17 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
       setDrafts((d) => { const n = { ...d }; delete n[t.activity]; return n; });
       setNextOpen(null);
       if (markingId === t.id) closeMarking();
+    }).finally(() => { generating.current = false; });
+  };
+  // Undo an approval: the task is open again and the next one that approving
+  // set (same activity, later, not started by the student) is removed.
+  const undoDone = (t) => {
+    const next = tasks.filter((x) => x.activity === t.activity && !x.completedAt && !x.studentDoneAt && x.taskDate > t.taskDate)
+      .sort((a, b) => (a.taskDate < b.taskDate ? -1 : 1))[0];
+    generating.current = true;
+    return run(async () => {
+      await repo.setTaskDone(t.id, false);
+      if (next) await repo.deleteTask(next.id);
     }).finally(() => { generating.current = false; });
   };
   const nextBox = (t) => {
@@ -616,54 +645,19 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
     );
   };
 
-  const groups = teacherTaskGroups(tasks, today);
+  const openTasks = teacherTaskList(tasks);
+  const ready = openTasks.filter((t) => t.studentDoneAt).length;
   // One short line for a portion: "p. 158 · 1 page · Al-A'raf 58 – 67".
   const portionLine = (t) => (
     <div className="ht-task-portion"><b>{describeRange([t.start, t.end])}</b>{describeAmount(t.end - t.start)} · {describeAyahs([t.start, t.end])}</div>
   );
-  // Approved today: stays in its place, green, with the next one (set for a
-  // later day) under it to check or change.
-  const finishedRow = (t, showDate) => {
-    const { title } = ACTIVITY_INFO[t.activity];
-    const count = mistakesForTask(t, mistakes).length;
-    const next = groups.next[t.activity];
-    return (
-      <li key={t.id} className={`ht-task ht-task-done ${markingId === t.id ? "ht-task-open" : ""}`}>
-        <span className="ht-task-tile ht-tile-done"><Check size={20} aria-hidden="true" /></span>
-        <div className="ht-task-main">
-          <div className="ht-task-top">
-            <b>{title}</b>{showDate && <span className="ht-task-date">{fmtDay(t.taskDate)}</span>}
-            <span className="ht-task-tags">
-              {count > 0 && <span className="hz-mistake-badge" title="Words marked"><Highlighter size={12} aria-hidden="true" />{count}</span>}
-              <span className="hz-badge hz-badge-completed">Finished</span>
-            </span>
-          </div>
-          {portionLine(t)}
-          {next && editingId === next.id ? (
-            <div className="ht-next" style={{ marginTop: 6 }}>
-              <div className="ht-next-head"><ArrowRight size={16} aria-hidden="true" />Change the next {title}</div>
-              <EditTask task={next} busy={busy} onCancel={() => setEditingId(null)}
-                onSave={(d) => run(() => repo.updateTask(next.id, d)).then((ok) => ok && setEditingId(null))} />
-            </div>
-          ) : (
-            <div className="ht-task-foot">
-              {next && <span className="ht-task-next"><ArrowRight size={13} aria-hidden="true" />Next · {fmtDay(next.taskDate)} · {describeRange([next.start, next.end])}</span>}
-              <span className="ht-task-links">
-                {next && <button className="hz-btn hz-btn-ghost" onClick={() => setEditingId(next.id)}>Change next</button>}
-                <button className="hz-btn hz-btn-ghost" onClick={() => openMarking(t)}>Mushaf</button>
-                <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => run(() => repo.setTaskDone(t.id, false))}>Undo</button>
-              </span>
-            </div>
-          )}
-        </div>
-      </li>
-    );
-  };
-  const taskRow = (t, showDate) => {
+  const dayChip = (t) => (t.taskDate === today
+    ? <span className="ht-day ht-day-today">Today</span>
+    : t.taskDate < today ? <span className="ht-day ht-day-late">Late · {fmtDay(t.taskDate)}</span> : <span className="ht-day">{fmtDay(t.taskDate)}</span>);
+  const taskRow = (t) => {
     const { title, Icon } = ACTIVITY_INFO[t.activity];
     const confirmed = drafts[t.activity];
     const count = mistakesForTask(t, mistakes).length;
-    if (t.completedAt) return finishedRow(t, showDate);
     if (editingId === t.id) {
       return (
         <li key={t.id} className="ht-row ht-row-open">
@@ -673,42 +667,36 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
         </li>
       );
     }
+    // The student has finished: highlighted, with a green Approve.
+    const done = !!t.studentDoneAt;
     return (
-      <li key={t.id} className={`ht-task ${markingId === t.id ? "ht-task-open" : ""}`}>
+      <li key={t.id} className={`ht-task ${done ? "ht-task-ready" : ""} ${markingId === t.id ? "ht-task-open" : ""}`}>
         <span className={`ht-task-tile ht-tile-${t.activity}`}><Icon size={20} aria-hidden="true" /></span>
         <div className="ht-task-main">
           <div className="ht-task-top">
-            <b>{title}</b>{showDate && <span className="ht-task-date">{fmtDay(t.taskDate)}</span>}
+            <b>{title}</b>{dayChip(t)}
             <span className="ht-task-tags">
               {count > 0 && <span className="hz-mistake-badge" title="Words marked"><Highlighter size={12} aria-hidden="true" />{count}</span>}
-              {t.studentDoneAt
-                ? <span className="hz-badge hz-badge-submitted" title={`Finished ${fmtDate(t.studentDoneAt.slice(0, 10))}`}><CheckCheck size={13} aria-hidden="true" /> Student finished</span>
-                : t.taskDate < today && <span className="hz-badge hz-badge-partial">Late</span>}
+              {done && <span className="ht-ready-tag" title={`Finished ${fmtDate(t.studentDoneAt.slice(0, 10))}`}><CheckCheck size={14} aria-hidden="true" />Student finished</span>}
             </span>
           </div>
           {portionLine(t)}
           {t.notes && <div className="hz-task-notes" style={{ marginTop: 4 }}>{t.notes}</div>}
           <div className="ht-task-actions">
             <button className="hz-btn hz-btn-primary" onClick={() => openMarking(t)}><Highlighter size={15} aria-hidden="true" />Listen & mark</button>
-            <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => markDone(t)}><CheckCircle2 size={15} aria-hidden="true" />Approve</button>
-            <span className="ht-task-links">
-              <button className="hz-btn hz-btn-ghost" aria-expanded={nextOpen === t.id} onClick={() => setNextOpen(nextOpen === t.id ? null : t.id)}>Next task</button>
-              <button className="hz-btn hz-btn-ghost" onClick={() => setEditingId(t.id)}>Change</button>
-              <button className="hz-btn hz-btn-ghost" aria-label={`Delete ${title} for ${fmtDay(t.taskDate)}`} title="Delete" onClick={() => remove("task", () => repo.deleteTask(t.id))}><Trash2 size={15} aria-hidden="true" /></button>
+            <button className={`hz-btn ${done ? "ht-btn-approve" : "hz-btn-outline"}`} disabled={busy} onClick={() => markDone(t)}><CheckCircle2 size={15} aria-hidden="true" />Approve</button>
+            <span className="ht-task-more">
+              <button className="hz-btn ht-btn-small" aria-expanded={nextOpen === t.id} onClick={() => setNextOpen(nextOpen === t.id ? null : t.id)}><ArrowRight size={14} aria-hidden="true" />Next task</button>
+              <button className="hz-btn ht-btn-small" onClick={() => setEditingId(t.id)}><Pencil size={14} aria-hidden="true" />Change</button>
+              <button className="hz-btn ht-btn-small ht-btn-icon" aria-label={`Delete ${title} for ${fmtDay(t.taskDate)}`} title="Delete" onClick={() => remove("task", () => repo.deleteTask(t.id))}><Trash2 size={14} aria-hidden="true" /></button>
             </span>
           </div>
-          {confirmed && nextOpen !== t.id && <div className="ht-task-next" style={{ color: "#567493" }}>Next (confirmed) · {fmtDay(confirmed.taskDate)} · {describeRange([confirmed.start, confirmed.end])}</div>}
+          {confirmed && nextOpen !== t.id && <div className="ht-task-portion" style={{ fontSize: 13 }}>Next (confirmed) · {fmtDay(confirmed.taskDate)} · {describeRange([confirmed.start, confirmed.end])}</div>}
           {nextOpen === t.id && markingId !== t.id && nextBox(t)}
         </div>
       </li>
     );
   };
-  const group = (label, list, showDate = true) => list.length > 0 && (
-    <>
-      <div className="ht-group">{label}</div>
-      <ul className="ht-rows">{list.map((t) => taskRow(t, showDate))}</ul>
-    </>
-  );
 
   return (
     <div className="ht">
@@ -746,23 +734,16 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
             ? <>Set from the Hifz plan · {student.schedule?.days?.length === 7 ? "every day" : student.schedule?.days?.length ? student.schedule.days.join(", ") : "class days"}</>
             : "Save the Hifz plan above to start. The tasks are then set automatically for the class days."}
         </p>
-        {/* New Hifz, Short, Long Muraja'ah always in that order; approved today stays green in its place until tomorrow. */}
-        {(() => {
-          const doneCount = tasks.filter((t) => t.completedAt).length;
-          const any = groups.today.length + groups.overdue.length + groups.upcoming.length;
-          return (
-            <>
-              {!any && planReady && <p className="hz-muted" style={{ margin: 0 }}>Setting the next tasks…</p>}
-              {group(`Today · ${fmtDate(today)}`, groups.today, false)}
-              {group("Not finished from earlier days", groups.overdue)}
-              {group("Coming up", groups.upcoming)}
-              {doneCount > 0 && <p className="hz-muted" style={{ margin: "14px 0 0" }}>{doneCount} done · see History below</p>}
-            </>
-          );
-        })()}
+        {/* New Hifz, Short, Long Muraja'ah always in that order; approved ones go to History and the next one takes their place. */}
+        {ready > 0 && (
+          <div className="ht-ready-note" role="status"><CheckCheck size={18} aria-hidden="true" /><span><b>{ready} task{ready === 1 ? "" : "s"} finished by the student.</b> Listen, then approve.</span></div>
+        )}
+        {openTasks.length === 0 && planReady && <p className="hz-muted" style={{ margin: 0 }}>Setting the next tasks…</p>}
+        {openTasks.length > 0 && <ul className="ht-rows">{openTasks.map(taskRow)}</ul>}
       </section>
 
-      <HistorySection tasks={tasks} mistakes={mistakes} />
+      <HistorySection tasks={tasks} mistakes={mistakes} today={today} busy={busy}
+        onOpen={openMarking} onUndo={undoDone} />
 
       {marking && listenAndMark()}
 

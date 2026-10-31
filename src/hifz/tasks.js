@@ -152,27 +152,12 @@ export function summarizeHifz({ profile, tasks, mistakes = [], goalYear = null }
   };
 }
 
-// The teacher's task list, always New Hifz, Short then Long Muraja'ah. A task
-// approved today stays where it was (green) until tomorrow, so nothing moves
-// around; the next one, set for a later day, waits behind it as `next`.
-//   today:    due today, or approved today and due today or before
-//   overdue:  not done from earlier days
-//   upcoming: due after today
-export function teacherTaskGroups(tasks, today, timezone = TIMEZONE) {
-  const doneToday = tasks.filter((t) => t.completedAt && localDate(new Date(t.completedAt), timezone) === today);
-  const finished = new Set(doneToday.map((t) => t.activity));
-  const waiting = (t) => !t.completedAt && finished.has(t.activity) && t.taskDate > today;
+// The teacher's task list: the tasks not done yet, always New Hifz, Short then
+// Long Muraja'ah (then by day), so an approved task's next one takes its
+// place and nothing moves around. Done tasks are in History.
+export function teacherTaskList(tasks) {
   const order = (t) => ACTIVITIES.indexOf(t.activity);
-  const shown = [...doneToday, ...tasks.filter((t) => !t.completedAt && !waiting(t))]
-    .sort((a, b) => order(a) - order(b) || byDateThenMade(a, b));
-  const next = {};
-  for (const t of tasks.filter(waiting).sort(byDateThenMade)) next[t.activity] ||= t;
-  return {
-    today: shown.filter((t) => t.taskDate === today || (t.completedAt && t.taskDate < today)),
-    overdue: shown.filter((t) => !t.completedAt && t.taskDate < today),
-    upcoming: shown.filter((t) => t.taskDate > today),
-    next,
-  };
+  return tasks.filter((t) => !t.completedAt).sort((a, b) => order(a) - order(b) || byDateThenMade(a, b));
 }
 
 // Open mistakes inside a task's portion (by the word's line; older marks

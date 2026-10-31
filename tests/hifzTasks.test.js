@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pageToUnit, UNITS_PER_PAGE, TOTAL_UNITS, wholeJuz } from "../src/hifz/quran.js";
-import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile, shortBefore, nextClassDay, nextTasksToSet, previewNext, directionFor, hifzPath, teacherTaskGroups } from "../src/hifz/tasks.js";
+import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile, shortBefore, nextClassDay, nextTasksToSet, previewNext, directionFor, hifzPath, teacherTaskList } from "../src/hifz/tasks.js";
 import { loadHifz } from "../src/hifz/taskService.js";
 import { createHifzMemoryStore, createMemoryHifzRepo } from "../src/hifz/taskRepos.js";
 
@@ -210,31 +210,17 @@ test("the way New Hifz goes follows from where the student starts", () => {
   assert.deepEqual(shortBefore(pageToUnit(545), [wholeJuz("last", 2), pages(542, 544)], j28), { start: pageToUnit(544), end: pageToUnit(545) });
 });
 
-test("teacher's list: New, Short, Long in that order; approved today stays in place", () => {
+test("teacher's list: not done yet, New, Short, Long in that order", () => {
   const SUN = "2026-11-01", MON = "2026-11-02";
   // Made in the order Short, Long, New (as they were approved), all for Sunday.
   const short = task(SUN, "short", pages(153, 156));
   const long = task(SUN, "long", pages(188, 191));
   const nw = task(SUN, "new", pages(157, 157));
-  const g = teacherTaskGroups([short, long, nw], TODAY);
-  assert.deepEqual(g.upcoming.map((t) => t.activity), ["new", "short", "long"]);
-  // Also across days: New for Monday still comes before Short for Sunday.
-  assert.deepEqual(teacherTaskGroups([short, task(MON, "new", pages(158, 158))], TODAY).upcoming.map((t) => t.activity), ["new", "short"]);
-  // New Hifz approved today (Sat, Maldives time): it stays where it was and
-  // Monday's New Hifz waits behind it; Short and Long don't move.
+  assert.deepEqual(teacherTaskList([short, long, nw]).map((t) => t.activity), ["new", "short", "long"]);
+  // Across days too: New for Monday still comes before Short for Sunday; a late one first in its activity.
+  const late = task("2026-10-30", "short", pages(150, 153));
+  assert.deepEqual(teacherTaskList([short, task(MON, "new", pages(158, 158)), late]).map((t) => [t.activity, t.taskDate]), [["new", MON], ["short", "2026-10-30"], ["short", SUN]]);
+  // Approved New Hifz goes to History; Monday's takes its place at the top.
   const approved = { ...nw, completedAt: "2026-10-31T10:00:00Z" };
-  const monNew = task(MON, "new", pages(158, 158));
-  const after = teacherTaskGroups([short, long, approved, monNew], TODAY);
-  assert.deepEqual(after.upcoming.map((t) => [t.activity, t.taskDate, !!t.completedAt]), [["new", SUN, true], ["short", SUN, false], ["long", SUN, false]]);
-  assert.equal(after.next.new.id, monNew.id);
-  // Tomorrow the approved one has gone to History and Monday's shows.
-  const tomorrow = teacherTaskGroups([short, long, approved, monNew], SUN);
-  assert.deepEqual(tomorrow.today.map((t) => t.activity), ["short", "long"]);
-  assert.deepEqual(tomorrow.upcoming.map((t) => t.id), [monNew.id]);
-  // Approved today but due earlier: shown with today's tasks; a next one due today isn't held back.
-  const late = { ...task("2026-10-30", "new", pages(150, 150)), completedAt: "2026-10-31T09:00:00Z" };
-  const dueToday = task(TODAY, "new", pages(151, 151));
-  const g2 = teacherTaskGroups([late, dueToday], TODAY);
-  assert.deepEqual(g2.today.map((t) => t.id), [late.id, dueToday.id]);
-  assert.deepEqual(g2.overdue, []);
+  assert.deepEqual(teacherTaskList([short, long, approved, task(MON, "new", pages(158, 158))]).map((t) => [t.activity, t.taskDate]), [["new", MON], ["short", SUN], ["long", SUN]]);
 });
