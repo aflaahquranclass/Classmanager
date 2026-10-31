@@ -3,7 +3,7 @@
 // SMS goes through the `send-sms` Edge Function (MessageOwl), which holds the
 // API key; email through the site's Worker (Cloudflare Email Service).
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Bell, Send, RotateCw, Search, Smartphone, MessageSquare, Trash2, ChevronDown, ChevronRight, CheckCircle2, AlertTriangle, Mail } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
@@ -12,7 +12,7 @@ import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { thaanaChange, hasThaana } from "./thaanaKeyboard.js";
 import { createNotification, sendPendingSms, sendPendingEmail, loadEmailStatus, loadTemplates, loadDvNames } from "./smsSend.js";
 import { SmsTemplates, PaymentReminders } from "./SmsTemplates.jsx";
-import { smsParts, fillTemplate, TEMPLATES, DEFAULT_TEMPLATE_BODIES, isCustomKey, customName } from "./templates.js";
+import { smsParts, fillTemplate, TEMPLATES, DEFAULT_TEMPLATE_BODIES, CUSTOM_PLACEHOLDERS, PLACEHOLDER_LABELS, isCustomKey, customName } from "./templates.js";
 import { maldivesMonth } from "../dates.js";
 
 // Has {name}, {fee}, … to fill in for each recipient.
@@ -83,6 +83,7 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
   const [templates, setTemplates] = useState(null); // { [key]: row } — reloaded when New message opens
   const [dvNames, setDvNames] = useState({});
   const [templateKey, setTemplateKey] = useState("");
+  const bodyRef = useRef(null);
 
   const people = useMemo(() => [
     ...students.map((s) => ({ key: `s:${s.id}`, kind: "Student", student_id: s.id, user_id: s.userId || null, name: s.name, phone: s.phone || null, email: s.email || null, className: s.className || "" })),
@@ -170,6 +171,16 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
     setDhivehi(hasThaana(text));
     if (audience === "everyone") setAudience("people");
     setTab("compose");
+  };
+
+  // Puts {student_id}, {name}, … at the cursor in the message box.
+  const insertDetail = (key) => {
+    const el = bodyRef.current;
+    const tag = `{${key}}`;
+    const at = el ? el.selectionStart : body.length;
+    const end = el ? el.selectionEnd : body.length;
+    setBody(body.slice(0, at) + tag + body.slice(end));
+    requestAnimationFrame(() => { el?.focus(); el?.setSelectionRange(at + tag.length, at + tag.length); });
   };
 
   // Each recipient's own wording when the message has {name}, {fee}, …
@@ -340,11 +351,21 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
           <input id="nt-title" className={`lc-input ${dhivehi ? "nt-dv" : ""}`} dir={dhivehi ? "rtl" : "auto"} lang={dhivehi ? "dv" : undefined} value={title} maxLength={120} placeholder={dhivehi ? "މިސާލު: މާދަމާ ކްލާސް ނުހިންގޭނެ" : "e.g. Class cancelled tomorrow"} onChange={(e) => thaanaChange(e, title, setTitle, dhivehi)} />
 
           <label className="nt-label" htmlFor="nt-body">Message</label>
-          <textarea id="nt-body" className={`lc-input nt-textarea ${dhivehi ? "nt-dv" : ""}`} dir={dhivehi ? "rtl" : "auto"} lang={dhivehi ? "dv" : undefined} value={body} placeholder={dhivehi ? "މެސެޖު ލިޔުއްވާ…" : "Write your message…"} onChange={(e) => { thaanaChange(e, body, setBody, dhivehi); setTemplateKey(""); }} />
+          <textarea id="nt-body" ref={bodyRef} className={`lc-input nt-textarea ${dhivehi ? "nt-dv" : ""}`} dir={dhivehi ? "rtl" : "auto"} lang={dhivehi ? "dv" : undefined} value={body} placeholder={dhivehi ? "މެސެޖު ލިޔުއްވާ…" : "Write your message…"} onChange={(e) => { thaanaChange(e, body, setBody, dhivehi); setTemplateKey(""); }} />
           <div className="nt-meta">
             <span>{(title ? title.length + 1 : 0) + preview.length} characters</span>
             {useSms && body && <span>{parts} SMS part{parts === 1 ? "" : "s"} per person</span>}
           </div>
+          {audience !== "numbers" && (
+            <>
+              <span className="nt-label">Insert student details</span>
+              <div className="nt-chips">
+                {CUSTOM_PLACEHOLDERS.map((p) => (
+                  <button key={p} type="button" className="nt-chip" style={{ minHeight: "34px", padding: "5px 12px" }} onClick={() => insertDetail(p)}>{PLACEHOLDER_LABELS[p]}</button>
+                ))}
+              </div>
+            </>
+          )}
           {personal && (
             <>
               <span className="nt-label">Preview{recipients[0] ? ` — ${recipients[0].name}` : ""}</span>
