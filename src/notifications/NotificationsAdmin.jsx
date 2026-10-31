@@ -161,6 +161,17 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
     setDhivehi(hasThaana(t.body));
   };
 
+  // "Send to students" on a template card: New message with it filled in,
+  // ready to pick the students.
+  const openWithTemplate = async (key, text) => {
+    if (body.trim() && body !== text && !(await confirmDialog({ title: "Replace your message?", message: "New message already has text. It will be replaced with this template.", confirmLabel: "Replace", danger: false }))) return;
+    setTemplateKey(key);
+    setBody(text);
+    setDhivehi(hasThaana(text));
+    if (audience === "everyone") setAudience("people");
+    setTab("compose");
+  };
+
   // Each recipient's own wording when the message has {name}, {fee}, …
   const studentsById = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const personalise = (r) => {
@@ -305,7 +316,7 @@ export function AdminNotifications({ students = [], teachers = [], classes = [],
       </div>
 
       {tab === "reminders" && <PaymentReminders students={students} teachers={teachers} showToast={showToast} onSent={loadHistory} />}
-      {tab === "templates" && <SmsTemplates students={students} teachers={teachers} showToast={showToast} onSent={loadHistory} />}
+      {tab === "templates" && <SmsTemplates students={students} teachers={teachers} showToast={showToast} onSent={loadHistory} onUse={openWithTemplate} />}
 
       {tab === "compose" && (
       <div className="nt-grid">

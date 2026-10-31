@@ -47,7 +47,7 @@ function SmsPreview({ text }) {
 
 // def.custom: one of the admin's own templates — its name can be changed and
 // it can be deleted. takenNames: the other templates' names, kept unique.
-function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, showToast, onSaved, onSent, onDeleted, takenNames = [] }) {
+function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, showToast, onSaved, onSent, onDeleted, onUse, takenNames = [] }) {
   const [body, setBody] = useState(row?.body || DEFAULT_TEMPLATE_BODIES[def.key] || "");
   const [name, setName] = useState(def.custom ? def.label : "");
   const [autoSend, setAutoSend] = useState(!!row?.auto_send);
@@ -160,6 +160,11 @@ function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, show
             <button type="button" className="tp-btn-gradient" disabled={!changed || saving || !body.trim()} onClick={save}>
               <Save size={16} aria-hidden="true" />{saving ? "Saving…" : changed ? "Save template" : "Saved"}
             </button>
+            {onUse && (
+              <button type="button" className="tp-btn-outline" disabled={changed || saving || !body.trim()} title={changed ? "Save the template first" : undefined} onClick={() => onUse(def.key, body)}>
+                <Send size={16} aria-hidden="true" />Send to students
+              </button>
+            )}
             {def.custom && (
               <button type="button" className="tp-btn-outline" style={{ color: "#A32020" }} disabled={saving} onClick={remove}>
                 <Trash2 size={16} aria-hidden="true" />Delete
@@ -192,7 +197,8 @@ function TemplateCard({ def, row, sample, ctx, students, teachers, dvNames, show
   );
 }
 
-export function SmsTemplates({ students, teachers, showToast, onSent }) {
+// onUse(key, body): open New message with this template.
+export function SmsTemplates({ students, teachers, showToast, onSent, onUse }) {
   const { templates, setTemplates, dvNames } = useTemplateData();
   const sample = students.find((s) => s.className && s.schedule) || students[0];
   // Preview only: a made-up one-time password for {password}.
@@ -203,7 +209,7 @@ export function SmsTemplates({ students, teachers, showToast, onSent }) {
 
   if (!templates) return <div className="lc-loading-row" style={{ marginBottom: "16px" }}><span className="lc-spinner"></span>Loading templates…</div>;
   const custom = Object.keys(templates).filter(isCustomKey).sort((a, b) => customName(a).localeCompare(customName(b)));
-  const cardProps = { sample, ctx, students, teachers, dvNames, showToast, onSent };
+  const cardProps = { sample, ctx, students, teachers, dvNames, showToast, onSent, onUse };
   const customDef = (key, label) => ({ key, label, hint: "", placeholders: CUSTOM_PLACEHOLDERS, custom: true });
   const otherNames = (key) => custom.filter((k) => k !== key).map(customName);
   const onDeleted = (key) => {

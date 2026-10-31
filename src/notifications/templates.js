@@ -110,12 +110,30 @@ const CLASS_TYPE = {
   hifz: { en: "Hifz", dv: "ޙިފްޡު" },
   foundation: { en: "Foundation", dv: "ފައުންޑޭޝަން" },
 };
+// No age group (a student added by hand): just "ޙިފްޡު ކްލާސް" / "Hifz class".
 function classTypeLabel(classType, dv) {
   const type = CLASS_TYPE[classType?.category];
   if (!type) return "";
-  if (dv) return `${classType.ageGroup === "children" ? "ކުޑަކުދިންގެ" : "ބޮޑެތި މީހުންގެ"} ${type.dv} ކްލާސް`;
-  return `${classType.ageGroup === "children" ? "Children's" : "Adults'"} ${type.en} class`;
+  const age = classType.ageGroup === "children" ? (dv ? "ކުޑަކުދިންގެ " : "Children's ") : classType.ageGroup === "adults" ? (dv ? "ބޮޑެތި މީހުންގެ " : "Adults' ") : "";
+  return dv ? `${age}${type.dv} ކްލާސް` : `${age}${type.en} class`;
 }
+
+// A current student's class type, from their class name ("Hifz Class B05",
+// "Thilawa Class B12") or, failing that, their student portal programs.
+function guessClassType(student) {
+  const name = (student.className || "").toLowerCase();
+  if (/hifz|hifl/.test(name)) return { category: "hifz" };
+  if (/thilaw|tilaw|tajweed|tajwid/.test(name)) return { category: "tajweed" };
+  if (/foundation|qaid|qaa?idha/.test(name)) return { category: "foundation" };
+  const programs = student.programs || [];
+  if (programs.length === 1) return { category: programs[0] === "hifz" ? "hifz" : "tajweed" };
+  return null;
+}
+
+// Class names are typed in English ("Hifz Class B05 (21:30)"); a Dhivehi
+// message gets the words in Dhivehi and keeps the batch code and time.
+const CLASS_WORDS_DV = { hifz: "ޙިފްޡު", thilawa: "ތިލާވަތު", tilawa: "ތިލާވަތު", tajweed: "ތަޖްވީދު", foundation: "ފައުންޑޭޝަން", class: "ކްލާސް", weekend: "ހަފްތާ ބަންދު" };
+const classNameDv = (name) => name.replace(/[A-Za-z]+/g, (w) => CLASS_WORDS_DV[w.toLowerCase()] || w).replace(/\s{2,}/g, " ").trim();
 
 // student: { name, studentCode, className, fee, schedule: { days, startTime, endTime } }
 // ctx: { teacherName, monthKey ("2026-10"), dvNames: { [englishName]: thaana }, password,
@@ -129,9 +147,9 @@ export function fillTemplate(body, student, ctx = {}) {
   const values = {
     name: dv ? dvName(student.name) : student.name || "",
     student_id: student.studentCode || "",
-    class: student.className || "",
+    class: dv ? classNameDv(student.className || "") : student.className || "",
     teacher: dv ? dvName(ctx.teacherName) : ctx.teacherName || "",
-    class_type: classTypeLabel(ctx.classType, dv),
+    class_type: classTypeLabel(ctx.classType || guessClassType(student), dv),
     days: dv ? listDv(days) : days.join(", "),
     time: !sched.startTime ? "" : dv ? timeRangeDv(sched.startTime, sched.endTime) : `${time12(sched.startTime)} - ${time12(sched.endTime)}`,
     fee: dv ? `-/${fmtFee(student.fee)} ރުފިޔާ` : `MVR ${fmtFee(student.fee)}`,
