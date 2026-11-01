@@ -5,14 +5,15 @@
 // The student's portal updates live and they get a phone notification.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2 } from "lucide-react";
+import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2, Download } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract, localDate } from "./engine.js";
-import { mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE } from "./tasks.js";
+import { downloadClassTasks } from "./taskImage.js";
+import { classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -464,7 +465,7 @@ function HistorySection({ tasks, mistakes, today, busy, onOpen, onUndo }) {
 
 // ---------- one student ----------
 
-export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
+export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked }) {
   const { state: data, error, setError, refresh } = useHifz(repo, onChanged);
   const [busy, setBusy] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -529,7 +530,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
       setDrafts((d) => { const n = { ...d }; delete n[t.activity]; return n; });
       setNextOpen(null);
       if (markingId === t.id) closeMarking();
-    }).finally(() => { generating.current = false; });
+    }).then((ok) => { if (ok) onMarked?.(); return ok; }).finally(() => { generating.current = false; });
   };
   // Undo an approval: the task is open again and the next one that approving
   // set (same activity, later, not started by the student) is removed.
@@ -560,7 +561,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
     setSelectedKey(w.key);
     const open = openMistakes.find((m) => m.verseKey === w.verseKey && m.position === w.position);
     if (open || busy) return; // tapping a marked word selects it; ignore taps while saving
-    run(() => repo.addMistake({ page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text, taskId: marking?.id }));
+    run(() => repo.addMistake({ page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text, taskId: marking?.id }))
+      .then((ok) => { if (ok) onMarked?.(); });
   };
   const remove = async (what, fn) => {
     if (await confirmDialog({ title: `Delete this ${what}?`, message: "This can't be undone.", confirmLabel: "Delete" })) run(fn);
@@ -757,8 +759,11 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
 
 // ---------- all of the teacher's Hifz students ----------
 
-export function TeacherHifz({ students, teacherId }) {
+// onMarked(studentId): the teacher approved a task or marked a mistake (the
+// app marks the student present for today's class).
+export function TeacherHifz({ students, teacherId, onMarked }) {
   const [openId, setOpenId] = useState(null);
+  const [saving, setSaving] = useState(false); // making the class's task list image
   const [query, setQuery] = useState("");
   const [openClass, setOpenClass] = useState(null); // class whose students are shown
   const [overview, setOverview] = useState(null);
@@ -799,7 +804,7 @@ export function TeacherHifz({ students, teacherId }) {
     <div>
       <style>{HIFZ_CSS}{teacherCss}</style>
       {opened ? (
-        <TeacherHifzStudent key={opened.id} student={opened} repo={repo} onBack={() => { setOpenId(null); loadOverview(); }} />
+        <TeacherHifzStudent key={opened.id} student={opened} repo={repo} onBack={() => { setOpenId(null); loadOverview(); }} onMarked={() => onMarked?.(opened.id)} />
       ) : (
         <div className="ht">
           <div className="hz-row">
@@ -813,6 +818,15 @@ export function TeacherHifz({ students, teacherId }) {
             <div className="hz-card hz-muted">None of your students are enrolled in Hifz. The admin chooses Hifz, Thilawa or both when adding a student.</div>
           ) : (
             <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={setOpenClass} gridClass="ht-grid"
+              classActions={(c) => (
+                <button className="hz-btn hz-btn-outline" disabled={!overview || saving}
+                  onClick={async () => {
+                    setSaving(true);
+                    try { await downloadClassTasks({ className: c.name, sheet: classTaskSheet(c.students, (s) => overview[s.id]?.tasks) }); setError(""); } catch (e) { setError(e.message); } finally { setSaving(false); }
+                  }}>
+                  <Download size={17} aria-hidden="true" />{saving ? "Making image…" : "Download task list"}
+                </button>
+              )}
               summary={(list) => {
                 const os = list.map((s) => overview?.[s.id]).filter(Boolean);
                 const behind = os.filter((o) => o.overdue.length > 0).length;

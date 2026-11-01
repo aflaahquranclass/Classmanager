@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pageToUnit, UNITS_PER_PAGE, TOTAL_UNITS, wholeJuz } from "../src/hifz/quran.js";
-import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile, shortBefore, nextClassDay, nextTasksToSet, previewNext, directionFor, hifzPath, teacherTaskList } from "../src/hifz/tasks.js";
+import { summarizeHifz, suggestPortion, suggestDate, nextAfter, mistakesForTask, taskPages, legacyProfile, shortBefore, nextClassDay, nextTasksToSet, previewNext, directionFor, hifzPath, teacherTaskList, classTaskSheet, describeAyahs } from "../src/hifz/tasks.js";
 import { loadHifz } from "../src/hifz/taskService.js";
 import { createHifzMemoryStore, createMemoryHifzRepo } from "../src/hifz/taskRepos.js";
 
@@ -229,4 +229,23 @@ test("teacher's list: not done yet, New, Short, Long in that order", () => {
   // Approved New Hifz goes to History; Monday's takes its place at the top.
   const approved = { ...nw, completedAt: "2026-10-31T10:00:00Z" };
   assert.deepEqual(teacherTaskList([short, long, approved, task(MON, "new", pages(158, 158))]).map((t) => [t.activity, t.taskDate]), [["new", MON], ["short", SUN], ["long", SUN]]);
+});
+
+test("class task sheet: each student's next New, Short and Long, A–Z, with the class's day", () => {
+  const ahmed = [
+    task("2026-11-01", "new", pages(10, 10), "2026-11-01T10:00:00Z"), // done: not shown
+    task("2026-11-02", "new", pages(11, 11)),
+    task("2026-11-02", "short", pages(8, 9)),
+    task("2026-11-02", "long", pages(2, 4)),
+  ];
+  const mohamed = [task("2026-11-03", "new", pages(30, 30)), task("2026-11-02", "short", pages(25, 26))];
+  const sheet = classTaskSheet([{ id: "m", name: "Mohamed" }, { id: "a", name: "ahmed" }], (s) => (s.id === "a" ? ahmed : mohamed));
+  assert.equal(sheet.date, "2026-11-02");
+  assert.deepEqual(sheet.rows.map((r) => r.name), ["ahmed", "Mohamed"]);
+  const [a, m] = sheet.rows;
+  assert.deepEqual(a.items.map((i) => i.label), ["Hifz", "Short Muraja'ah", "Long Muraja'ah"]);
+  assert.equal(a.items[0].text, describeAyahs(pages(11, 11)));
+  assert.equal(a.items[0].date, null);
+  assert.equal(m.items[0].date, "2026-11-03"); // a different day keeps its own date
+  assert.equal(m.items[2].text, null); // nothing set
 });

@@ -1612,6 +1612,25 @@ export default function App() {
     }
   };
 
+  // A teacher approving a Hifz task or marking a mistake means the student is
+  // in class: mark them present today, if they have a class today and today's
+  // attendance isn't marked yet (an existing Present / Absent / reschedule stays).
+  const markPresentFromHifz = async (studentId) => {
+    const dateStr = maldivesToday();
+    if (!getSessionsForDate(dateStr).some((r) => r.studentId === studentId)) return;
+    try {
+      const { data: row, error } = await supabase.from("attendance_records").select("*").eq("student_id", studentId).eq("record_date", dateStr).maybeSingle();
+      if (error) throw error;
+      if (row?.status) return;
+      const rec = { ...(row ? ATT_FROM_DB(row) : {}), status: "present" };
+      const { error: saveErr } = await supabase.from("attendance_records").upsert(ATT_TO_DB(studentId, dateStr, rec), { onConflict: "student_id,record_date" });
+      if (saveErr) throw saveErr;
+      setAttendanceByDate((prev) => (prev[dateStr] ? { ...prev, [dateStr]: { ...prev[dateStr], [studentId]: rec } } : prev));
+    } catch {
+      // Attendance can still be marked by hand; the Hifz mark itself is saved.
+    }
+  };
+
   // ---- Admin: attendance/records data cleanup (keeps the database from growing forever) ----
   const ATTENDANCE_FIELDS = ["status", "rescheduledTo", "rescheduledStartTime", "rescheduledEndTime"];
   const RECORD_FIELDS = ["note", "recordType", "hifz", "shortMuraja", "longMuraja", "recorded"];
@@ -3479,7 +3498,7 @@ export default function App() {
 
             {section === "hifz" && (
               <Suspense fallback={<LogoLoader label="Loading Hifz…" />}>
-                <TeacherHifz teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "hifz", classes.find((c) => c.id === s.classId)?.program))} />
+                <TeacherHifz teacherId={loggedInTeacherId} onMarked={markPresentFromHifz} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "hifz", classes.find((c) => c.id === s.classId)?.program))} />
               </Suspense>
             )}
 

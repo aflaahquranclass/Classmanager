@@ -152,6 +152,28 @@ export function summarizeHifz({ profile, tasks, mistakes = [], goalYear = null }
   };
 }
 
+// A class's task list to share as an image: for each student (A–Z), the
+// next task not done yet of each of New Hifz, Short and Long Muraja'ah, as
+// "Al-Baqarah 23 – 34". `tasksOf(student)` gives that student's tasks.
+// `date` is the day most of the tasks are for; a task for another day keeps
+// its own `date`.
+export const SHEET_LABELS = { new: "Hifz", short: "Short Muraja'ah", long: "Long Muraja'ah" };
+export function classTaskSheet(students, tasksOf) {
+  const rows = [...students].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })).map((s) => {
+    const open = [...(tasksOf(s) || [])].filter((t) => !t.completedAt).sort(byDateThenMade);
+    const items = ACTIVITIES.map((activity) => {
+      const t = open.find((x) => x.activity === activity);
+      return { activity, label: SHEET_LABELS[activity], text: t ? describeAyahs(range(t)) : null, date: t?.taskDate || null };
+    });
+    return { name: s.name, items };
+  });
+  const counts = new Map();
+  for (const r of rows) for (const i of r.items) if (i.date) counts.set(i.date, (counts.get(i.date) || 0) + 1);
+  const date = [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] || null;
+  for (const r of rows) for (const i of r.items) if (i.date === date) i.date = null;
+  return { date, rows };
+}
+
 // The teacher's task list: the tasks not done yet, always New Hifz, Short then
 // Long Muraja'ah (then by day), so an approved task's next one takes its
 // place and nothing moves around. Done tasks are in History.
