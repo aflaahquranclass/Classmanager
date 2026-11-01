@@ -8,7 +8,7 @@ import { BookOpenCheck, Target, AudioLines, Gauge, Flame, StickyNote, ListChecks
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
 import { addDays } from "../hifz/engine.js";
-import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel } from "./engine.js";
+import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, mistakeCategory, mistakeColors } from "./engine.js";
 import { browserTimezone, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "./service.js";
 
 export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -52,6 +52,7 @@ export const thilawaCss = () => `
   .th-reader-title { text-align: center; font-weight: 700; color: #123B67; font-size: 15px; flex: 1; min-width: 0; }
   .th-reader-title small { display: block; font-weight: 400; color: #567493; font-size: 13px; }
   .th-read-btn { width: 100%; }
+  .th-cat { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; font: 600 15px/1.4 "Noto Naskh Arabic", serif; }
   .th-read-done { background: #1E8A5A !important; box-shadow: 0 8px 18px rgba(30,138,90,0.25) !important; }
   .th-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
   .th-today { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -150,8 +151,8 @@ export function Corrections({ repo, data, refresh }) {
         <ul className="hz-list">
           {list.map((m) => (
             <li key={m.id}>
-              <span className="hz-ar hz-mark" lang="ar">{m.wordText || "—"}</span>
-              <div>Page {m.page} · Ayah {m.verseKey}</div>
+              <span className="hz-ar hz-mark" lang="ar" style={mistakeColors(m.category)}>{m.wordText || "—"}</span>
+              <div>Page {m.page} · Ayah {m.verseKey}{mistakeCategory(m.category) && <span className="th-cat" lang="ar" dir="rtl" aria-label={mistakeCategory(m.category).en} style={mistakeColors(m.category)}>{mistakeCategory(m.category).ar}</span>}</div>
               <button className="hz-tick" disabled={busy} onClick={() => run(() => repo.setMistakeTicked(m.id, true))} aria-label={`Tick off ${m.wordText || "this word"} as fixed`} title="Fixed it"><CheckCircle2 size={22} aria-hidden="true" /></button>
             </li>
           ))}

@@ -6,13 +6,14 @@
 //
 // Optional: `range` ([start, end) in half-line units, see hifz/quran.js)
 // fades the lines outside a portion; `marks` highlights mistakes (open in
-// red; corrected in green when `showCorrected`); `onWordTap(word)` lets the
+// red, or their category's colour; corrected in green when `showCorrected`); `onWordTap(word)` lets the
 // teacher tap words, with `selectedKey` outlining the chosen one.
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Maximize2, X } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
+import { MISTAKE_CATEGORIES } from "./engine.js";
 
 export { buildLines };
 
@@ -148,6 +149,8 @@ export const mushafCss = `
   .mp-tap { cursor: pointer; }
   .mp-tap:hover { background: #FFF1C2; }
   .mp-tap.mp-mistake:hover { background: #F7BCAE; }
+${MISTAKE_CATEGORIES.map((c) => `  .mp-mistake.mp-cat-${c.id} { background: ${c.bg}; color: ${c.fg}; box-shadow: 0 0 0 0.06em ${c.ring}; }
+  .mp-tap.mp-mistake.mp-cat-${c.id}:hover { background: ${c.bg}; filter: brightness(0.94); }`).join("\n")}
   .mp-tap:focus-visible { outline: 2px solid #176FD1; outline-offset: 1px; }
   .mp-selected { outline: 0.08em solid #176FD1; outline-offset: 0.04em; }
   .mp-surah { display: flex; align-items: center; justify-content: center; height: 1.95em; }
@@ -216,9 +219,10 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
   const font = `"${pageFont(page)}", serif`;
   let wordLine = -1;
   const markOf = new Map();
+  const categoryOf = new Map(); // open mistakes' category, for its colour
   for (const m of marks) {
     const key = `${m.verseKey}:${m.position}`;
-    if (!m.correctedAt) markOf.set(key, "open");
+    if (!m.correctedAt) { markOf.set(key, "open"); if (m.category) categoryOf.set(key, m.category); }
     else if (showCorrected && !markOf.has(key)) markOf.set(key, "fixed");
   }
   // A line is inside the portion when any of its half-lines is.
@@ -258,7 +262,7 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
                 style={{ fontFamily: font, fontSize: squeeze.has(wordLine) ? `${squeeze.get(wordLine)}em` : undefined }}>
                 {line.words.map((w, k) => {
                   const mark = markOf.get(w.key);
-                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${selectedKey === w.key ? "mp-selected" : ""}`;
+                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""}`;
                   if (!onWordTap || w.end) return <span key={k} className={cls}>{w.code}</span>;
                   const tap = () => onWordTap({ ...w, page, line: line.line });
                   return (

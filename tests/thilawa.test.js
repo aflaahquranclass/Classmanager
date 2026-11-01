@@ -126,8 +126,13 @@ test("finished reading waits for the teacher; marks show to the student until ti
 
   await teacher.addMistake({ assignmentId: reading.id, page: 582, line: 3, verseKey: "78:2", position: 2, wordText: "ٱلنَّبَإِ" });
   await assert.rejects(student.addMistake({ assignmentId: reading.id, page: 582, verseKey: "78:3", position: 1 }), /Only the teacher/);
+  const [marked] = await teacher.listMistakes();
+  assert.equal(marked.category, null);
+  await teacher.setMistakeCategory(marked.id, "madd");
+  await assert.rejects(student.setMistakeCategory(marked.id, "sukun"), /Only the teacher/);
   await teacher.setAssignmentChecked(reading.id, true);
   d = await loadThilawa(student);
+  assert.equal(d.corrections[0].category, "madd");
   assert.equal(d.toListen.length, 0);
   assert.equal(d.lastChecked.id, reading.id);
   assert.deepEqual(d.corrections.map((m) => m.verseKey), ["78:2"]);

@@ -95,6 +95,28 @@ export function goalCheck(goalDate, pagesLeft, pace, today) {
 }
 
 // Teacher levels are 0–100; these are the words shown with the bar.
+// What kind of mistake a marked word is; the teacher picks one in Listen & mark.
+// Shown in Arabic; `en` is for screen readers. Each has its own highlighter
+// colour (bg / text / ring) in the Mushaf and lists; a word with no category
+// keeps the plain mistake colour, and corrected words are green, so none of
+// these is green or the plain salmon.
+export const MISTAKE_CATEGORIES = [
+  { id: "lahn_jali", ar: "لحن جلي", en: "Lahn jali", bg: "#F5A3AE", fg: "#8A0A1E", ring: "#D9475C" },
+  { id: "sukun", ar: "السكون", en: "Sukun", bg: "#CFE3FB", fg: "#0D4F85", ring: "#7DB0EA" },
+  { id: "noon_sakinah", ar: "النون الساكنة والتنوين", en: "Noon saakinah and tanween", bg: "#E4D7FB", fg: "#5B2A9E", ring: "#B194E8" },
+  { id: "shafawi", ar: "الشفوي", en: "Shafawi", bg: "#FFEDA3", fg: "#7A5300", ring: "#E8C547" },
+  { id: "madd", ar: "المد", en: "Madd", bg: "#C9F0F2", fg: "#0B6470", ring: "#6CCBD3" },
+  { id: "leen", ar: "اللين", en: "Leen", bg: "#FFC58F", fg: "#8A3B00", ring: "#F08A2C" },
+  { id: "raa", ar: "أحكام الراء", en: "Ahkaam ur-raa", bg: "#F7C6E8", fg: "#8E1A64", ring: "#D96BB4" },
+  { id: "itmam_harakah", ar: "إتمام الحركة", en: "Itmaam ul-harakah", bg: "#DCE1E8", fg: "#3A4556", ring: "#9AA6B6" },
+];
+// The highlighter colour of a category as inline styles, or {} for none.
+export function mistakeColors(id) {
+  const c = mistakeCategory(id);
+  return c ? { background: c.bg, color: c.fg, boxShadow: `0 0 0 1px ${c.ring}` } : {};
+}
+export const mistakeCategory = (id) => MISTAKE_CATEGORIES.find((c) => c.id === id) || null;
+
 export const LEVELS = [
   { min: 85, label: "Excellent" },
   { min: 70, label: "Very good" },

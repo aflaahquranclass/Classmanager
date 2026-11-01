@@ -15,6 +15,7 @@
 //   deleteAssignment(id) (teacher)
 //   listMistakes() → rows                               addMistake({ assignmentId, page, line, verseKey, position, wordText }) (teacher)
 //   setMistakeCorrected(id, corrected) (teacher)        deleteMistake(id) (teacher)
+//   setMistakeCategory(id, category) (teacher; an id from MISTAKE_CATEGORIES, or null)
 //   setMistakeTicked(id, ticked) (the student's own tick)
 //   listAssessments() → rows                            addAssessment({ tajweed, fluency, comment }) (teacher)
 //   deleteAssessment(id) (teacher)
@@ -28,7 +29,7 @@ const assignmentFromDb = (r) => ({
 });
 const mistakeFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, assignmentId: r.assignment_id, page: r.page, line: r.word_line, verseKey: r.verse_key, position: r.word_position,
-  wordText: r.word_text || "", note: r.note || "", correctedAt: r.corrected_at, tickedAt: r.student_ticked_at || null, createdAt: r.created_at,
+  wordText: r.word_text || "", category: r.category || null, note: r.note || "", correctedAt: r.corrected_at, tickedAt: r.student_ticked_at || null, createdAt: r.created_at,
 });
 const assessmentFromDb = (r) => ({ id: r.id, teacherId: r.teacher_id, tajweed: r.tajweed, fluency: r.fluency, comment: r.comment || "", assessedOn: r.assessed_on, createdAt: r.created_at });
 const noteFromDb = (r) => ({ id: r.id, teacherId: r.teacher_id, body: r.body, visibleToStudent: r.visible_to_student, createdAt: r.created_at, updatedAt: r.updated_at });
@@ -97,6 +98,9 @@ export function createSupabaseThilawaRepo(supabase, studentId, teacherId = null)
     },
     async setMistakeCorrected(id, corrected) {
       check(await supabase.from("thilawa_mistakes").update({ corrected_at: corrected ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
+    },
+    async setMistakeCategory(id, category) {
+      check(await supabase.from("thilawa_mistakes").update({ category: category || null }).eq("id", id).eq("student_id", studentId));
     },
     async setMistakeTicked(id, ticked) {
       check(await supabase.from("thilawa_mistakes").update({ student_ticked_at: ticked ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
@@ -180,10 +184,11 @@ export function createMemoryThilawaRepo(store, studentId, { asStudent = false, t
     async addMistake(m) {
       teacherOnly();
       if (store.mistakes.some((x) => own(x) && !x.correctedAt && x.assignmentId === m.assignmentId && x.verseKey === m.verseKey && x.position === m.position)) throw new Error("That word is already marked.");
-      add("mistakes", { teacherId, assignmentId: m.assignmentId, page: m.page, line: m.line || null, verseKey: m.verseKey, position: m.position, wordText: m.wordText || "", note: "", correctedAt: null, tickedAt: null });
+      add("mistakes", { teacherId, assignmentId: m.assignmentId, page: m.page, line: m.line || null, verseKey: m.verseKey, position: m.position, wordText: m.wordText || "", category: null, note: "", correctedAt: null, tickedAt: null });
       changed();
     },
     async setMistakeCorrected(id, corrected) { teacherOnly(); find("mistakes", id).correctedAt = corrected ? stamp() : null; changed(); },
+    async setMistakeCategory(id, category) { teacherOnly(); find("mistakes", id).category = category || null; changed(); },
     async setMistakeTicked(id, ticked) { find("mistakes", id).tickedAt = ticked ? stamp() : null; changed(); },
     async deleteMistake(id) { teacherOnly(); remove("mistakes", id); changed(); },
     subscribe(onChange) { store.listeners ??= new Set(); store.listeners.add(onChange); return () => store.listeners.delete(onChange); },
