@@ -5166,7 +5166,8 @@ export default function App() {
                         const liveDays = [...cDays].sort((a, b) => DAY_ORDER.indexOf(a) - DAY_ORDER.indexOf(b));
                         const liveClash = getClassClash(editingClassId, cTeacherId, liveDays, cStartTime, cEndTime);
                         return (
-                        <div className="tp-card" style={{ marginBottom: "18px" }}>
+                        <div className="lc-modal-backdrop" onClick={resetClassForm}>
+                        <div className="lc-modal-sheet" role="dialog" aria-modal="true" aria-label={editingClassId ? "Edit class" : "New class"} onClick={(e) => e.stopPropagation()} style={{ maxWidth: "640px" }}>
                           <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "12px", color: TP.navy }}>
                             {editingClassId ? "Edit class" : "New class"}
                           </div>
@@ -5252,6 +5253,7 @@ export default function App() {
                             <button className="lc-btn lc-btn-primary" onClick={handleSaveClass} disabled={!!liveClash}>{editingClassId ? "Save changes" : "Add class"}</button>
                             <button className="lc-btn" onClick={resetClassForm}>Cancel</button>
                           </div>
+                        </div>
                         </div>
                         );
                       })()}
