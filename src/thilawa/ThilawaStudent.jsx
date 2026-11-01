@@ -10,6 +10,7 @@ import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
 import { addDays } from "../hifz/engine.js";
 import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, mistakeColors } from "./engine.js";
 import { MistakeTag } from "./MistakeCategories.jsx";
+import { LetterChips } from "./LettersPanel.jsx";
 import { browserTimezone, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "./service.js";
 
 export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -146,6 +147,7 @@ export function Corrections({ repo, data, refresh }) {
     <section className="hz-card th-reader-card" aria-label="Corrections from your teacher">
       <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Corrections from your teacher</h2>
       <p className="hz-muted" style={{ marginTop: 0 }}>{a.kind === "lesson" ? "Lesson" : "Reading"} · {describePages(a.fromPage, a.toPage)} · listened {fmtWhen(a.checkedAt)}</p>
+      <LetterChips letters={a.letters} style={{ marginBottom: 12 }} inMushaf={showing} />
       {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
       {list.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No words to correct. MashaAllah!</p> : (
         <ul className="hz-list">
@@ -159,7 +161,7 @@ export function Corrections({ repo, data, refresh }) {
         </ul>
       )}
       <button className="hz-btn hz-btn-outline" style={{ marginTop: 12 }} onClick={() => setShowing((v) => !v)}><BookOpen size={16} aria-hidden="true" />{showing ? "Hide the Mushaf" : "Show in the Mushaf"}</button>
-      {showing && <div style={{ marginTop: 12 }}><Reader from={a.fromPage} to={a.toPage} page={at} onPage={setPage} marks={marks} /></div>}
+      {showing && <div style={{ marginTop: 12 }}><Reader from={a.fromPage} to={a.toPage} page={at} onPage={setPage} marks={marks} letters={a.letters} /></div>}
     </section>
   );
 }
@@ -274,7 +276,7 @@ export function ThilawaTracker({ repo, data, refresh, onGo }) {
 
 // Shows the Madinah Mushaf one page at a time between `from` and `to`.
 // With onTick/onUntick each page can be ticked as read today.
-function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [] }) {
+function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [], letters = [] }) {
   const read = readToday?.has(page);
   // Like a printed Mushaf: the next page is to the left.
   const next = () => { if (page < to) onPage(page + 1); };
@@ -288,7 +290,7 @@ function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, foo
         <div className="th-reader-title">{pageLabel(page)}{to > from && <small>Page {page - from + 1} of {to - from + 1}</small>}</div>
         <button className="hz-btn hz-btn-outline" disabled={page <= from} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
-      <div {...swipe}><MushafPage page={page} marks={marks} /></div>
+      <div {...swipe}><MushafPage page={page} marks={marks} letters={letters} /></div>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
         : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => onTick(page)}><Circle size={18} aria-hidden="true" />I've read this page</button>)}
@@ -336,9 +338,10 @@ export function AssignedReading({ repo, data, refresh }) {
             <button className="hz-btn hz-btn-ghost" onClick={() => setOpen(null)}><ChevronLeft size={18} aria-hidden="true" />All readings</button>
           </div>
           {a.instructions && <div className="th-instr" style={{ marginBottom: 12 }}>{a.instructions}</div>}
+          <LetterChips letters={a.letters} style={{ marginBottom: 12 }} inMushaf />
           {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
           {a.checkedAt && <div className="hz-muted" style={{ marginBottom: 10 }}><Highlighter size={14} aria-hidden="true" /> {listenedLabel(a)}. Marked words are highlighted.</div>}
-          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage} marks={marksOf(a)}
+          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage} marks={marksOf(a)} letters={a.letters}
             footer={lesson ? null : a.completedAt
               ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />Done · tap to undo</button>
               : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />I've finished this reading</button>} />
@@ -366,6 +369,7 @@ export function AssignedReading({ repo, data, refresh }) {
                   <div className="th-item-body">
                     <span className="th-item-title">{describePages(a.fromPage, a.toPage)}</span>
                     {a.instructions && <div className="th-instr">{a.instructions}</div>}
+                    <LetterChips letters={a.letters} />
                     <div className="th-meta">
                       <span>{a.toPage - a.fromPage + 1} page{a.toPage === a.fromPage ? "" : "s"}</span>
                       {a.dueDate && <span className={late ? "th-due-late" : undefined}><CalendarDays size={13} aria-hidden="true" /> {late ? "Was due" : "Due"} {fmtDate(a.dueDate)}</span>}
@@ -391,6 +395,8 @@ export function AssignedReading({ repo, data, refresh }) {
               <article key={l.id} className="th-item">
                 <div className="th-item-body">
                   <span className="th-item-title">{describePages(l.fromPage, l.toPage)}</span>
+                  {l.instructions && <div className="th-instr">{l.instructions}</div>}
+                  <LetterChips letters={l.letters} />
                   <div className="th-meta">
                     <span><CalendarDays size={13} aria-hidden="true" /> {fmtWhen(l.createdAt)}</span>
                     {l.checkedAt

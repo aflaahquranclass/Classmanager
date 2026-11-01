@@ -2,6 +2,8 @@
 // and Hifz (marking a task). A word starts as a plain mistake (خطأ); picking a
 // category is optional and gives it that category's highlighter colour.
 
+import { useRef, useState, useLayoutEffect, useEffect } from "react";
+import { Check, X } from "lucide-react";
 import { MISTAKE_CATEGORIES, mistakeCategory, mistakeColors } from "./engine.js";
 
 // The plain mistake: no category, the usual "to correct" colour.
@@ -16,10 +18,21 @@ const CSS = `
   .mc-cat i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-inline-end: 7px; vertical-align: -1px; }
   .mc-cat[aria-pressed="true"] i { display: none; }
   .mc-legend { font-family: "Noto Naskh Arabic", serif; font-size: 13px; }
+  .mc-pop { position: fixed; z-index: 40; width: min(380px, calc(100vw - 16px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
+    background: #123B67; color: #FFFFFF; border-radius: 14px; padding: 12px; box-shadow: 0 16px 40px rgba(13,40,70,0.4); font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  .mc-pop-docked { left: 50%; bottom: 16px; transform: translateX(-50%); }
+  .mc-pop-head { display: flex; align-items: center; gap: 10px; }
+  .mc-pop-head b { color: #FFD9CF; font: 400 28px/1.2 "Noto Naskh Arabic", "Geeza Pro", serif; }
+  .mc-pop-head span { flex: 1; min-width: 0; font-size: 13px; opacity: 0.85; }
+  .mc-pop-label { font-size: 12px; font-weight: 600; opacity: 0.8; }
+  .mc-pop-close { flex-shrink: 0; width: 36px; height: 36px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.4); background: transparent; color: #FFFFFF; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .mc-pop-actions { display: flex; gap: 8px; }
+  .mc-pop-actions .hz-btn { flex: 1; min-height: 40px; }
+  .mc-pop .hz-btn-outline { background: transparent; color: #FFFFFF; border-color: rgba(255,255,255,0.5); }
   .mc-tag { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; font: 600 15px/1.4 "Noto Naskh Arabic", serif; }
 `;
 
-// Chips for the dark bar under a selected mistake. `value` is the category id
+// Chips for the dark pop-up on a selected mistake. `value` is the category id
 // (null = plain mistake); tapping the chosen category again goes back to plain.
 export function MistakeCategoryPicker({ value, onChange, disabled }) {
   return (
@@ -33,6 +46,57 @@ export function MistakeCategoryPicker({ value, onChange, disabled }) {
             onClick={() => onChange(on || !c.id ? null : c.id)}><i style={{ background: c.bg }} aria-hidden="true" />{c.ar}</button>
         );
       })}
+    </div>
+  );
+}
+
+// Pop-up next to a marked word: what kind of mistake it is, Corrected or
+// Remove. `anchor` is the word on screen (from MushafPage's onWordTap); it sits
+// below the word, or above it near the bottom of the screen, and follows it as
+// the page scrolls. Without the word on screen it docks at the bottom.
+export function MistakePopup({ anchor, mistake, busy, onCategory, onCorrected, onRemove, onClose }) {
+  const ref = useRef(null);
+  const [pos, setPos] = useState(null);
+  useLayoutEffect(() => {
+    const place = () => {
+      const box = ref.current;
+      if (!box) return;
+      if (!anchor?.isConnected) { setPos(null); return; }
+      const r = anchor.getBoundingClientRect();
+      const gap = 8;
+      let top = r.bottom + gap;
+      if (top + box.offsetHeight > window.innerHeight - gap) top = r.top - gap - box.offsetHeight;
+      top = Math.round(Math.max(gap, Math.min(top, window.innerHeight - box.offsetHeight - gap)));
+      const left = Math.round(Math.max(gap, Math.min(r.left + r.width / 2 - box.offsetWidth / 2, window.innerWidth - box.offsetWidth - gap)));
+      setPos((p) => (p && p.top === top && p.left === left ? p : { top, left }));
+    };
+    place();
+    let frame = 0;
+    const later = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(place); };
+    window.addEventListener("scroll", later, true);
+    window.addEventListener("resize", later);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", later, true); window.removeEventListener("resize", later); };
+  }, [anchor, mistake.id, mistake.category]);
+  // Esc closes the pop-up before anything behind it.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+  return (
+    <div ref={ref} className={`mc-pop ${pos ? "" : "mc-pop-docked"}`} style={pos || undefined} role="dialog" aria-label="Marked word">
+      <style>{CSS}</style>
+      <div className="mc-pop-head">
+        <b lang="ar">{mistake.wordText}</b>
+        <span>Page {mistake.page} · Ayah {mistake.verseKey}</span>
+        <button type="button" className="mc-pop-close" onClick={onClose} aria-label="Close"><X size={16} aria-hidden="true" /></button>
+      </div>
+      <div className="mc-pop-label">Kind of mistake</div>
+      <MistakeCategoryPicker value={mistake.category} disabled={busy} onChange={onCategory} />
+      <div className="mc-pop-actions">
+        <button type="button" className="hz-btn hz-btn-primary" disabled={busy} onClick={onCorrected}><Check size={16} aria-hidden="true" />Corrected</button>
+        <button type="button" className="hz-btn hz-btn-outline" disabled={busy} onClick={onRemove}>Remove</button>
+      </div>
     </div>
   );
 }

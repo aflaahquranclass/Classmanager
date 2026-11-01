@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
+import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, ARABIC_LETTERS, wordHasLetter, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
 import { loadThilawa, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "../src/thilawa/service.js";
 import { createThilawaMemoryStore, createMemoryThilawaRepo } from "../src/thilawa/repos.js";
 
@@ -184,4 +184,29 @@ test("surah search matches names loosely and numbers by prefix", () => {
   assert.ok(searchSurahs("al baqara").some((s) => s.number === 2));
   assert.deepEqual(searchSurahs("11").map((s) => s.number), [11, 110, 111, 112, 113, 114]);
   assert.equal(searchSurahs("").length, 114);
+});
+
+test("the teacher chooses letters to improve; the student sees them but can't change them", async () => {
+  const store = createThilawaMemoryStore();
+  const teacher = createMemoryThilawaRepo(store, "s1", { teacherId: "t1" });
+  const student = createMemoryThilawaRepo(store, "s1", { asStudent: true });
+  const lesson = await teacher.addAssignment({ fromPage: 562, toPage: 562, kind: "lesson" });
+  assert.deepEqual(lesson.letters, []);
+  // Kept in alphabet order, each once, unknown letters dropped.
+  await teacher.setAssignmentLetters(lesson.id, ["ظ", "ض", "ض", "x", "ح"]);
+  assert.deepEqual((await student.listAssignments())[0].letters, ["ح", "ض", "ظ"]);
+  await assert.rejects(() => student.setAssignmentLetters(lesson.id, []));
+  await teacher.setAssignmentLetters(lesson.id, []);
+  assert.deepEqual((await student.listAssignments())[0].letters, []);
+  assert.equal(ARABIC_LETTERS.length, 29);
+});
+
+test("words are found by the letters in them, whatever form the letter takes", () => {
+  const has = (word, ...letters) => wordHasLetter(word, letters);
+  assert.ok(has("ٱلْمُلْكُ", "ك") && has("ٱلْمُلْكُ", "ا") && !has("ٱلْمُلْكُ", "ض"));
+  assert.ok(has("ٱلرَّحْمَٰنِ", "ا")); // the small alif
+  assert.ok(has("يُؤْمِنُونَ", "ء") && has("يُؤْمِنُونَ", "و"));
+  assert.ok(has("ٱلصَّلَوٰةَ", "ت") && has("ٱلصَّلَوٰةَ", "ه")); // taa marbutah
+  assert.ok(has("عَلَىٰ", "ي") && !has("عَلَىٰ", "ب"));
+  assert.ok(!has("ٱلْمُلْكُ"));
 });

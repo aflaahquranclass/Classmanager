@@ -12,6 +12,7 @@
 //   addAssignment({ fromPage, toPage, instructions, dueDate, kind }) → row (teacher;
 //     kind "lesson" = a lesson held today, done when made)
 //   setAssignmentChecked(id, checked) (teacher: finished listening)
+//   setAssignmentLetters(id, letters) (teacher: Arabic letters the student needs to work on)
 //   deleteAssignment(id) (teacher)
 //   listMistakes() → rows                               addMistake({ assignmentId, page, line, verseKey, position, wordText }) (teacher)
 //   setMistakeCorrected(id, corrected) (teacher)        deleteMistake(id) (teacher)
@@ -22,10 +23,13 @@
 //   listNotes() → rows (students only get shared ones)  addNote({ body, visibleToStudent }) (teacher)
 //   updateNote(id, patch) (teacher)                     deleteNote(id) (teacher)
 
+import { sortLetters } from "./engine.js";
+
 const readingFromDb = (r) => ({ id: r.id, readOn: r.read_on, fromPage: r.from_page, toPage: r.to_page, assignmentId: r.assignment_id, createdAt: r.created_at });
 const assignmentFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, fromPage: r.from_page, toPage: r.to_page, instructions: r.instructions || "",
   dueDate: r.due_date, completedAt: r.completed_at, createdAt: r.created_at, kind: r.kind || "reading", checkedAt: r.checked_at || null,
+  letters: r.letters || [],
 });
 const mistakeFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, assignmentId: r.assignment_id, page: r.page, line: r.word_line, verseKey: r.verse_key, position: r.word_position,
@@ -88,6 +92,9 @@ export function createSupabaseThilawaRepo(supabase, studentId, teacherId = null)
     },
     async setAssignmentChecked(id, checked) {
       check(await supabase.from("thilawa_assignments").update({ checked_at: checked ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
+    },
+    async setAssignmentLetters(id, letters) {
+      check(await supabase.from("thilawa_assignments").update({ letters: sortLetters(letters) }).eq("id", id).eq("student_id", studentId));
     },
     listMistakes: () => list("thilawa_mistakes", mistakeFromDb),
     async addMistake(m) {
@@ -175,11 +182,12 @@ export function createMemoryThilawaRepo(store, studentId, { asStudent = false, t
       teacherOnly();
       const lesson = a.kind === "lesson";
       const row = add("assignments", { teacherId, fromPage: a.fromPage, toPage: a.toPage, instructions: a.instructions?.trim() || "", dueDate: a.dueDate || null,
-        kind: lesson ? "lesson" : "reading", completedAt: lesson ? stamp() : null, checkedAt: null });
+        kind: lesson ? "lesson" : "reading", completedAt: lesson ? stamp() : null, checkedAt: null, letters: [] });
       changed();
       return row;
     },
     async setAssignmentChecked(id, checked) { teacherOnly(); find("assignments", id).checkedAt = checked ? stamp() : null; changed(); },
+    async setAssignmentLetters(id, letters) { teacherOnly(); find("assignments", id).letters = sortLetters(letters); changed(); },
     async listMistakes() { return clone(store.mistakes.filter(own)); },
     async addMistake(m) {
       teacherOnly();

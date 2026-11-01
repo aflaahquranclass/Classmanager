@@ -1,14 +1,17 @@
 // Teacher: listen to a Thilawa reading or lesson, full screen. The pages open
-// in the Mushaf; tapping a word the student gets wrong marks it, tapping a
-// marked word selects it (what kind of mistake, Corrected / Remove). Finish saves that the teacher
+// in the Mushaf; tapping a word the student gets wrong marks it and opens a
+// pop-up by it (what kind of mistake, Corrected / Remove); tapping a marked
+// word opens it again. Letters opens the Arabic letters table, to choose the
+// letters the student needs to work on. Finish saves that the teacher
 // listened, and the student is notified with how many words to correct.
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, CheckCircle2, Check, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { describePages, pageLabel } from "./engine.js";
-import { MistakeCategoryPicker, MistakeLegend } from "./MistakeCategories.jsx";
+import { MistakePopup, MistakeLegend } from "./MistakeCategories.jsx";
+import LettersPanel, { LetterChips } from "./LettersPanel.jsx";
 
 const CSS = `
   .lm { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #F4F8FC; color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
@@ -27,11 +30,9 @@ const CSS = `
   .lm-foot { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom));
     background: #FFFFFF; border-top: 1px solid #DCEBF8; box-shadow: 0 -6px 20px rgba(18,59,103,0.08); }
   .lm-foot .hz-btn { min-height: 48px; padding: 0 22px; font-size: 15px; }
-  .lm-bar { position: sticky; bottom: 8px; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #123B67; color: #FFFFFF; border-radius: 14px; padding: 10px 12px; box-shadow: 0 12px 30px rgba(13,40,70,0.35); }
-  .lm-bar .hz-ar { color: #FFD9CF; font-size: 26px; }
-  .lm-bar span { flex: 1; min-width: 120px; font-size: 13px; }
-  .lm-bar .hz-btn { min-height: 40px; }
-  .lm-bar .hz-btn-outline { background: transparent; color: #FFFFFF; border-color: rgba(255,255,255,0.5); }
+  .lm-abc { font: 500 18px/1 "Noto Naskh Arabic", "Geeza Pro", serif; font-style: normal; }
+  .lm-letters { min-height: 38px; padding: 0 12px; font-size: 13px; gap: 6px; }
+  .lm-count { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #176FD1; color: #FFFFFF; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
   @media (max-width: 640px) {
     .lm-inner { padding: 10px 6px 20px; }
     .lm-top .hz-btn span, .lm-nav .hz-btn span { display: none; }
@@ -42,6 +43,8 @@ const CSS = `
 export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose }) {
   const [page, setPage] = useState(a.fromPage);
   const [selectedKey, setSelectedKey] = useState(null);
+  const [anchor, setAnchor] = useState(null); // the selected word on screen
+  const [lettersOpen, setLettersOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lesson = a.kind === "lesson";
@@ -55,8 +58,9 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
     try { await fn(); await refresh(); return true; } catch (e) { setError(e.message); return false; } finally { setBusy(false); }
   };
   // Like a printed Mushaf: the next page is to the left.
-  const next = () => setPage((p) => Math.min(a.toPage, p + 1));
-  const prev = () => setPage((p) => Math.max(a.fromPage, p - 1));
+  const turn = (to) => { setSelectedKey(null); setPage(to); };
+  const next = () => turn(Math.min(a.toPage, page + 1));
+  const prev = () => turn(Math.max(a.fromPage, page - 1));
   const swipe = useMushafSwipe(next, prev);
 
   useEffect(() => {
@@ -69,6 +73,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
 
   const tapWord = (w) => {
     setSelectedKey(w.key);
+    setAnchor(w.el);
     if (busy || open.some((m) => m.verseKey === w.verseKey && m.position === w.position)) return; // a marked word is only selected
     run(() => repo.addMistake({ assignmentId: a.id, page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text }));
   };
@@ -88,14 +93,21 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
       <div className="lm-body">
         <div className="lm-inner">
           <div className="hz-legend">
-            <span>Tap a word the student gets wrong to mark it. Tap a marked word to choose the kind of mistake, Corrected or Remove.</span>
+            <span>Tap a word the student gets wrong to mark it, then choose the kind of mistake in the pop-up. Tap a marked word to open it again.</span>
             <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To correct</span>
             <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
             <MistakeLegend />
           </div>
           {a.instructions && <div className="hz-task-notes">{a.instructions}</div>}
+          <LetterChips letters={a.letters} inMushaf />
           {error && <div className="hz-error" role="alert">{error}</div>}
-          <MushafPresent>
+          {/* The letters table goes inside, so it shows in full screen too. */}
+          <MushafPresent tools={
+            <button type="button" className="hz-btn hz-btn-outline lm-letters" onClick={() => { setSelectedKey(null); setLettersOpen((o) => !o); }} aria-expanded={lettersOpen}
+              aria-label={`Letters to improve${a.letters.length ? ` (${a.letters.length} chosen)` : ""}`}>
+              <i className="lm-abc" lang="ar" aria-hidden="true">أ ب</i>Letters{a.letters.length > 0 && <b className="lm-count" aria-hidden="true">{a.letters.length}</b>}
+            </button>
+          }>
           {a.toPage > a.fromPage ? (
             <div className="lm-nav">
               <button className="hz-btn hz-btn-outline" disabled={page >= a.toPage} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
@@ -103,17 +115,15 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
               <button className="hz-btn hz-btn-outline" disabled={page <= a.fromPage} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
             </div>
           ) : <div className="lm-nav"><div className="lm-nav-title">{pageLabel(page)}</div></div>}
-          <div {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected /></div>
+          <div {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected letters={a.letters} /></div>
           {selected && (
-            <div className="lm-bar" role="region" aria-label="Selected mistake">
-              <b className="hz-ar" lang="ar">{selected.wordText}</b>
-              <span>Page {selected.page} · Ayah {selected.verseKey}</span>
-              <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}><Check size={16} aria-hidden="true" />Corrected</button>
-              <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))}>Remove</button>
-              <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
-              <MistakeCategoryPicker value={selected.category} disabled={busy} onChange={(c) => run(() => repo.setMistakeCategory(selected.id, c))} />
-            </div>
+            <MistakePopup anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
+              onCategory={(c) => run(() => repo.setMistakeCategory(selected.id, c)).then(() => setSelectedKey(null))}
+              onCorrected={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}
+              onRemove={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))} />
           )}
+          {lettersOpen && <LettersPanel value={a.letters} studentName={student.name} busy={busy} onClose={() => setLettersOpen(false)}
+            onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />}
           </MushafPresent>
         </div>
       </div>

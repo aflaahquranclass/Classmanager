@@ -42,7 +42,8 @@ if (DEMO) {
   const t = createMemoryThilawaRepo(thilawaDemoStore, "demo", { teacherId: "demo-teacher" });
   t.addAssessment({ tajweed: 45, fluency: 55, comment: "" });
   t.addAssessment({ tajweed: 60, fluency: 58, comment: "Good improvement on the madd rules." });
-  t.addAssignment({ fromPage: 582, toPage: 583, instructions: "Read Surah An-Naba slowly. Watch the ghunnah on noon and meem.", dueDate: null });
+  t.addAssignment({ fromPage: 582, toPage: 583, instructions: "Read Surah An-Naba slowly. Watch the ghunnah on noon and meem.", dueDate: null })
+    .then((a) => t.setAssignmentLetters(a.id, ["ن", "م"]));
   t.addNote({ body: "Practise reading 2 pages every day before class.", visibleToStudent: true });
   t.addNote({ body: "Private: needs help with qalqalah.", visibleToStudent: false });
   const h = createMemoryHifzRepo(hifzDemoStore, "demo", { teacherId: "demo-teacher" });

@@ -119,6 +119,24 @@ export function goalCheck(goalDate, pagesLeft, pace, today) {
   };
 }
 
+// The Arabic letters, in alphabet order (hamza and alif both), for the teacher
+// to choose the ones a student needs to work on in a reading or lesson.
+export const ARABIC_LETTERS = ["ء", "ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي"];
+// Only known letters, each once, in alphabet order.
+export const sortLetters = (letters) => ARABIC_LETTERS.filter((l) => letters.includes(l));
+
+// The letters in a word's Uthmani text. Harakat and Quranic marks are left
+// out; every alif form (and the small alif) counts as alif; hamza on a seat
+// counts as hamza and its seat; small waw / yaa as waw / yaa; alif maqsurah as
+// yaa; taa marbutah as both taa and haa.
+const LETTER_FORMS = { "ٱ": "ا", "ٰ": "ا", "آ": "اء", "أ": "اء", "إ": "اء", "ؤ": "وء", "ئ": "يء", "ٔ": "ء", "ٕ": "ء", "ى": "ي", "ۥ": "و", "ۦ": "ي", "ة": "ته" };
+export function lettersInWord(text) {
+  const found = new Set();
+  for (const ch of text || "") for (const l of LETTER_FORMS[ch] ?? ch) if (ARABIC_LETTERS.includes(l)) found.add(l);
+  return found;
+}
+export const wordHasLetter = (text, letters) => letters.length > 0 && letters.some((l) => lettersInWord(text).has(l));
+
 // Teacher levels are 0–100; these are the words shown with the bar.
 // What kind of mistake a marked word is; the teacher picks one in Listen & mark.
 // Shown in Arabic; `en` is for screen readers. Each has its own highlighter

@@ -18,7 +18,7 @@ import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
 import ClassBrowser from "../thilawa/ClassBrowser.jsx";
-import { MistakeCategoryPicker, MistakeLegend } from "../thilawa/MistakeCategories.jsx";
+import { MistakePopup, MistakeLegend } from "../thilawa/MistakeCategories.jsx";
 
 const teacherCss = `
   .ht { display: flex; flex-direction: column; gap: 18px; }
@@ -117,11 +117,6 @@ const teacherCss = `
     .ht-hist-actions { margin-left: 36px; }
   }
   .ht-group { margin: 16px 0 8px; font-size: 13px; font-weight: 700; color: #567493; text-transform: uppercase; letter-spacing: 0.04em; }
-  .ht-markbar { position: sticky; bottom: 12px; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #123B67; color: #FFFFFF; border-radius: 14px; padding: 10px 12px; box-shadow: 0 12px 30px rgba(13,40,70,0.35); }
-  .ht-markbar .hz-ar { color: #FFD9CF; font-size: 26px; }
-  .ht-markbar span { flex: 1; min-width: 120px; font-size: 13px; }
-  .ht-markbar .hz-btn { min-height: 40px; }
-  .ht-markbar .hz-btn-outline { background: transparent; color: #FFFFFF; border-color: rgba(255,255,255,0.5); }
 
   /* Listen & mark: the Mushaf full screen, then the next task to confirm. */
   .ht-full { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #F4F8FC; color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
@@ -136,7 +131,6 @@ const teacherCss = `
   .ht-full-foot { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom));
     background: #FFFFFF; border-top: 1px solid #DCEBF8; box-shadow: 0 -6px 20px rgba(18,59,103,0.08); }
   .ht-full-foot .hz-btn { min-height: 48px; padding: 0 22px; font-size: 15px; }
-  .ht-full .ht-markbar { bottom: 8px; }
   .ht-confirm { background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 16px; padding: 16px; }
   .ht-steps { display: flex; gap: 6px; font-size: 12px; font-weight: 600; color: #8FADC0; }
   .ht-steps b { color: #FFFFFF; }
@@ -472,6 +466,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const [editingId, setEditingId] = useState(null);
   const [markingId, setMarkingId] = useState(null); // task open in the Mushaf
   const [selectedKey, setSelectedKey] = useState(null);
+  const [anchor, setAnchor] = useState(null); // the selected word on screen
   const [drafts, setDrafts] = useState({}); // activity → the teacher's confirmed next task
   const [nextOpen, setNextOpen] = useState(null); // task whose next task is being looked at
   const [markStep, setMarkStep] = useState("mark"); // full screen: "mark" the Mushaf, then "next" to confirm
@@ -559,6 +554,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 
   const tapWord = (w) => {
     setSelectedKey(w.key);
+    setAnchor(w.el);
     const open = openMistakes.find((m) => m.verseKey === w.verseKey && m.position === w.position);
     if (open || busy) return; // tapping a marked word selects it; ignore taps while saving
     run(() => repo.addMistake({ page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text, taskId: marking?.id }))
@@ -597,7 +593,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
             {!onNext ? (
               <>
                 <div className="hz-legend">
-                  <span>Tap a word the student gets wrong to highlight it. Tap a highlighted word to choose the kind of mistake (optional), Corrected or Remove.</span>
+                  <span>Tap a word the student gets wrong to highlight it, then choose the kind of mistake in the pop-up (optional). Tap a highlighted word to open it again.</span>
                   <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
                   <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
                   <MistakeLegend />
@@ -605,14 +601,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
                 {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
                 <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected>
                 {selected && (
-                  <div className="ht-markbar" role="region" aria-label="Selected mistake">
-                    <b className="hz-ar" lang="ar">{selected.wordText}</b>
-                    <span>Page {selected.page} · Ayah {selected.verseKey}</span>
-                    <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}><Check size={16} aria-hidden="true" />Corrected</button>
-                    <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))}>Remove</button>
-                    <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
-                    <MistakeCategoryPicker value={selected.category} disabled={busy} onChange={(c) => run(() => repo.setMistakeCategory(selected.id, c))} />
-                  </div>
+                  <MistakePopup anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
+                    onCategory={(c) => run(() => repo.setMistakeCategory(selected.id, c)).then(() => setSelectedKey(null))}
+                    onCorrected={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}
+                    onRemove={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))} />
                 )}
                 </TaskReader>
               </>

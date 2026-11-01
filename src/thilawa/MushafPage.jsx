@@ -7,13 +7,15 @@
 // Optional: `range` ([start, end) in half-line units, see hifz/quran.js)
 // fades the lines outside a portion; `marks` highlights mistakes (open in
 // red, or their category's colour; corrected in green when `showCorrected`); `onWordTap(word)` lets the
-// teacher tap words, with `selectedKey` outlining the chosen one.
+// teacher tap words, with `selectedKey` outlining the chosen one; `letters`
+// (Arabic letters) shows the words with any of them in blue. A word is one
+// glyph in these fonts, so it's the whole word that turns blue.
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Maximize2, X } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
-import { MISTAKE_CATEGORIES } from "./engine.js";
+import { MISTAKE_CATEGORIES, wordHasLetter } from "./engine.js";
 
 export { buildLines };
 
@@ -39,10 +41,11 @@ export function useMushafSwipe(onNext, onPrev) {
 }
 
 // Full screen for presenting: `children` (the page with its Next / Previous)
-// fill the screen, sized so the whole page fits the screen's height, with an
-// Exit button along the top. Uses the browser's own full screen where there is
-// one (not on iPhone); otherwise it covers the window. Esc exits too.
-export function MushafPresent({ children }) {
+// fill the screen's width, with an Exit button along the top. Uses the
+// browser's own full screen where there is one (not on iPhone); otherwise it
+// covers the window. Esc exits too. `tools`: more buttons beside Full screen /
+// Exit, there in both.
+export function MushafPresent({ children, tools = null }) {
   const ref = useRef(null);
   const [full, setFull] = useState(false);
   const exit = () => {
@@ -80,6 +83,7 @@ export function MushafPresent({ children }) {
     <div ref={ref} className={`mf ${full ? "mf-full" : ""}`} role={full ? "dialog" : undefined} aria-modal={full || undefined} aria-label={full ? "Mushaf, full screen" : undefined}>
       <style>{presentCss}</style>
       <div className="mf-bar">
+        {tools}
         {full
           ? <button type="button" className="hz-btn hz-btn-primary" onClick={exit}><X size={18} aria-hidden="true" />Exit full screen</button>
           : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter}><Maximize2 size={16} aria-hidden="true" />Full screen</button>}
@@ -92,7 +96,7 @@ export function MushafPresent({ children }) {
 // Full screen fills the screen's width (a laptop scrolls down the page); very
 // wide monitors stop at 1600px so the text doesn't grow huge.
 const presentCss = `
-  .mf-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+  .mf-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
   .mf-content { display: flex; flex-direction: column; gap: 12px; }
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
   .mf-full { position: fixed; inset: 0; z-index: 2000; overflow: auto; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box; }
@@ -144,6 +148,7 @@ export const mushafCss = `
   .mp-line-center { justify-content: center; gap: 0.18em; }
   .mp-word { display: inline-block; line-height: 1; font-feature-settings: normal; border-radius: 0.12em; padding: 0.04em 0; }
   .mp-out { opacity: 0.22; }
+  .mp-letter { color: #176FD1; }
   .mp-mistake { background: #FBD5CC; color: #9B1C0A; box-shadow: 0 0 0 0.06em #F2A595; }
   .mp-fixed { background: #DDF5E9; color: #156B45; }
   .mp-tap { cursor: pointer; }
@@ -167,7 +172,7 @@ ${MISTAKE_CATEGORIES.map((c) => `  .mp-mistake.mp-cat-${c.id} { background: ${c.
   .mp-status { text-align: center; color: #7A8496; font-family: Inter, system-ui, sans-serif; font-size: 14px; padding: 40px 0; }
 `;
 
-export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null }) {
+export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [] }) {
   const [state, setState] = useState({ status: "loading", page, lines: [] });
   const [attempt, setAttempt] = useState(0);
   const bodyRef = useRef(null);
@@ -262,12 +267,13 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
                 style={{ fontFamily: font, fontSize: squeeze.has(wordLine) ? `${squeeze.get(wordLine)}em` : undefined }}>
                 {line.words.map((w, k) => {
                   const mark = markOf.get(w.key);
-                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""}`;
+                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""} ${!w.end && wordHasLetter(w.text, letters) ? "mp-letter" : ""}`;
                   if (!onWordTap || w.end) return <span key={k} className={cls}>{w.code}</span>;
-                  const tap = () => onWordTap({ ...w, page, line: line.line });
+                  // el: the word on screen, for a pop-up next to it.
+                  const tap = (e) => onWordTap({ ...w, page, line: line.line, el: e.currentTarget });
                   return (
                     <span key={k} className={`${cls} mp-tap`} role="button" tabIndex={0} aria-label={`${w.text}${mark === "open" ? " (marked mistake)" : ""}`}
-                      onClick={tap} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tap(); } }}>{w.code}</span>
+                      onClick={tap} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tap(e); } }}>{w.code}</span>
                   );
                 })}
               </div>

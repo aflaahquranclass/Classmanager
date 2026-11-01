@@ -15,6 +15,7 @@ import { LevelMeter, thilawaCss, fmtDate } from "./ThilawaStudent.jsx";
 import ClassBrowser from "./ClassBrowser.jsx";
 import ListenScreen from "./ListenScreen.jsx";
 import SurahAyahPicker from "./SurahAyahPicker.jsx";
+import { LetterChips } from "./LettersPanel.jsx";
 
 const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -208,7 +209,8 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
                 return (
                   <li key={a.id}>
                     <div><b>{describePages(a.fromPage, a.toPage)}</b> <span className="hz-badge hz-badge-empty">{a.kind === "lesson" ? "Lesson" : "Reading"}</span>
-                      <small>{a.instructions ? `${a.instructions} · ` : ""}{fmtWhen(a.checkedAt)} · {n ? `${plural(n, "word")} to correct` : "No corrections"}</small></div>
+                      <small>{a.instructions ? `${a.instructions} · ` : ""}{fmtWhen(a.checkedAt)} · {n ? `${plural(n, "word")} to correct` : "No corrections"}</small>
+                      <LetterChips letters={a.letters} style={{ marginTop: 6 }} /></div>
                     <button className="hz-btn hz-btn-outline" onClick={() => setListenId(a.id)}>Open</button>
                   </li>
                 );
@@ -301,6 +303,7 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
                   <span className={`hz-badge ${a.completedAt ? "hz-badge-completed" : "hz-badge-pending"}`}>{a.completedAt ? `Done ${fmtWhen(a.completedAt)}` : "Not done yet"}</span>
                   {a.checkedAt && <> <span className="hz-badge hz-badge-empty"><CheckCircle2 size={12} aria-hidden="true" /> Listened{toCorrect(a) ? ` · ${toCorrect(a)} to correct` : ""}</span></>}
                   {a.instructions && <small>{a.instructions}</small>}
+                  <LetterChips letters={a.letters} style={{ marginTop: 6 }} />
                   <small>Set {fmtWhen(a.createdAt)}{a.dueDate ? ` · due ${fmtDate(a.dueDate)}` : ""}</small>
                 </div>
                 {a.completedAt && <button className="hz-btn hz-btn-outline" onClick={() => setListenId(a.id)}><Highlighter size={15} aria-hidden="true" />{a.checkedAt ? "Open" : "Listen & mark"}</button>}
