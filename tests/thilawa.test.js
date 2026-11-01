@@ -93,7 +93,7 @@ test("student ticks pages and set reading; teacher-only actions are refused", as
   assert.equal((await other.listReading()).length, 0);
 });
 
-test("class name decides the teacher section; other classes follow the admin's choice", async () => {
+test("the class's setting or name decides the teacher section; other classes follow the student's choice", async () => {
   const { inProgramSection, groupByClass } = await import("../src/thilawa/programRules.js");
   const s = (className, programs) => ({ name: "A", className, programs });
   assert.equal(inProgramSection(s("Thilawa Class B12", ["hifz"]), "thilawa"), true);
@@ -102,6 +102,10 @@ test("class name decides the teacher section; other classes follow the admin's c
   assert.equal(inProgramSection(s("Hifz Class B05  (21:30)", ["thilawa"]), "thilawa"), false);
   assert.equal(inProgramSection(s("PC Sausan", ["hifz", "thilawa"]), "thilawa"), true);
   assert.equal(inProgramSection(s("PC Sausan", ["hifz"]), "thilawa"), false);
+  // The admin's setting for the class wins over its name and the students' choice.
+  assert.equal(inProgramSection(s("Hifz Class B05", ["hifz"]), "thilawa", "thilawa"), true);
+  assert.equal(inProgramSection(s("Hifz Class B05", ["hifz"]), "hifz", "thilawa"), false);
+  assert.equal(inProgramSection(s("PC Sausan", ["thilawa"]), "hifz", "hifz"), true);
   const groups = groupByClass([
     { name: "Zaid", className: "Hifz Class B10 (20:15)" }, { name: "Ali", className: "Hifz Class B10 (20:15)" },
     { name: "Musa", className: "Hifz Class B09 (21:30)" }, { name: "Isa", className: "" },

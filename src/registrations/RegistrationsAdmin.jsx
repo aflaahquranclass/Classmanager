@@ -336,6 +336,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
   const [problem, setProblem] = useState("");
 
   const target = mode === "existing" ? classes.find((c) => c.id === classId) : { ...draft, name: draft.name.trim() };
+  const classSet = mode === "existing" ? target?.program || null : null;
   const studentCount = (id) => students.filter((s) => s.classId === id).length;
   // A student already has this ID card number: they can't be added again.
   const duplicate = students.find((s) => s.nic && s.nic.trim().toUpperCase() === (reg.nic || "").trim().toUpperCase());
@@ -389,7 +390,8 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
     // A portal login is made only when the message gives its password.
     const needsLogin = sendWelcome && message.includes("{password}");
     const login = needsLogin ? await supabase.functions.invoke("student-login", { body: { student_id: studentId } }) : null;
-    await supabase.from("students").update({ programs }).eq("id", studentId);
+    // An ongoing class set to Hifz or Thilawa decides the student's portal.
+    await supabase.from("students").update({ programs: classSet ? [classSet] : programs }).eq("id", studentId);
     const { data: row } = await supabase.from("students").select("*").eq("id", studentId).single();
 
     let note = "";
@@ -469,7 +471,11 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
           </div>
         )}
         <label className="rg-fee">Monthly fee (MVR)<input className="lc-input" type="number" min="0" step="any" value={fee} onChange={(e) => setFee(e.target.value)} /></label>
-        <div className="rg-wide" style={{ marginTop: "10px" }}><ProgramPicker value={programs} onChange={setPrograms} /></div>
+        <div className="rg-wide" style={{ marginTop: "10px" }}>
+          {classSet
+            ? <span style={{ fontSize: "12px", color: "#567493" }}>Student portal: <strong>{classSet === "hifz" ? "Hifz" : "Thilawa"}</strong> (set on the class)</span>
+            : <ProgramPicker value={programs} onChange={setPrograms} />}
+        </div>
       </fieldset>
 
       <fieldset className="rg-step">

@@ -3,12 +3,14 @@
 
 export const hasProgram = (student, key) => (student?.programs?.length ? student.programs : ["hifz"]).includes(key);
 
-// A class named for Thilawa or Hifz decides the section on its own: a
+// A class decides the section on its own when the admin set it to Hifz or
+// Thilawa (`setting`, classes.program), or else when it is named for one: a
 // "Thilawa Class" student is only in Thilawa, a "Hifz Class" student only in
-// Hifz. Other classes (e.g. private classes) follow the admin's choice.
-export const classProgram = (className) => (/th?ilaa?wa/i.test(className || "") ? "thilawa" : /hifz|hifdh/i.test(className || "") ? "hifz" : null);
-export const inProgramSection = (student, key) => {
-  const fromClass = classProgram(student?.className);
+// Hifz. Other classes (e.g. private classes) follow each student's choice.
+export const classProgram = (className, setting = null) =>
+  setting || (/th?ilaa?wa/i.test(className || "") ? "thilawa" : /hifz|hifdh/i.test(className || "") ? "hifz" : null);
+export const inProgramSection = (student, key, setting = null) => {
+  const fromClass = classProgram(student?.className, setting);
   return fromClass ? fromClass === key : hasProgram(student, key);
 };
 

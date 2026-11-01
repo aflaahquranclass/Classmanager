@@ -17,7 +17,7 @@ import { AdminReviews, usePendingReviewCount } from "./reviews/ReviewsAdmin.jsx"
 import { AdminRegistrations, usePendingRegistrationCount } from "./registrations/RegistrationsAdmin.jsx";
 import { usePendingInfoCount } from "./registrations/InfoUpdatesAdmin.jsx";
 import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
-import { ProgramPicker, inProgramSection } from "./thilawa/programs.jsx";
+import { ProgramPicker, inProgramSection, classProgram } from "./thilawa/programs.jsx";
 import { hideSplash, LogoLoader } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
@@ -1077,11 +1077,11 @@ export default function App() {
   });
   const CLASS_TO_DB = (c) => ({
     name: c.name, code: c.code || null, teacher_id: c.teacherId || null, days: c.days || [],
-    start_time: c.startTime || null, end_time: c.endTime || null,
+    start_time: c.startTime || null, end_time: c.endTime || null, program: c.program || null,
   });
   const CLASS_FROM_DB = (r) => ({
     id: r.id, name: r.name, code: r.code || "", teacherId: r.teacher_id, days: r.days || [],
-    startTime: r.start_time || "", endTime: r.end_time || "",
+    startTime: r.start_time || "", endTime: r.end_time || "", program: r.program || null,
   });
   const HOLIDAY_TO_DB = (h) => ({ label: h.label, start_date: h.startDate, end_date: h.endDate });
   const HOLIDAY_FROM_DB = (r) => ({ id: r.id, label: r.label, startDate: r.start_date, endDate: r.end_date });
@@ -1233,6 +1233,7 @@ export default function App() {
   const [cDays, setCDays] = useState([]);
   const [cStartTime, setCStartTime] = useState("");
   const [cEndTime, setCEndTime] = useState("");
+  const [cProgram, setCProgram] = useState(""); // "" = automatic (from the name), "hifz" or "thilawa"
   const [classFormError, setClassFormError] = useState("");
 
   // Holiday / term-break form
@@ -1951,7 +1952,8 @@ export default function App() {
       email: sEmail.trim(),
       nic: sNic.trim().toUpperCase(),
       atollIsland: sAtollIsland.trim(),
-      programs: sPrograms,
+      // A class set to Hifz or Thilawa decides the student's portal.
+      programs: cls?.program ? [cls.program] : sPrograms,
     };
     if (editingStudentId) {
       saveStudents(students.map((s) => (s.id === editingStudentId ? { ...s, ...payload } : s)));
@@ -2071,7 +2073,7 @@ export default function App() {
 
   // ---- Classes ----
   const resetClassForm = () => {
-    setCName(""); setCCode(""); setCTeacherId(""); setCDays([]); setCStartTime(""); setCEndTime("");
+    setCName(""); setCCode(""); setCTeacherId(""); setCDays([]); setCStartTime(""); setCEndTime(""); setCProgram("");
     setClassFormError(""); setShowClassForm(false); setEditingClassId(null);
   };
 
@@ -2124,13 +2126,14 @@ export default function App() {
       return;
     }
     setClassFormError("");
-    const payload = { name, code: cCode.trim() || null, teacherId: cTeacherId || null, days, startTime: cStartTime || "", endTime: cEndTime || "" };
+    const payload = { name, code: cCode.trim() || null, teacherId: cTeacherId || null, days, startTime: cStartTime || "", endTime: cEndTime || "", program: cProgram || null };
     if (editingClassId) {
       saveClasses(classes.map((c) => (c.id === editingClassId ? { ...c, ...payload } : c)));
       const schedule = days.length > 0 && cStartTime && cEndTime ? { days, startTime: cStartTime, endTime: cEndTime } : null;
+      // A class set to Hifz or Thilawa gives its students that portal too.
       saveStudents(students.map((s) =>
         s.classId === editingClassId
-          ? { ...s, className: name, teacherId: cTeacherId || null, schedule }
+          ? { ...s, className: name, teacherId: cTeacherId || null, schedule, ...(cProgram ? { programs: [cProgram] } : {}) }
           : s
       ));
       showToast(`Saved changes for ${name}`);
@@ -2144,7 +2147,7 @@ export default function App() {
   const startEditClass = (c) => {
     setEditingClassId(c.id);
     setCName(c.name); setCCode(c.code || ""); setCTeacherId(c.teacherId || "");
-    setCDays(c.days || []); setCStartTime(c.startTime || ""); setCEndTime(c.endTime || "");
+    setCDays(c.days || []); setCStartTime(c.startTime || ""); setCEndTime(c.endTime || ""); setCProgram(c.program || "");
     setClassFormError("");
     setShowClassForm(true);
   };
@@ -3476,13 +3479,13 @@ export default function App() {
 
             {section === "hifz" && (
               <Suspense fallback={<LogoLoader label="Loading Hifz…" />}>
-                <TeacherHifz teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "hifz"))} />
+                <TeacherHifz teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "hifz", classes.find((c) => c.id === s.classId)?.program))} />
               </Suspense>
             )}
 
             {section === "thilawa" && (
               <Suspense fallback={<LogoLoader label="Loading Thilawa…" />}>
-                <TeacherThilawa teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "thilawa"))} />
+                <TeacherThilawa teacherId={loggedInTeacherId} students={students.filter((s) => s.teacherId === loggedInTeacherId && inProgramSection(s, "thilawa", classes.find((c) => c.id === s.classId)?.program))} />
               </Suspense>
             )}
 
@@ -5213,6 +5216,25 @@ export default function App() {
                             </div>
                           </div>
 
+                          <div style={{ marginBottom: "12px" }}>
+                            <label style={{ fontSize: "12px", color: C.a, display: "block", marginBottom: "6px" }}>Hifz or Thilawa</label>
+                            <div role="radiogroup" aria-label="Hifz or Thilawa" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                              {[["", "Automatic"], ["hifz", "Hifz"], ["thilawa", "Thilawa"]].map(([value, label]) => (
+                                <button key={label} type="button" role="radio" aria-checked={cProgram === value}
+                                  className={`lc-subtab ${cProgram === value ? "lc-subtab-active" : ""}`} onClick={() => setCProgram(value)} style={{ font: "inherit" }}>
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                            <div style={{ fontSize: "12px", color: C.a, marginTop: "6px" }}>
+                              {cProgram
+                                ? `Students in this class are in the teacher's ${cProgram === "hifz" ? "Hifz" : "Thilawa"} section and get the ${cProgram === "hifz" ? "Hifz" : "Thilawa"} student portal.`
+                                : classProgram(cName)
+                                  ? `From the class name: ${classProgram(cName) === "hifz" ? "Hifz" : "Thilawa"}.`
+                                  : "The name doesn't say, so each student's own choice (Hifz, Thilawa or both) is used."}
+                            </div>
+                          </div>
+
                           {liveClash && (
                             <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", background: "#FBEDEA", border: "1px solid #E3C3BA", borderRadius: "8px", padding: "10px 12px", marginBottom: "12px" }}>
                               <span style={{ color: C.b, fontSize: "13px" }}>
@@ -5304,6 +5326,7 @@ export default function App() {
                                     <ChevronRight size={18} className={`tp-accordion-chevron ${isOpen ? "tp-accordion-chevron-open" : ""}`} aria-hidden="true" />
                                     {c.code && <span className="tp-code-badge" style={{ background: badge.bg, color: badge.color }}>{c.code}</span>}
                                     <span className="tp-accordion-title">{c.name}</span>
+                                    {classProgram(c.name, c.program) && <span className="tp-count-badge" title={c.program ? "Set by the admin" : "From the class name"}>{classProgram(c.name, c.program) === "hifz" ? "Hifz" : "Thilawa"}</span>}
                                     <span className="tp-count-badge">{classStudents.length} student{classStudents.length === 1 ? "" : "s"}</span>
                                     {(() => {
                                       const notInGroup = classStudents.filter((s) => !s.inGroup).length;
@@ -5505,7 +5528,12 @@ export default function App() {
                                   <input className="lc-input" type="month" value={sJoinedMonth} onChange={(e) => setSJoinedMonth(e.target.value)} />
                                 </div>
                                 <div style={{ gridColumn: "1 / -1" }}>
-                                  <ProgramPicker value={sPrograms} onChange={setSPrograms} />
+                                  {(() => {
+                                    const set = classes.find((c) => c.id === sClassId)?.program;
+                                    return set
+                                      ? <div style={{ fontSize: "12px", color: C.a }}>Student portal: <strong>{set === "hifz" ? "Hifz" : "Thilawa"}</strong> (set on the class)</div>
+                                      : <ProgramPicker value={sPrograms} onChange={setSPrograms} />;
+                                  })()}
                                 </div>
                               </div>
                               <div style={{ fontSize: "12px", color: C.a, marginBottom: "12px" }}>
