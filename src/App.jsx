@@ -826,6 +826,9 @@ export default function App() {
   const [students, setStudents] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [paymentsByMonth, setPaymentsByMonth] = useState({});
+  // Students removed after paying, by month: their paid fee still counts in
+  // Finance and salaries for that month (payments keep who they were).
+  const [leftStudentsByMonth, setLeftStudentsByMonth] = useState({});
   const [expensesByMonth, setExpensesByMonth] = useState({});
   const [otherIncomeByMonth, setOtherIncomeByMonth] = useState({});
   const [loading, setLoading] = useState(true);
@@ -1317,10 +1320,21 @@ export default function App() {
       const { data, error } = await supabase.from("payments").select("*").eq("month", key);
       if (error) throw error;
       const map = {};
+      const left = [];
       (data || []).forEach((r) => {
-        map[r.student_id] = { paid: r.paid, amountPaid: r.amount_paid, paidDate: r.paid_date };
+        const rec = { paid: r.paid, amountPaid: r.amount_paid, paidDate: r.paid_date };
+        if (r.student_id) { map[r.student_id] = rec; return; }
+        if (!r.paid) return;
+        const id = `left:${r.id}`;
+        map[id] = rec;
+        left.push({
+          id, left: true, name: r.student_name || "Removed student", studentCode: r.student_code || "",
+          teacherId: r.teacher_id, sharePercent: Number(r.teacher_share_percent) || 0,
+          classId: r.class_id, className: r.class_name, fee: Number(r.fee) || Number(r.amount_paid) || 0,
+        });
       });
       setPaymentsByMonth((prev) => ({ ...prev, [key]: map }));
+      setLeftStudentsByMonth((prev) => ({ ...prev, [key]: left }));
     } catch {
       setPaymentsByMonth((prev) => ({ ...prev, [key]: {} }));
     }
@@ -2065,7 +2079,7 @@ export default function App() {
   const removeStudentWhoLeft = async (s) => {
     if (!(await confirmDialog({
       title: `Remove ${s.name} (${s.studentCode || "no ID"})?`,
-      message: `They will no longer count as an active student and will be removed from Finance, including their payment and attendance records. Their ID stays reserved under "Show removed students".`,
+      message: `They will no longer count as an active student, and their attendance records are deleted. Fees they have already paid stay in Finance and in their teacher's salary. Their ID stays reserved under "Show removed students".`,
       confirmLabel: "Remove student",
     }))) return;
     removeStudent(s.id);
@@ -2179,7 +2193,7 @@ export default function App() {
     const classStudents = students.filter((s) => s.classId === id);
     const n = classStudents.length;
     const message = n > 0
-      ? `Its ${n} student${n === 1 ? "" : "s"} will also be removed from the app and from Finance, including their payment and attendance records. Their IDs stay reserved under "Show removed students".`
+      ? `Its ${n} student${n === 1 ? "" : "s"} will also be removed from the app and from Finance, and their attendance records are deleted. Fees they have already paid stay in Finance and in their teacher's salary. Their IDs stay reserved under "Show removed students".`
       : "";
     if (!(await confirmDialog({ title: `Remove class "${cls ? cls.name : ""}"?`, message, confirmLabel: "Remove class" }))) return;
     saveClasses(classes.filter((c) => c.id !== id));
@@ -2434,16 +2448,21 @@ export default function App() {
     [students, month]
   );
 
+  // Finance totals and salaries also count students who paid this month and
+  // were removed later.
+  const leftStudents = useMemo(() => leftStudentsByMonth[month] || [], [leftStudentsByMonth, month]);
+  const financeStudents = useMemo(() => [...activeStudents, ...leftStudents], [activeStudents, leftStudents]);
+
   const totals = useMemo(() => {
     let expected = 0, received = 0, pending = 0;
-    activeStudents.forEach((s) => {
+    financeStudents.forEach((s) => {
       expected += s.fee;
       const rec = monthData[s.id];
       if (rec && rec.paid) received += rec.amountPaid || 0;
       else pending += s.fee;
     });
     return { expected, received, pending };
-  }, [activeStudents, monthData]);
+  }, [financeStudents, monthData]);
 
   const pendingStudents = activeStudents.filter((s) => !(monthData[s.id] && monthData[s.id].paid));
 
@@ -2467,7 +2486,7 @@ export default function App() {
   const monthlyPerformance = useMemo(() => {
     return dashboardMonthKeys.map((key) => {
       const monthMap = paymentsByMonth[key] || {};
-      const active = students.filter((s) => isEnrolledInMonth(s, key));
+      const active = [...students.filter((s) => isEnrolledInMonth(s, key)), ...(leftStudentsByMonth[key] || [])];
       let expected = 0, received = 0;
       active.forEach((s) => {
         expected += s.fee;
@@ -2476,12 +2495,12 @@ export default function App() {
       });
       return { key, expected, received, pending: Math.max(0, expected - received) };
     });
-  }, [dashboardMonthKeys, paymentsByMonth, students]);
+  }, [dashboardMonthKeys, paymentsByMonth, students, leftStudentsByMonth]);
 
   const salaryByTeacher = useMemo(() => {
     const rows = teachers.map((t) => ({ teacherId: t.id, name: t.name, collected: 0, payout: 0, studentCount: 0, activeCount: 0, expected: 0, estimated: 0 }));
     const byId = Object.fromEntries(rows.map((r) => [r.teacherId, r]));
-    activeStudents.forEach((s) => {
+    financeStudents.forEach((s) => {
       // Estimate: every active student's monthly fee, whether or not it has been paid yet.
       if (s.teacherId && byId[s.teacherId]) {
         const fee = Number(s.fee) || 0;
@@ -2499,7 +2518,7 @@ export default function App() {
       byId[s.teacherId].studentCount += 1;
     });
     return rows;
-  }, [teachers, activeStudents, monthData]);
+  }, [teachers, financeStudents, monthData]);
 
   // Admin's salary adjustments and bonuses for the month (Salaries → Salary sheets).
   const [salaryAdjustments, saveSalaryAdjustment] = useSalaryAdjustments(month, authView === "app" && role === "admin");
@@ -6364,6 +6383,25 @@ export default function App() {
                             </div>
                           );
                         })}
+                        {leftStudents.length > 0 && (
+                          <div className="tp-card" style={{ marginTop: "6px" }}>
+                            <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "4px", color: TP.navy }}>Paid, then removed</div>
+                            <div style={{ fontSize: "12px", color: TP.secondaryText, marginBottom: "10px" }}>These students paid for {monthLabel(month)} and were removed later. Their fees still count in Finance and in their teacher's salary.</div>
+                            <div className="tp-table-wrap"><table className="tp-list-table">
+                              <thead><tr><th>Name</th><th>Class</th><th>Teacher</th><th>Amount</th></tr></thead>
+                              <tbody>
+                                {[...leftStudents].sort((a, b) => a.name.localeCompare(b.name)).map((s) => (
+                                  <tr key={s.id}>
+                                    <td>{s.name}{s.studentCode && <span style={{ color: TP.secondaryText, fontSize: "12px" }}> · {s.studentCode}</span>}</td>
+                                    <td>{(s.classId && classes.find((c) => c.id === s.classId)?.name) || s.className || "—"}</td>
+                                    <td>{s.teacherId ? teacherName(s.teacherId) : "—"}</td>
+                                    <td>{fmtMoney(monthData[s.id]?.amountPaid || 0)}{monthData[s.id]?.paidDate && <div style={{ fontSize: "11px", color: TP.secondaryText, marginTop: "3px" }}>on {monthData[s.id].paidDate}</div>}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table></div>
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -6405,7 +6443,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      <SalarySheets teachers={teachers} students={activeStudents} payments={monthData} classes={classes} month={month} adjustments={salaryAdjustments} onSave={saveSalaryAdjustment} />
+                      <SalarySheets teachers={teachers} students={financeStudents} payments={monthData} classes={classes} month={month} adjustments={salaryAdjustments} onSave={saveSalaryAdjustment} />
 
                       <div className="tp-card">
                         <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "10px", color: TP.navy }}>Profit summary — {monthLabel(month)}</div>
