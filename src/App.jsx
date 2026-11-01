@@ -13,6 +13,7 @@ import { AdminLanguage } from "./LanguageAdmin.jsx";
 import { AdminNotifications } from "./notifications/NotificationsAdmin.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { AdminPaymentSlips, usePendingSlipCount } from "./payments/PaymentSlipsAdmin.jsx";
+import { SalarySheets, useSalaryAdjustments, salaryExtrasTotal } from "./payments/SalarySheets.jsx";
 import { AdminReviews, usePendingReviewCount } from "./reviews/ReviewsAdmin.jsx";
 import { AdminRegistrations, usePendingRegistrationCount } from "./registrations/RegistrationsAdmin.jsx";
 import { usePendingInfoCount } from "./registrations/InfoUpdatesAdmin.jsx";
@@ -2500,9 +2501,12 @@ export default function App() {
     return rows;
   }, [teachers, activeStudents, monthData]);
 
+  // Admin's salary adjustments and bonuses for the month (Salaries → Salary sheets).
+  const [salaryAdjustments, saveSalaryAdjustment] = useSalaryAdjustments(month, authView === "app" && role === "admin");
+  const salaryExtras = salaryExtrasTotal(salaryAdjustments);
   const totalPayouts = useMemo(
-    () => salaryByTeacher.reduce((sum, r) => sum + r.payout, 0),
-    [salaryByTeacher]
+    () => salaryByTeacher.reduce((sum, r) => sum + r.payout, 0) + salaryExtras,
+    [salaryByTeacher, salaryExtras]
   );
   const monthExpenses = expensesByMonth[month] || [];
   const monthOtherIncome = otherIncomeByMonth[month] || [];
@@ -6391,7 +6395,7 @@ export default function App() {
                                 <td style={{ color: TP.navy }}>{fmtMoney(salaryByTeacher.reduce((n, r) => n + r.estimated, 0))}</td>
                                 <td>{salaryByTeacher.reduce((n, r) => n + r.studentCount, 0)}</td>
                                 <td>{fmtMoney(salaryByTeacher.reduce((n, r) => n + r.collected, 0))}</td>
-                                <td>{fmtMoney(totalPayouts)}</td>
+                                <td>{fmtMoney(salaryByTeacher.reduce((n, r) => n + r.payout, 0))}</td>
                               </tr>
                             </tbody>
                           </table></div>
@@ -6401,10 +6405,12 @@ export default function App() {
                         </div>
                       </div>
 
+                      <SalarySheets teachers={teachers} students={activeStudents} payments={monthData} classes={classes} month={month} adjustments={salaryAdjustments} onSave={saveSalaryAdjustment} />
+
                       <div className="tp-card">
                         <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "10px", color: TP.navy }}>Profit summary — {monthLabel(month)}</div>
                         {(() => {
-                          const estPayouts = salaryByTeacher.reduce((sum, r) => sum + r.estimated, 0);
+                          const estPayouts = salaryByTeacher.reduce((sum, r) => sum + r.estimated, 0) + salaryExtras;
                           const estCenterProfit = totals.expected + totalOtherIncomeThisMonth - estPayouts - totalExpensesThisMonth;
                           return (
                             <div className="tp-table-wrap"><table className="tp-list-table">
@@ -6420,7 +6426,7 @@ export default function App() {
                           );
                         })()}
                         <div style={{ fontSize: "12px", color: TP.secondaryText, marginTop: "10px" }}>
-                          "Estimated" assumes every active student pays this month; "Received so far" counts only fees actually paid. Students with no teacher assigned, or a 0% share, are fully retained by the center.
+                          "Estimated" assumes every active student pays this month; "Received so far" counts only fees actually paid. Teacher salaries include the adjustments and bonuses from the salary sheets. Students with no teacher assigned, or a 0% share, are fully retained by the center.
                         </div>
                       </div>
                     </>
