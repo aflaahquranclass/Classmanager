@@ -17,6 +17,7 @@ import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
 import ClassBrowser from "../thilawa/ClassBrowser.jsx";
+import { MistakeCategoryPicker, MistakeLegend } from "../thilawa/MistakeCategories.jsx";
 
 const teacherCss = `
   .ht { display: flex; flex-direction: column; gap: 18px; }
@@ -594,9 +595,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
             {!onNext ? (
               <>
                 <div className="hz-legend">
-                  <span>Tap a word the student gets wrong to highlight it. Tap a highlighted word to clear it.</span>
+                  <span>Tap a word the student gets wrong to highlight it. Tap a highlighted word to choose the kind of mistake (optional), Corrected or Remove.</span>
                   <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
                   <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
+                  <MistakeLegend />
                 </div>
                 {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
                 <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected>
@@ -607,6 +609,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
                     <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}><Check size={16} aria-hidden="true" />Corrected</button>
                     <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))}>Remove</button>
                     <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
+                    <MistakeCategoryPicker value={selected.category} disabled={busy} onChange={(c) => run(() => repo.setMistakeCategory(selected.id, c))} />
                   </div>
                 )}
                 </TaskReader>

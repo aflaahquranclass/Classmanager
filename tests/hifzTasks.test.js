@@ -105,6 +105,12 @@ test("teacher sets and changes tasks and mistakes; the student finishes, the tea
   await assert.rejects(student.addMistake({ page: 581, verseKey: "77:1", position: 1 }));
   await teacher.addMistake({ page: 581, verseKey: "77:1", position: 1, wordText: "x", taskId: t.id });
   await assert.rejects(teacher.addMistake({ page: 581, verseKey: "77:1", position: 1 }));
+  // A plain mistake until the teacher picks a kind; only the teacher can.
+  const [mark] = await teacher.listMistakes();
+  assert.equal(mark.category, null);
+  await teacher.setMistakeCategory(mark.id, "raa");
+  await assert.rejects(student.setMistakeCategory(mark.id, "madd"), /Only the teacher/);
+  assert.equal((await student.listMistakes())[0].category, "raa");
 
   // The student finishing doesn't complete it: it waits for the teacher.
   await assert.rejects(student.setTaskDone(t.id, true), /Only the teacher/);

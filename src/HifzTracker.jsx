@@ -16,6 +16,8 @@ import { ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine,
 import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./thilawa/MushafPage.jsx";
+import { MistakeTag } from "./thilawa/MistakeCategories.jsx";
+import { mistakeColors } from "./thilawa/engine.js";
 
 export const ACTIVITY_INFO = {
   new: { title: ACTIVITY_TITLES.new, Icon: BookOpenText },
@@ -590,8 +592,8 @@ export default function HifzTracker({ repo, onSummary }) {
                 const t = lessonTaskOf(m);
                 return (
                   <li key={m.id}>
-                    <span className="hz-ar hz-mark" lang="ar">{m.wordText || "—"}</span>
-                    <div>{ACTIVITY_INFO[t.activity].title} · Page {m.page} · Ayah {m.verseKey}{m.note && <small>{m.note}</small>}</div>
+                    <span className="hz-ar hz-mark" lang="ar" style={mistakeColors(m.category)}>{m.wordText || "—"}</span>
+                    <div>{ACTIVITY_INFO[t.activity].title} · Page {m.page} · Ayah {m.verseKey}<MistakeTag category={m.category} />{m.note && <small>{m.note}</small>}</div>
                     <button className="hz-tick" disabled={busy} onClick={() => tickMistake(m)} aria-label={`Tick off ${m.wordText || "this mistake"} as fixed`} title="Fixed it"><CheckCircle2 size={22} aria-hidden="true" /></button>
                   </li>
                 );

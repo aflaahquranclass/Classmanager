@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CheckCircle2, Check, X } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
-import { describePages, pageLabel, MISTAKE_CATEGORIES, mistakeColors } from "./engine.js";
+import { describePages, pageLabel } from "./engine.js";
+import { MistakeCategoryPicker, MistakeLegend } from "./MistakeCategories.jsx";
 
 const CSS = `
   .lm { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #F4F8FC; color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
@@ -30,14 +31,6 @@ const CSS = `
   .lm-bar span { flex: 1; min-width: 120px; font-size: 13px; }
   .lm-bar .hz-btn { min-height: 40px; }
   .lm-bar .hz-btn-outline { background: transparent; color: #FFFFFF; border-color: rgba(255,255,255,0.5); }
-  .lm-cats { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px; direction: rtl; }
-  .lm-cat { min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.5); background: transparent; color: #FFFFFF;
-    font: 600 16px/1 "Noto Naskh Arabic", "Geeza Pro", "Arabic Typesetting", serif; cursor: pointer; }
-  .lm-cat:hover { background: rgba(255,255,255,0.12); }
-  .lm-cat i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-inline-end: 7px; vertical-align: -1px; }
-  .lm-cat[aria-pressed="true"] i { display: none; }
-  .lm-legend-ar { font-family: "Noto Naskh Arabic", serif; font-size: 13px; }
-  .lm-cat:disabled { opacity: 0.6; cursor: default; }
   @media (max-width: 640px) {
     .lm-inner { padding: 10px 6px 20px; }
     .lm-top .hz-btn span, .lm-nav .hz-btn span { display: none; }
@@ -97,7 +90,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
             <span>Tap a word the student gets wrong to mark it. Tap a marked word to choose the kind of mistake, Corrected or Remove.</span>
             <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To correct</span>
             <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
-            {MISTAKE_CATEGORIES.map((c) => <span key={c.id} className="lm-legend-ar" lang="ar"><i style={mistakeColors(c.id)} />{c.ar}</span>)}
+            <MistakeLegend />
           </div>
           {a.instructions && <div className="hz-task-notes">{a.instructions}</div>}
           {error && <div className="hz-error" role="alert">{error}</div>}
@@ -117,14 +110,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
               <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}><Check size={16} aria-hidden="true" />Corrected</button>
               <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))}>Remove</button>
               <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
-              {/* What kind of mistake; tapping the chosen one again clears it. */}
-              <div className="lm-cats" role="group" aria-label="Kind of mistake" lang="ar">
-                {MISTAKE_CATEGORIES.map((c) => (
-                  <button key={c.id} type="button" className="lm-cat" aria-pressed={selected.category === c.id} aria-label={c.en} disabled={busy}
-                    style={selected.category === c.id ? { background: c.bg, borderColor: c.bg, color: c.fg } : undefined}
-                    onClick={() => run(() => repo.setMistakeCategory(selected.id, selected.category === c.id ? null : c.id))}><i style={{ background: c.bg }} aria-hidden="true" />{c.ar}</button>
-                ))}
-              </div>
+              <MistakeCategoryPicker value={selected.category} disabled={busy} onChange={(c) => run(() => repo.setMistakeCategory(selected.id, c))} />
             </div>
           )}
           </MushafPresent>
