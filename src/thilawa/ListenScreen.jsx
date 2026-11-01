@@ -19,7 +19,8 @@ const CSS = `
   .lm-title { flex: 1; min-width: 0; font-weight: 700; font-size: 16px; line-height: 1.25; }
   .lm-title small { display: block; font-weight: 400; font-size: 13px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lm-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-  .lm-inner { max-width: 860px; margin: 0 auto; padding: 16px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+  .lm-inner { max-width: 1600px; margin: 0 auto; padding: 16px 24px 24px; display: flex; flex-direction: column; gap: 12px; }
+  .lm .mp-page { max-width: none; }
   .lm-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .lm-nav-title { flex: 1; min-width: 0; text-align: center; font-weight: 700; font-size: 15px; }
   .lm-nav-title small { display: block; font-weight: 400; color: #567493; font-size: 13px; }

@@ -89,14 +89,14 @@ export function MushafPresent({ children }) {
   );
 }
 
-// A page is about 1.7 times as tall as it is wide; the rest of the screen's
-// height goes to the Exit bar and the Next / Previous row.
+// Full screen fills the screen's width (a laptop scrolls down the page); very
+// wide monitors stop at 1600px so the text doesn't grow huge.
 const presentCss = `
   .mf-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
   .mf-content { display: flex; flex-direction: column; gap: 12px; }
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
   .mf-full { position: fixed; inset: 0; z-index: 2000; overflow: auto; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box; }
-  .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: max(320px, calc((100vh - 150px) / 1.7)); max-width: max(320px, calc((100dvh - 150px) / 1.7)); margin-left: auto; margin-right: auto; }
+  .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
   .mf-full .mf-bar { position: sticky; top: 0; z-index: 6; }
   .mf-full .mp-page { max-width: none; }
 `;
