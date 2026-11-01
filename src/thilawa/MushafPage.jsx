@@ -10,6 +10,7 @@
 // teacher tap words, with `selectedKey` outlining the chosen one.
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { Maximize2, X } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 
@@ -35,6 +36,69 @@ export function useMushafSwipe(onNext, onPrev) {
     },
   };
 }
+
+// Full screen for presenting: `children` (the page with its Next / Previous)
+// fill the screen, sized so the whole page fits the screen's height, with an
+// Exit button along the top. Uses the browser's own full screen where there is
+// one (not on iPhone); otherwise it covers the window. Esc exits too.
+export function MushafPresent({ children }) {
+  const ref = useRef(null);
+  const [full, setFull] = useState(false);
+  const exit = () => {
+    setFull(false);
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
+  };
+  const enter = () => {
+    setFull(true);
+    const el = ref.current;
+    const request = el && (el.requestFullscreen || el.webkitRequestFullscreen);
+    try { request?.call(el)?.catch?.(() => {}); } catch { /* it covers the window instead */ }
+  };
+  useEffect(() => {
+    if (!full) return undefined;
+    const el = ref.current;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // Caught first, so Esc leaves full screen without also closing a screen behind it.
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); exit(); } };
+    // Leaving the browser's full screen (its own Esc or gesture) leaves ours too.
+    const onChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) setFull(false); };
+    window.addEventListener("keydown", onKey, true);
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    return () => {
+      document.body.style.overflow = before;
+      window.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+      if (document.fullscreenElement === el) document.exitFullscreen?.().catch(() => {});
+    };
+  }, [full]);
+  return (
+    <div ref={ref} className={`mf ${full ? "mf-full" : ""}`} role={full ? "dialog" : undefined} aria-modal={full || undefined} aria-label={full ? "Mushaf, full screen" : undefined}>
+      <style>{presentCss}</style>
+      <div className="mf-bar">
+        {full
+          ? <button type="button" className="hz-btn hz-btn-primary" onClick={exit}><X size={18} aria-hidden="true" />Exit full screen</button>
+          : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter}><Maximize2 size={16} aria-hidden="true" />Full screen</button>}
+      </div>
+      <div className="mf-content">{children}</div>
+    </div>
+  );
+}
+
+// A page is about 1.7 times as tall as it is wide; the rest of the screen's
+// height goes to the Exit bar and the Next / Previous row.
+const presentCss = `
+  .mf-bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+  .mf-content { display: flex; flex-direction: column; gap: 12px; }
+  .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
+  .mf-full { position: fixed; inset: 0; z-index: 2000; overflow: auto; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box; }
+  .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: max(320px, calc((100vh - 150px) / 1.7)); max-width: max(320px, calc((100dvh - 150px) / 1.7)); margin-left: auto; margin-right: auto; }
+  .mf-full .mf-bar { position: sticky; top: 0; z-index: 6; }
+  .mf-full .mp-page { max-width: none; }
+`;
 
 // The endpoint quran.com's own site uses. (The older /api/v4/verses/by_page
 // files some ayahs that cross a page under the wrong page, e.g. 70:40.)

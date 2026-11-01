@@ -6,7 +6,7 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CheckCircle2, Check, X } from "lucide-react";
-import MushafPage, { useMushafSwipe } from "./MushafPage.jsx";
+import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { describePages, pageLabel } from "./engine.js";
 
 const CSS = `
@@ -92,6 +92,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
           </div>
           {a.instructions && <div className="hz-task-notes">{a.instructions}</div>}
           {error && <div className="hz-error" role="alert">{error}</div>}
+          <MushafPresent>
           {a.toPage > a.fromPage ? (
             <div className="lm-nav">
               <button className="hz-btn hz-btn-outline" disabled={page >= a.toPage} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
@@ -109,6 +110,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
               <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
             </div>
           )}
+          </MushafPresent>
         </div>
       </div>
 

@@ -599,7 +599,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
                   <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
                 </div>
                 {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
-                <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected />
+                <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected>
                 {selected && (
                   <div className="ht-markbar" role="region" aria-label="Selected mistake">
                     <b className="hz-ar" lang="ar">{selected.wordText}</b>
@@ -609,6 +609,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged }) {
                     <button className="hz-btn hz-btn-outline" onClick={() => setSelectedKey(null)} aria-label="Close"><X size={16} aria-hidden="true" /></button>
                   </div>
                 )}
+                </TaskReader>
               </>
             ) : (
               <div className="ht-confirm">

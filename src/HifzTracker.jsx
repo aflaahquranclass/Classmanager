@@ -15,7 +15,7 @@ import { nearestAyahs } from "./hifz/ayahs.js";
 import { ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs } from "./hifz/tasks.js";
 import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
-import MushafPage, { useMushafSwipe } from "./thilawa/MushafPage.jsx";
+import MushafPage, { MushafPresent, useMushafSwipe } from "./thilawa/MushafPage.jsx";
 
 export const ACTIVITY_INFO = {
   new: { title: ACTIVITY_TITLES.new, Icon: BookOpenText },
@@ -317,7 +317,8 @@ export function PortionText({ task }) {
 // Only the task's own pages can be turned to; without a task, only `page`.
 // `page` also picks the page to open on (e.g. where a mistake is).
 // Teacher mode: onWordTap / selectedKey / showCorrected (see MushafPage).
-export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false }) {
+// `children` go under the page and stay with it in full screen.
+export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, children }) {
   const pages = task ? taskPages(task) : [focus ?? 1];
   const first = pages[0];
   const last = pages[pages.length - 1];
@@ -336,7 +337,7 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
     </div>
   );
   return (
-    <div className="hz-reader">
+    <MushafPresent><div className="hz-reader">
       {pages.length > 1 ? (
         <div className="hz-reader-nav">
           <button className="hz-btn hz-btn-outline" disabled={shown >= last} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
@@ -345,7 +346,8 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
         </div>
       ) : <div className="hz-reader-nav">{title}</div>}
       <div {...(pages.length > 1 ? swipe : {})}><MushafPage page={shown} range={task ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} /></div>
-    </div>
+      {children}
+    </div></MushafPresent>
   );
 }
 

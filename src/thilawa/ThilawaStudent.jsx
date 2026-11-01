@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { BookOpenCheck, Target, AudioLines, Gauge, Flame, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Pencil, X, AlertTriangle, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
-import MushafPage, { useMushafSwipe } from "./MushafPage.jsx";
+import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
 import { addDays } from "../hifz/engine.js";
 import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel } from "./engine.js";
@@ -281,7 +281,7 @@ function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, foo
   const swipe = useMushafSwipe(next, prev);
   useEffect(() => { window.scrollTo?.({ top: 0, behavior: "smooth" }); }, [page]);
   return (
-    <div className="th-reader">
+    <MushafPresent><div className="th-reader">
       <div className="th-reader-nav">
         <button className="hz-btn hz-btn-outline" disabled={page >= to} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
         <div className="th-reader-title">{pageLabel(page)}{to > from && <small>Page {page - from + 1} of {to - from + 1}</small>}</div>
@@ -292,7 +292,7 @@ function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, foo
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
         : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => onTick(page)}><Circle size={18} aria-hidden="true" />I've read this page</button>)}
       {footer}
-    </div>
+    </div></MushafPresent>
   );
 }
 
