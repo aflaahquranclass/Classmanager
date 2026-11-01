@@ -8,16 +8,15 @@ import { BookOpenCheck, Trophy, ListChecks, StickyNote, ChevronLeft, Trash2, Eye
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS } from "../HifzTracker.jsx";
-import { SURAHS } from "../hifz/quran.js";
 import { TOTAL_PAGES, describePages, levelLabel } from "./engine.js";
 import { summarizeThilawa, loadThilawa } from "./service.js";
 import { createSupabaseThilawaRepo, selectAll, THILAWA_MAPS } from "./repos.js";
 import { LevelMeter, thilawaCss, fmtDate } from "./ThilawaStudent.jsx";
 import ClassBrowser from "./ClassBrowser.jsx";
 import ListenScreen from "./ListenScreen.jsx";
+import SurahAyahPicker from "./SurahAyahPicker.jsx";
 
 const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-const surahEndPage = (i) => (i + 1 < SURAHS.length ? Math.max(SURAHS[i].startPage, SURAHS[i + 1].startPage - 1) : TOTAL_PAGES);
 
 const teacherCss = () => `
   .tt { display: flex; flex-direction: column; gap: 18px; }
@@ -88,7 +87,10 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
   const [toPage, setToPage] = useState("");
   const [instructions, setInstructions] = useState("");
   const [dueDate, setDueDate] = useState("");
-  const pickSurah = (i) => { setFromPage(String(SURAHS[i].startPage)); setToPage(String(surahEndPage(i))); };
+  // Ayahs picked with the surah picker ("Al-Mulk 1–15"), until the pages are typed over.
+  const [ayahs, setAyahs] = useState(null);
+  const [readingPicker, setReadingPicker] = useState(0); // bumped to clear the picker
+  const pickAyahs = (r) => { setFromPage(String(r.fromPage)); setToPage(String(r.toPage)); setAyahs(r.whole ? null : r.label); };
 
   // Notes form.
   const [note, setNote] = useState("");
@@ -98,7 +100,9 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
   const [listenId, setListenId] = useState(null);
   const [lessonFrom, setLessonFrom] = useState("");
   const [lessonTo, setLessonTo] = useState("");
-  const pickLessonSurah = (i) => { setLessonFrom(String(SURAHS[i].startPage)); setLessonTo(String(surahEndPage(i))); };
+  const [lessonAyahs, setLessonAyahs] = useState(null);
+  const [lessonPicker, setLessonPicker] = useState(0);
+  const pickLessonAyahs = (r) => { setLessonFrom(String(r.fromPage)); setLessonTo(String(r.toPage)); setLessonAyahs(r.whole ? null : r.label); };
 
   if (!data) {
     return <div className="tt">{error ? <div className="hz-error" role="alert">{error.message}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
@@ -113,8 +117,9 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
     const b = Math.round(+(toPage || fromPage));
     if (!(a >= 1 && a <= TOTAL_PAGES && b >= a && b <= TOTAL_PAGES)) { setError({ where: "reading", message: `Pages must be between 1 and ${TOTAL_PAGES}, with the last page not before the first.` }); return; }
     run("reading", async () => {
-      await repo.addAssignment({ fromPage: a, toPage: b, instructions, dueDate });
-      setFromPage(""); setToPage(""); setInstructions(""); setDueDate("");
+      // Part of a surah: the ayahs go first in the instructions, so the student knows where to stop.
+      await repo.addAssignment({ fromPage: a, toPage: b, instructions: [ayahs, instructions.trim()].filter(Boolean).join(" · "), dueDate });
+      setFromPage(""); setToPage(""); setInstructions(""); setDueDate(""); setAyahs(null); setReadingPicker((k) => k + 1);
     });
   };
   const addNote = () => {
@@ -126,8 +131,8 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
     const b = Math.round(+(lessonTo || lessonFrom));
     if (!(a >= 1 && a <= TOTAL_PAGES && b >= a && b <= TOTAL_PAGES)) { setError({ where: "listen", message: `Pages must be between 1 and ${TOTAL_PAGES}, with the last page not before the first.` }); return; }
     run("listen", async () => {
-      const lesson = await repo.addAssignment({ fromPage: a, toPage: b, kind: "lesson" });
-      setLessonFrom(""); setLessonTo("");
+      const lesson = await repo.addAssignment({ fromPage: a, toPage: b, kind: "lesson", instructions: lessonAyahs || "" });
+      setLessonFrom(""); setLessonTo(""); setLessonAyahs(null); setLessonPicker((k) => k + 1);
       setListenId(lesson.id);
     });
   };
@@ -179,20 +184,14 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
         <h3 className="hz-h2" style={{ fontSize: 15, margin: "6px 0 8px" }}><BookOpen size={18} aria-hidden="true" />Today's lesson</h3>
         <p className="hz-muted" style={{ marginTop: 0 }}>Open the Mushaf at the pages you're reading in class today and mark as you listen. {student.name} sees the words to correct.</p>
         <div className="tt-form">
-          <div className="hz-field tt-wide">
-            <label htmlFor="tt-lesson-surah">Whole surah (fills the pages)</label>
-            <select id="tt-lesson-surah" className="hz-select" value="" onChange={(e) => e.target.value !== "" && pickLessonSurah(+e.target.value)}>
-              <option value="">Choose a surah…</option>
-              {SURAHS.map((x, i) => <option key={x.number} value={i}>{x.number}. {x.name} (p. {x.startPage})</option>)}
-            </select>
-          </div>
+          <div className="tt-wide"><SurahAyahPicker key={lessonPicker} id="tt-lesson" onPick={pickLessonAyahs} /></div>
           <div className="hz-field">
             <label htmlFor="tt-lesson-from">From page</label>
-            <input id="tt-lesson-from" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={lessonFrom} onChange={(e) => setLessonFrom(e.target.value)} placeholder="e.g. 582" />
+            <input id="tt-lesson-from" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={lessonFrom} onChange={(e) => { setLessonFrom(e.target.value); setLessonAyahs(null); }} placeholder="e.g. 582" />
           </div>
           <div className="hz-field">
             <label htmlFor="tt-lesson-to">To page</label>
-            <input id="tt-lesson-to" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={lessonTo} onChange={(e) => setLessonTo(e.target.value)} placeholder="Same page" />
+            <input id="tt-lesson-to" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={lessonTo} onChange={(e) => { setLessonTo(e.target.value); setLessonAyahs(null); }} placeholder="Same page" />
           </div>
         </div>
         {errorIn("listen")}
@@ -209,7 +208,7 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
                 return (
                   <li key={a.id}>
                     <div><b>{describePages(a.fromPage, a.toPage)}</b> <span className="hz-badge hz-badge-empty">{a.kind === "lesson" ? "Lesson" : "Reading"}</span>
-                      <small>{fmtWhen(a.checkedAt)} · {n ? `${plural(n, "word")} to correct` : "No corrections"}</small></div>
+                      <small>{a.instructions ? `${a.instructions} · ` : ""}{fmtWhen(a.checkedAt)} · {n ? `${plural(n, "word")} to correct` : "No corrections"}</small></div>
                     <button className="hz-btn hz-btn-outline" onClick={() => setListenId(a.id)}>Open</button>
                   </li>
                 );
@@ -268,20 +267,14 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
         <h2 className="hz-h2"><ListChecks size={22} aria-hidden="true" />Set Reading</h2>
         <p className="hz-muted" style={{ marginTop: 0 }}>The student sees this under Teacher's Reading, reads it and ticks it. You're notified when it's done, to listen and mark.</p>
         <div className="tt-form">
-          <div className="hz-field tt-wide">
-            <label htmlFor="tt-surah">Whole surah (fills the pages)</label>
-            <select id="tt-surah" className="hz-select" value="" onChange={(e) => e.target.value !== "" && pickSurah(+e.target.value)}>
-              <option value="">Choose a surah…</option>
-              {SURAHS.map((s, i) => <option key={s.number} value={i}>{s.number}. {s.name} (p. {s.startPage})</option>)}
-            </select>
-          </div>
+          <div className="tt-wide"><SurahAyahPicker key={readingPicker} id="tt-reading" onPick={pickAyahs} /></div>
           <div className="hz-field">
             <label htmlFor="tt-from">From page</label>
-            <input id="tt-from" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={fromPage} onChange={(e) => setFromPage(e.target.value)} placeholder="e.g. 582" />
+            <input id="tt-from" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={fromPage} onChange={(e) => { setFromPage(e.target.value); setAyahs(null); }} placeholder="e.g. 582" />
           </div>
           <div className="hz-field">
             <label htmlFor="tt-to">To page</label>
-            <input id="tt-to" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={toPage} onChange={(e) => setToPage(e.target.value)} placeholder="Same page" />
+            <input id="tt-to" className="hz-input" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} value={toPage} onChange={(e) => { setToPage(e.target.value); setAyahs(null); }} placeholder="Same page" />
           </div>
           <div className="hz-field tt-wide">
             <label htmlFor="tt-instr">Instructions (optional)</label>
@@ -297,7 +290,7 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
         </div>
         {errorIn("reading")}
         {fromPage && +fromPage >= 1 && +fromPage <= TOTAL_PAGES && (+toPage || +fromPage) >= +fromPage && (+toPage || +fromPage) <= TOTAL_PAGES && (
-          <p className="hz-muted" style={{ marginBottom: 0 }}>{describePages(+fromPage, +(toPage || fromPage))}</p>
+          <p className="hz-muted" style={{ marginBottom: 0 }}>{ayahs ? `${ayahs} · ` : ""}{describePages(+fromPage, +(toPage || fromPage))}</p>
         )}
         {assignments.length > 0 && (
           <ul className="tt-rows" style={{ marginTop: 14 }}>

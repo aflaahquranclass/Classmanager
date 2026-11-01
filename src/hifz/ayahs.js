@@ -42,7 +42,8 @@ export const PAGE_FIRST_AYAH = [
 ];
 
 const TOTAL_AYAHS = 6236;
-const SURAH_FIRST_AYAH = SURAH_AYAH_COUNTS.reduce((acc, n, i) => [...acc, acc[i] + n], [1]);
+// SURAH_FIRST_AYAH[s - 1] = number (1–6236) of surah s's first ayah.
+export const SURAH_FIRST_AYAH = SURAH_AYAH_COUNTS.reduce((acc, n, i) => [...acc, acc[i] + n], [1]);
 const pageFirst = (page) => (page > TOTAL_PAGES ? TOTAL_AYAHS + 1 : PAGE_FIRST_AYAH[page - 1]);
 
 // Estimated ayah number (1–6236, may be fractional) at a unit position. Exact

@@ -4,7 +4,8 @@
 // A reading row is { id, readOn: "YYYY-MM-DD", fromPage, toPage, assignmentId, createdAt }.
 
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, surahsOnPages, juzOfPage } from "../hifz/quran.js";
-import { PAGE_FIRST_AYAH, TOTAL_AYAHS } from "../hifz/ayahs.js";
+import { PAGE_FIRST_AYAH, TOTAL_AYAHS, SURAH_AYAH_COUNTS, SURAH_FIRST_AYAH } from "../hifz/ayahs.js";
+import { AYAH_START_LINE, AYAH_END_LINE } from "../hifz/ayahLines.js";
 import { computeStreak, diffDays, addDays } from "../hifz/engine.js";
 
 export { TOTAL_PAGES };
@@ -50,6 +51,30 @@ export function ayahsOnPages(from, to) {
   const first = PAGE_FIRST_AYAH[from - 1];
   const next = to < TOTAL_PAGES ? PAGE_FIRST_AYAH[to] : TOTAL_AYAHS + 1;
   return { first, last: Math.max(first, next - 1) };
+}
+
+// Pages that ayahs fromAyah..toAyah of a surah are on (ayahs clamped to the
+// surah, toAyah not before fromAyah), with an "Al-Mulk 1–15" label.
+export function ayahPages(surah, fromAyah, toAyah = fromAyah) {
+  const count = SURAH_AYAH_COUNTS[surah - 1];
+  const a = Math.min(Math.max(1, Math.round(fromAyah) || 1), count);
+  const b = Math.min(Math.max(a, Math.round(toAyah) || a), count);
+  const first = SURAH_FIRST_AYAH[surah - 1];
+  const page = (line) => Math.floor(line / 15) + 1;
+  const name = SURAHS[surah - 1].name;
+  const whole = a === 1 && b === count;
+  return { fromAyah: a, toAyah: b, whole, fromPage: page(AYAH_START_LINE[first + a - 2]), toPage: page(AYAH_END_LINE[first + b - 2]), label: whole ? name : `${name} ${a}${a === b ? "" : `–${b}`}` };
+}
+
+// Surahs matching a search: by number prefix, or by name ignoring spaces,
+// hyphens and apostrophes ("Al-Mulk" → "almulk"; "Yaseen" and "Ya-Sin" both → "yasin").
+const searchKey = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/ee/g, "i").replace(/oo/g, "u").replace(/aa/g, "a");
+
+export function searchSurahs(query) {
+  const q = searchKey(query);
+  if (!q) return SURAHS;
+  if (/^\d+$/.test(q)) return SURAHS.filter((s) => String(s.number).startsWith(q));
+  return SURAHS.filter((s) => searchKey(s.name).includes(q));
 }
 
 // "Al-Baqarah · p. 2–5" style description of a page range.

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
+import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
 import { loadThilawa, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "../src/thilawa/service.js";
 import { createThilawaMemoryStore, createMemoryThilawaRepo } from "../src/thilawa/repos.js";
 
@@ -161,4 +161,27 @@ test("a lesson is done when made, isn't set reading, and its marks replace the l
   assert.equal(d.assignments.length, 0);
   assert.equal(d.lessons.length, 2);
   assert.deepEqual(d.corrections.map((m) => m.verseKey), ["2:77"]);
+});
+
+test("ayah ranges map to the pages they're on", () => {
+  assert.deepEqual(ayahPages(1, 1, 7), { fromAyah: 1, toAyah: 7, whole: true, fromPage: 1, toPage: 1, label: "Al-Fatihah" });
+  const mulk = ayahPages(67, 1, 30);
+  assert.equal(mulk.whole, true);
+  assert.equal(mulk.fromPage, 562);
+  assert.equal(mulk.toPage, 564);
+  const part = ayahPages(2, 255, 257);
+  assert.equal(part.label, "Al-Baqarah 255–257");
+  assert.equal(part.fromPage, 42);
+  assert.equal(part.toPage, 43);
+  // Clamped to the surah, and the last ayah is never before the first.
+  assert.deepEqual([ayahPages(112, 3, 99).toAyah, ayahPages(112, 3, 1).toAyah, ayahPages(112, 2).label], [4, 3, "Al-Ikhlas 2"]);
+  assert.equal(ayahPages(114, 1, 6).toPage, 604);
+});
+
+test("surah search matches names loosely and numbers by prefix", () => {
+  assert.deepEqual(searchSurahs("mulk").map((s) => s.number), [67]);
+  assert.deepEqual(searchSurahs("Yaseen").map((s) => s.number), [36]);
+  assert.ok(searchSurahs("al baqara").some((s) => s.number === 2));
+  assert.deepEqual(searchSurahs("11").map((s) => s.number), [11, 110, 111, 112, 113, 114]);
+  assert.equal(searchSurahs("").length, 114);
 });
