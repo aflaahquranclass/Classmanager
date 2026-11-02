@@ -1,5 +1,5 @@
 // Lines of one Madinah Mushaf page from quran.com's qdc /verses/by_page data
-// (mushaf=1, words with code_v2, line_number and page_number). Lines with no
+// (mushaf=1, words with code_v2, line_number, page_number and the text). Lines with no
 // words are surah titles and basmalas, worked out the way the printed Mushaf
 // lays them out:
 //  - before a surah's first line: its title, then its basmala (At-Tawbah has
@@ -10,7 +10,7 @@
 //    basmala when there are two).
 // Pages 1 and 2 use lines 8–15 (they sit lower, in a decorated block).
 //
-// → [{ kind: "words", line, words: [{ code, end, key, verseKey, position, text }] }
+// → [{ kind: "words", line, words: [{ code, end, key, verseKey, position, text, hafs }] }
 //    | { kind: "surah", line, surah } | { kind: "basmala", line } | { kind: "blank", line }]
 export function buildLines(page, verses) {
   const first = page <= 2 ? 8 : 1;
@@ -25,7 +25,7 @@ export function buildLines(page, verses) {
       if (!byLine.has(w.line_number)) byLine.set(w.line_number, []);
       byLine.get(w.line_number).push({
         code: w.code_v2, end: w.char_type_name === "end", key: `${v.verse_key}:${w.position}`,
-        verseKey: v.verse_key, position: w.position, text: w.text_uthmani || "",
+        verseKey: v.verse_key, position: w.position, text: w.text_uthmani || "", hafs: w.text_qpc_hafs || "",
       });
     }
     if (ayah === 1 && words.length) startsAt.set(words[0].line_number, surah);

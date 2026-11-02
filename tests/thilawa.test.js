@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, ARABIC_LETTERS, wordHasLetter, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
+import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, ARABIC_LETTERS, wordHasLetter, letterParts, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
 import { loadThilawa, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "../src/thilawa/service.js";
 import { createThilawaMemoryStore, createMemoryThilawaRepo } from "../src/thilawa/repos.js";
 
@@ -209,4 +209,13 @@ test("words are found by the letters in them, whatever form the letter takes", (
   assert.ok(has("ٱلصَّلَوٰةَ", "ت") && has("ٱلصَّلَوٰةَ", "ه")); // taa marbutah
   assert.ok(has("عَلَىٰ", "ي") && !has("عَلَىٰ", "ب"));
   assert.ok(!has("ٱلْمُلْكُ"));
+});
+
+test("only the chosen letters of a word are picked out, with their harakat", () => {
+  const on = (word, ...letters) => letterParts(word, letters).filter((p) => p.on).map((p) => p.text);
+  assert.deepEqual(on("بَلَوۡنَٰهُمۡ", "ل", "م"), ["لَ", "مۡ"]);
+  assert.deepEqual(on("بَلَوۡنَٰهُمۡ", "ا"), ["ٰ"]); // the small alif alone, not its noon
+  assert.deepEqual(on("ٱلصَّلَوٰةَ", "ت"), ["ةَ"]);
+  assert.equal(letterParts("كَمَا", ["ب"]).map((p) => p.text).join(""), "كَمَا");
+  assert.deepEqual(letterParts("كَمَا", []), [{ text: "كَمَا", on: false }]);
 });

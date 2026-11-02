@@ -84,7 +84,7 @@ export default function LettersPanel({ value, studentName, busy, onChange, onClo
 }
 
 // The chosen letters as a row of chips, for the student and the teacher's lists.
-// inMushaf: the Mushaf below shows their words in blue, so say so.
+// inMushaf: the Mushaf below shows these letters in orange, so say so.
 export function LetterChips({ letters, style, inMushaf = false }) {
   if (!letters?.length) return null;
   return (
@@ -92,7 +92,7 @@ export function LetterChips({ letters, style, inMushaf = false }) {
       <style>{CSS}</style>
       <span>Letters to improve</span>
       {letters.map((l) => <b key={l} lang="ar">{l}</b>)}
-      {inMushaf && <span>· words with them are in blue</span>}
+      {inMushaf && <span>· shown in orange in the Mushaf</span>}
     </div>
   );
 }

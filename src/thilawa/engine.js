@@ -137,6 +137,29 @@ export function lettersInWord(text) {
 }
 export const wordHasLetter = (text, letters) => letters.length > 0 && letters.some((l) => lettersInWord(text).has(l));
 
+// A word's text in runs, `on` where it is one of `letters` (counted the same
+// way as above), for showing just those letters in colour. Harakat go with
+// their letter; a mark that is itself a letter (the small alif) goes on its own.
+// → [{ text, on }]
+export function letterParts(text, letters) {
+  const parts = [];
+  let letterOn = false;
+  for (const ch of text || "") {
+    const forms = [...(LETTER_FORMS[ch] ?? ch)];
+    const mark = /\p{M}/u.test(ch);
+    let on;
+    if (mark && !forms.some((l) => ARABIC_LETTERS.includes(l))) on = letterOn;
+    else {
+      on = forms.some((l) => letters.includes(l));
+      if (!mark) letterOn = on;
+    }
+    const last = parts[parts.length - 1];
+    if (last && last.on === on) last.text += ch;
+    else parts.push({ text: ch, on });
+  }
+  return parts;
+}
+
 // Teacher levels are 0–100; these are the words shown with the bar.
 // What kind of mistake a marked word is; the teacher picks one in Listen & mark.
 // Shown in Arabic; `en` is for screen readers. Each has its own highlighter

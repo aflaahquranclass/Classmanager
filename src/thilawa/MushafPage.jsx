@@ -8,14 +8,16 @@
 // fades the lines outside a portion; `marks` highlights mistakes (open in
 // red, or their category's colour; corrected in green when `showCorrected`); `onWordTap(word)` lets the
 // teacher tap words, with `selectedKey` outlining the chosen one; `letters`
-// (Arabic letters) shows the words with any of them in blue. A word is one
-// glyph in these fonts, so it's the whole word that turns blue.
+// (Arabic letters) shows those letters in orange. A word is one glyph in these
+// fonts, so a word with any of them is drawn from its text in the King Fahd
+// Complex's Uthmanic Hafs font instead, fitted to the printed word's width,
+// with just those letters in orange.
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Maximize2, X } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
-import { MISTAKE_CATEGORIES, wordHasLetter } from "./engine.js";
+import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
 
 export { buildLines };
 
@@ -110,6 +112,8 @@ const presentCss = `
 const API = "https://api.qurancdn.com/api/qdc/verses/by_page";
 const FONT_BASE = "https://verses.quran.foundation/fonts/quran/hafs/v2/woff2";
 const SURAH_NAMES_FONT = "https://verses.quran.foundation/fonts/quran/surah-names/v1/sura_names.woff2";
+// For words with letters to show in colour: real letters, same style (text_qpc_hafs).
+const HAFS_FONT = "https://verses.quran.foundation/fonts/quran/hafs/uthmanic_hafs/UthmanicHafs1Ver18.woff2";
 // Al-Fatihah's first ayah in the page 1 font, without its end marker: the basmala.
 const BASMALA_GLYPHS = "ﱁ ﱂ ﱃ ﱄ";
 // Full lines are 15.3–16.0 em wide in the page fonts (measured across the
@@ -132,7 +136,7 @@ const loadPageFont = (page) => loadFont(pageFont(page), `${FONT_BASE}/p${page}.w
 const dataCache = new Map(); // page → Promise<lines>
 function loadPageLines(page) {
   if (!dataCache.has(page)) {
-    const p = fetch(`${API}/${page}?words=true&per_page=all&mushaf=1&word_fields=code_v2,line_number,text_uthmani,page_number`)
+    const p = fetch(`${API}/${page}?words=true&per_page=all&mushaf=1&word_fields=code_v2,line_number,text_uthmani,text_qpc_hafs,page_number`)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((body) => buildLines(page, body.verses || []));
     p.catch(() => dataCache.delete(page));
@@ -152,7 +156,10 @@ export const mushafCss = `
      68:17), and the next word's highlight would hide those letters. */
   .mp-word::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; }
   .mp-out { opacity: 0.22; }
-  .mp-letter { color: #176FD1; }
+  .mp-letter { color: #E8650A; }
+  .mp-lettered > .mp-glyph { visibility: hidden; }
+  .mp-hafs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: "UthmanicHafs", serif; line-height: 1; white-space: nowrap; pointer-events: none; }
+  .mp-hafs b { font-weight: inherit; color: #E8650A; }
   .mp-mistake { color: #9B1C0A; }
   .mp-mistake::before { background: #FBD5CC; box-shadow: 0 0 0 0.06em #F2A595; animation: mp-mark-plain 340ms ease-out; }
   .mp-fixed { color: #156B45; }
@@ -190,6 +197,8 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
   const [fontSize, setFontSize] = useState(null);
   const [centered, setCentered] = useState(new Set());
   const [squeeze, setSqueeze] = useState(new Map()); // line → font scale, for a line wider than the page
+  const [hafsReady, setHafsReady] = useState(false);
+  const wantHafs = letters.length > 0;
 
   useEffect(() => {
     let live = true;
@@ -201,6 +210,13 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
     if (page < 604) { loadPageLines(page + 1).catch(() => {}); loadPageFont(page + 1).catch(() => {}); }
     return () => { live = false; };
   }, [page, attempt]);
+
+  useEffect(() => {
+    if (!wantHafs) return undefined;
+    let live = true;
+    loadFont("UthmanicHafs", HAFS_FONT).then(() => live && setHafsReady(true)).catch(() => {});
+    return () => { live = false; };
+  }, [wantHafs]);
 
   // Size the text so a full line fills the page's width on any screen.
   useLayoutEffect(() => {
@@ -231,6 +247,17 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
     setCentered((prev) => (prev.size === next.size && [...next].every((x) => prev.has(x)) ? prev : next));
     setSqueeze((prev) => (prev.size === tight.size && [...tight].every(([k, v]) => prev.get(k) === v) ? prev : tight));
   }, [state, fontSize]);
+
+  // A word drawn in the Hafs font is shrunk to the printed word's width where
+  // it is wider (the printed page stacks some letters). All read, then all set.
+  useLayoutEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const words = [...el.querySelectorAll(".mp-lettered")].map((w) => [w.querySelector(".mp-glyph"), w.querySelector(".mp-hafs")]);
+    words.forEach(([, hafs]) => { hafs.style.fontSize = ""; });
+    words.map(([glyph, hafs]) => glyph.getBoundingClientRect().width / hafs.getBoundingClientRect().width)
+      .forEach((fit, i) => { if (fit < 1) words[i][1].style.fontSize = `${Math.floor(fit * 1000) / 1000}em`; });
+  });
 
   const font = `"${pageFont(page)}", serif`;
   let wordLine = -1;
@@ -278,13 +305,19 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
                 style={{ fontFamily: font, fontSize: squeeze.has(wordLine) ? `${squeeze.get(wordLine)}em` : undefined }}>
                 {line.words.map((w, k) => {
                   const mark = markOf.get(w.key);
-                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""} ${!w.end && wordHasLetter(w.text, letters) ? "mp-letter" : ""}`;
-                  if (!onWordTap || w.end) return <span key={k} className={cls}>{w.code}</span>;
+                  // Until the Hafs font is here (or without the text), the whole word is orange.
+                  const lettered = !w.end && wordHasLetter(w.text, letters);
+                  const parts = lettered && hafsReady && w.hafs ? letterParts(w.hafs, letters) : null;
+                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""} ${parts ? "mp-lettered" : lettered ? "mp-letter" : ""}`;
+                  const glyph = parts
+                    ? <><span className="mp-glyph">{w.code}</span><span className="mp-hafs" aria-hidden="true">{parts.map((p, j) => (p.on ? <b key={j}>{p.text}</b> : p.text))}</span></>
+                    : w.code;
+                  if (!onWordTap || w.end) return <span key={k} className={cls}>{glyph}</span>;
                   // el: the word on screen, for a pop-up next to it.
                   const tap = (e) => onWordTap({ ...w, page, line: line.line, el: e.currentTarget });
                   return (
                     <span key={k} className={`${cls} mp-tap`} role="button" tabIndex={0} aria-label={`${w.text}${mark === "open" ? " (marked mistake)" : ""}`}
-                      onClick={tap} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tap(e); } }}>{w.code}</span>
+                      onClick={tap} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tap(e); } }}>{glyph}</span>
                   );
                 })}
               </div>
