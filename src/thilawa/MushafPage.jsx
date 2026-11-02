@@ -144,18 +144,29 @@ function loadPageLines(page) {
 export const mushafCss = `
   .mp-page { background: #FFFFFF; color: #1A1F36; border: 1px solid #E6E9EF; border-radius: 14px; box-shadow: 0 10px 30px rgba(18,59,103,0.07); padding: 4% 4.5% 2.5%; box-sizing: border-box; width: 100%; max-width: 760px; margin: 0 auto; }
   .mp-body { direction: rtl; }
-  .mp-line { display: flex; justify-content: space-between; align-items: center; white-space: nowrap; height: 1.95em; }
+  .mp-line { display: flex; justify-content: space-between; align-items: center; white-space: nowrap; height: 1.95em; isolation: isolate; }
   .mp-line-center { justify-content: center; gap: 0.18em; }
-  .mp-word { display: inline-block; line-height: 1; font-feature-settings: normal; border-radius: 0.12em; padding: 0.04em 0; }
+  .mp-word { position: relative; display: inline-block; line-height: 1; font-feature-settings: normal; border-radius: 0.12em; padding: 0.04em 0; }
+  /* A word's highlight sits underneath every word of its line: some words
+     reach past their own box into the next word's (the meem of بَلَوْنَٰهُمْ,
+     68:17), and the next word's highlight would hide those letters. */
+  .mp-word::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; }
   .mp-out { opacity: 0.22; }
   .mp-letter { color: #176FD1; }
-  .mp-mistake { background: #FBD5CC; color: #9B1C0A; box-shadow: 0 0 0 0.06em #F2A595; }
-  .mp-fixed { background: #DDF5E9; color: #156B45; }
+  .mp-mistake { color: #9B1C0A; }
+  .mp-mistake::before { background: #FBD5CC; box-shadow: 0 0 0 0.06em #F2A595; animation: mp-mark-plain 340ms ease-out; }
+  .mp-fixed { color: #156B45; }
+  .mp-fixed::before { background: #DDF5E9; animation: mp-mark-fixed 340ms ease-out; }
   .mp-tap { cursor: pointer; }
-  .mp-tap:hover { background: #FFF1C2; }
-  .mp-tap.mp-mistake:hover { background: #F7BCAE; }
-${MISTAKE_CATEGORIES.map((c) => `  .mp-mistake.mp-cat-${c.id} { background: ${c.bg}; color: ${c.fg}; box-shadow: 0 0 0 0.06em ${c.ring}; }
-  .mp-tap.mp-mistake.mp-cat-${c.id}:hover { background: ${c.bg}; filter: brightness(0.94); }`).join("\n")}
+  .mp-tap:hover::before { background: #FFF1C2; }
+  .mp-tap.mp-mistake:hover::before { background: #F7BCAE; }
+${MISTAKE_CATEGORIES.map((c) => `  .mp-mistake.mp-cat-${c.id} { color: ${c.fg}; }
+  .mp-mistake.mp-cat-${c.id}::before { background: ${c.bg}; box-shadow: 0 0 0 0.06em ${c.ring}; animation-name: mp-mark-${c.id}; }
+  .mp-tap.mp-mistake.mp-cat-${c.id}:hover::before { background: ${c.bg}; filter: brightness(0.94); }`).join("\n")}
+  /* The highlight pops in when a word is marked or gets its kind of mistake:
+     one name per colour, so changing colour plays it again. */
+${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyframes mp-mark-${n} { from { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.1); } to { transform: none; } }`).join("\n")}
+  @media (prefers-reduced-motion: reduce) { .mp-word::before { animation: none !important; } }
   .mp-tap:focus-visible { outline: 2px solid #176FD1; outline-offset: 1px; }
   .mp-selected { outline: 0.08em solid #176FD1; outline-offset: 0.04em; }
   .mp-surah { display: flex; align-items: center; justify-content: center; height: 1.95em; }

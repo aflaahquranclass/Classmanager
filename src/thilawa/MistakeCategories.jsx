@@ -30,6 +30,15 @@ const CSS = `
   .mc-pop-actions .hz-btn { flex: 1; min-height: 40px; }
   .mc-pop .hz-btn-outline { background: transparent; color: #FFFFFF; border-color: rgba(255,255,255,0.5); }
   .mc-tag { display: inline-block; margin-left: 8px; padding: 2px 10px; border-radius: 999px; font: 600 15px/1.4 "Noto Naskh Arabic", serif; }
+  /* The pop-up grows in, its kinds of mistake follow one after another, and
+     the chosen one bounces. (scale/translate, so the docked pop-up keeps its transform.) */
+  .mc-pop { animation: mc-pop-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both; }
+  .mc-cat { animation: mc-cat-in 260ms ease-out backwards; animation-delay: calc(80ms + var(--i, 0) * 30ms); }
+  .mc-cat[aria-pressed="true"] { animation: mc-cat-pick 360ms cubic-bezier(0.2, 0.9, 0.3, 1.4); }
+  @keyframes mc-pop-in { from { opacity: 0; scale: 0.9; } }
+  @keyframes mc-cat-in { from { opacity: 0; translate: 0 6px; } }
+  @keyframes mc-cat-pick { 0% { scale: 0.85; } 60% { scale: 1.1; } 100% { scale: 1; } }
+  @media (prefers-reduced-motion: reduce) { .mc-pop, .mc-cat { animation: none !important; } }
 `;
 
 // Chips for the dark pop-up on a selected mistake. `value` is the category id
@@ -38,11 +47,11 @@ export function MistakeCategoryPicker({ value, onChange, disabled }) {
   return (
     <div className="mc-cats" role="group" aria-label="Kind of mistake" lang="ar">
       <style>{CSS}</style>
-      {[PLAIN_MISTAKE, ...MISTAKE_CATEGORIES].map((c) => {
+      {[PLAIN_MISTAKE, ...MISTAKE_CATEGORIES].map((c, i) => {
         const on = (value || null) === c.id;
         return (
           <button key={c.id || "plain"} type="button" className="mc-cat" aria-pressed={on} aria-label={c.en} disabled={disabled}
-            style={on ? { background: c.bg, borderColor: c.bg, color: c.fg } : undefined}
+            style={on ? { "--i": i, background: c.bg, borderColor: c.bg, color: c.fg } : { "--i": i }}
             onClick={() => onChange(on || !c.id ? null : c.id)}><i style={{ background: c.bg }} aria-hidden="true" />{c.ar}</button>
         );
       })}

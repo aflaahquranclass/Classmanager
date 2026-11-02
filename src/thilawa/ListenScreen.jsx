@@ -117,7 +117,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
           ) : <div className="lm-nav"><div className="lm-nav-title">{pageLabel(page)}</div></div>}
           <div {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected letters={a.letters} /></div>
           {selected && (
-            <MistakePopup anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
+            <MistakePopup key={selected.id} anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
               onCategory={(c) => run(() => repo.setMistakeCategory(selected.id, c)).then(() => setSelectedKey(null))}
               onCorrected={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}
               onRemove={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))} />
