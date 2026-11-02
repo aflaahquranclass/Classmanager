@@ -6,6 +6,8 @@ import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog } from 
 import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
 import { pageToUnit } from "./hifz/quran.js";
+import { addDays } from "./hifz/engine.js";
+import { useMotivation, motivationTextProps, MOTIVATION_FONT_CSS } from "./MotivationAdmin.jsx";
 import { TOTAL_AYAHS } from "./hifz/ayahs.js";
 import { maldivesToday } from "./dates.js";
 import { hideSplash } from "./splash.jsx";
@@ -26,7 +28,6 @@ const TOTAL_JUZ = 30;
 const PATTERN_MAIN_URL = "/images/tp-pattern-main.png";
 const PATTERN_ON_BLUE_URL = "/images/tp-pattern-sidebar.png";
 
-const MOTIVATION = "dont give up i can do it";
 const HADITH = {
   text: "It will said to the one who had memorised the quran [ and acted upon it ] : Recite the quran .......",
   source: "( HADITH )",
@@ -274,6 +275,20 @@ const NAV = [
   { key: "finance", label: "Finance", Icon: Wallet },
 ];
 
+// This week, Saturday to Friday, for the header: each day done (a streak
+// day), missed, today or still to come.
+const WEEK_DAYS = [["S", "Saturday"], ["S", "Sunday"], ["M", "Monday"], ["T", "Tuesday"], ["W", "Wednesday"], ["T", "Thursday"], ["F", "Friday"]];
+const WEEK_STATE = { done: "done", today: "today", future: "still to come", missed: "missed" };
+function thisWeek(today, calendar) {
+  const active = new Set(calendar.filter((d) => d.active).map((d) => d.date));
+  const start = addDays(today, -((new Date(`${today}T00:00:00Z`).getUTCDay() + 1) % 7));
+  return WEEK_DAYS.map(([letter, name], i) => {
+    const date = addDays(start, i);
+    const state = active.has(date) ? "done" : date === today ? "today" : date > today ? "future" : "missed";
+    return { date, letter, name, state };
+  });
+}
+
 // Remembers which dashboard (Hifz or Thilawa) a student enrolled in both last looked at.
 const DASH_KEY = "aqc_student_dashboard";
 const readDash = () => { try { return localStorage.getItem(DASH_KEY); } catch { return null; } };
@@ -393,6 +408,8 @@ export default function StudentPortal() {
     { label: "Khatam goal", Icon: Target, value: th?.settings ? fmtDate(th.settings.goalDate).replace(/^\d+ /, "") : "—" },
   ];
   const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
+  const week = thisWeek(maldivesToday(), (dash === "thilawa" ? th?.streak.calendar : summary?.streak.calendar) || []);
+  const quotes = useMotivation(ready && !DEMO);
 
   // Signing in uses the shared full-screen sign-in layout.
   if (auth.status === "login") return <StudentLogin error={loginError} onSignIn={signIn} />;
@@ -408,7 +425,7 @@ export default function StudentPortal() {
         .sp-page-pattern { position: absolute; width: 320px; max-width: 70%; height: auto; opacity: 0.18; pointer-events: none; user-select: none; z-index: 0; }
         .sp-page-pattern-top { top: 0; right: 0; }
         .sp-page-pattern-bottom { bottom: 0; left: 0; transform: rotate(180deg); }
-        .sp-blue-pattern { position: absolute; height: auto; opacity: 0.24; pointer-events: none; user-select: none; z-index: 0; }
+        .sp-blue-pattern { position: absolute; height: auto; opacity: 0.1; pointer-events: none; user-select: none; z-index: 0; }
         .sp-header .sp-blue-pattern { right: 0; bottom: 0; width: 340px; transform: scaleX(-1); }
         .sp-header > *:not(.sp-blue-pattern), .sp-stat > *:not(.sp-blue-pattern) { position: relative; z-index: 1; }
         .sp-wrap { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
@@ -433,20 +450,25 @@ export default function StudentPortal() {
         .sp-card { position: relative; background: rgba(255,255,255,0.92); border: 1px solid #DCEBF8; border-radius: 18px; box-shadow: 0 10px 30px rgba(18,59,103,0.08); }
         .sp-grad { background: linear-gradient(120deg, ${TP.gradStart} 0%, ${TP.blue} 55%, ${TP.gradEnd} 100%); color: #FFFFFF; border: none; box-shadow: 0 12px 28px rgba(13,79,133,0.25); }
 
-        .sp-header { display: flex; align-items: center; gap: 18px; padding: 16px; overflow: hidden; }
+        .sp-header { display: flex; flex-direction: column; gap: 16px; padding: 16px 18px 14px; overflow: hidden; }
         .sp-header::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
           background: radial-gradient(ellipse at 85% -20%, rgba(255,255,255,0.22), transparent 55%); }
-        .sp-avatar { flex-shrink: 0; width: clamp(76px, 20vw, 118px); aspect-ratio: 1; border-radius: 18px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+        .sp-header-top { display: flex; align-items: center; gap: 18px; }
+        .sp-avatar { flex-shrink: 0; width: clamp(64px, 17vw, 96px); aspect-ratio: 1; border-radius: 18px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
         .sp-avatar svg { width: 62%; height: 62%; }
         .sp-ident { flex: 1 1 auto; min-width: 0; }
         .sp-name { font-size: clamp(18px, 4.6vw, 28px); font-weight: 700; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; }
         .sp-id { font-size: clamp(14px, 3.4vw, 20px); opacity: 0.9; margin-top: 6px; }
-        .sp-divider { align-self: stretch; width: 1px; margin: 14px 0; background: rgba(255,255,255,0.45); flex-shrink: 0; }
-        .sp-streak-box { flex-shrink: 0; border: 1.5px solid rgba(255,255,255,0.85); border-radius: 12px; padding: 8px 14px; text-align: center; }
-        .sp-streak-box span { display: block; font-size: clamp(13px, 3vw, 17px); }
-        .sp-streak-box strong { display: block; font-size: clamp(22px, 5vw, 30px); line-height: 1.15; }
-        .sp-flame { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: clamp(11px, 2.6vw, 15px); font-weight: 700; letter-spacing: 0.03em; }
-        .sp-flame svg { width: clamp(30px, 7vw, 46px); height: auto; }
+        .sp-streak-box { flex-shrink: 0; display: flex; align-items: center; gap: 8px; border: 2px solid rgba(255,255,255,0.85); border-radius: 14px; padding: 8px 14px; }
+        .sp-streak-box strong { font-size: clamp(22px, 5vw, 30px); line-height: 1.15; }
+        .sp-flame { width: clamp(20px, 4.6vw, 26px); height: auto; color: #F5B942; }
+        .sp-week { display: flex; justify-content: space-between; gap: 6px; margin: 0; padding: 12px 0 0; list-style: none; border-top: 1px solid rgba(255,255,255,0.35); }
+        .sp-day { width: clamp(22px, 5.4vw, 28px); aspect-ratio: 1; border-radius: 50%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: clamp(11px, 2.8vw, 13px); font-weight: 700; }
+        .sp-day-done { background: #FFFFFF; color: ${TP.gradStart}; }
+        .sp-day-today { border: 2px solid #FFFFFF; }
+        .sp-day-missed { border: 1.5px solid rgba(255,255,255,0.4); color: rgba(255,255,255,0.65); }
+        .sp-day-future { border: 1.5px dashed rgba(255,255,255,0.65); }
+        .sp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
         .sp-tracker { padding: 22px 22px 18px; }
         .sp-tracker-head { display: flex; align-items: center; gap: 14px; }
@@ -479,6 +501,7 @@ export default function StudentPortal() {
         .sp-setup-btn { margin-top: 14px; width: 100%; }
         ${HIFZ_CSS}
         ${thilawaCss()}
+        ${MOTIVATION_FONT_CSS}
         .sp-switch { display: flex; gap: 6px; padding: 6px; border-radius: 16px; background: rgba(255,255,255,0.92); border: 1px solid #DCEBF8; box-shadow: 0 6px 18px rgba(18,59,103,0.06); }
         .sp-switch button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: none; border-radius: 12px; background: transparent; color: ${TP.navy}; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
         .sp-switch button[aria-selected="true"] { background: linear-gradient(120deg, ${TP.gradStart}, ${TP.blue}); color: #FFFFFF; box-shadow: 0 6px 14px rgba(13,79,133,0.25); }
@@ -515,7 +538,7 @@ export default function StudentPortal() {
         .sp-header::before, .sp-stat::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 35%; pointer-events: none; z-index: 2;
           background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent); animation: sp-shine 5s ease-in-out 1s infinite; }
         .sp-stat::before { animation-duration: 6s; animation-delay: 1.6s; }
-        .sp-flame svg { animation: sp-flicker 1.8s ease-in-out infinite; transform-origin: 50% 90%; filter: drop-shadow(0 0 6px rgba(255,200,120,0.55)); }
+        .sp-flame { animation: sp-flicker 1.8s ease-in-out infinite; transform-origin: 50% 90%; filter: drop-shadow(0 0 6px rgba(255,200,120,0.55)); }
         .sp-pop { animation: sp-pop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
         .sp-avatar { transition: transform 0.3s ease; }
         .sp-header:hover .sp-avatar { transform: rotate(-4deg) scale(1.04); }
@@ -551,9 +574,9 @@ export default function StudentPortal() {
 
 
         @media (max-width: 520px) {
-          .sp-header { gap: 10px; padding: 12px; }
-          .sp-divider { display: none; }
-          .sp-avatar { width: 72px; }
+          .sp-header { gap: 12px; padding: 12px; }
+          .sp-header-top { gap: 12px; }
+          .sp-avatar { width: 64px; }
         }
         @media (max-width: 420px) {
           .sp-streak-box { padding: 6px 10px; }
@@ -632,20 +655,27 @@ export default function StudentPortal() {
       <main key={view} className="sp-wrap">
         <section className="sp-card sp-grad sp-header" aria-label="Student profile">
           <img src={PATTERN_ON_BLUE_URL} className="sp-blue-pattern" alt="" aria-hidden="true" />
-          <div className="sp-avatar"><StudentAvatarIcon /></div>
-          <div className="sp-ident">
-            <div className="sp-name">{student.name}</div>
-            <div className="sp-id">{student.student_code}</div>
+          <div className="sp-header-top">
+            <div className="sp-avatar"><StudentAvatarIcon /></div>
+            <div className="sp-ident">
+              <div className="sp-name">{student.name}</div>
+              <div className="sp-id">{student.student_code}</div>
+            </div>
+            <div className="sp-streak-box" title="Streak">
+              <Flame className="sp-flame" strokeWidth={2} aria-hidden="true" />
+              <span className="sp-sr">Streak:</span>
+              <strong key={streakNow} className="sp-pop"><CountUp value={streakNow} /></strong>
+              <span className="sp-sr">{streakNow === 1 ? "day" : "days"}</span>
+            </div>
           </div>
-          <div className="sp-divider" aria-hidden="true" />
-          <div className="sp-streak-box">
-            <span>Streak</span>
-            <strong key={streakNow} className="sp-pop"><CountUp value={streakNow} /></strong>
-          </div>
-          <div className="sp-flame" aria-hidden="true">
-            <Flame strokeWidth={1.8} />
-            STREAK
-          </div>
+          <ol className="sp-week" aria-label="This week">
+            {week.map((d) => (
+              <li key={d.date} className={`sp-day sp-day-${d.state}`} title={`${d.name}: ${WEEK_STATE[d.state]}`}>
+                <span aria-hidden="true">{d.letter}</span>
+                <span className="sp-sr">{d.name}: {WEEK_STATE[d.state]}</span>
+              </li>
+            ))}
+          </ol>
         </section>
 
         {view === "hifz" && doesHifz && <HifzTracker repo={repo} />}
@@ -704,7 +734,7 @@ export default function StudentPortal() {
 
         <section className="sp-card sp-motivation" aria-label="My motivation">
           <span className="sp-accent" aria-hidden="true" />
-          <p>{THILAWA_HADITH.short}</p>
+          <p {...motivationTextProps(quotes.thilawa)}>{quotes.thilawa.body}</p>
         </section>
 
         <section className="sp-stats" aria-label="Thilawa summary">
@@ -768,7 +798,7 @@ export default function StudentPortal() {
 
         <section className="sp-card sp-motivation" aria-label="My motivation">
           <span className="sp-accent" aria-hidden="true" />
-          <p>{MOTIVATION}</p>
+          <p {...motivationTextProps(quotes.hifz)}>{quotes.hifz.body}</p>
         </section>
 
         <section className="sp-stats" aria-label="Progress summary">

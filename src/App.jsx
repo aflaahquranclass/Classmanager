@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
-import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus, Bell, Star, BookOpenCheck } from "lucide-react";
+import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus, Bell, Star, BookOpenCheck, Quote } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 import { maldivesMonth, maldivesToday } from "./dates.js";
 import { AdminExamScheduler, TeacherScheduledExams, QuestionCard, Passage, examCss, questionKindLabel } from "./exams/ExamUI.jsx";
@@ -10,6 +10,7 @@ import { dhivehiRemarks } from "./exams/dhivehiRemarks.js";
 import { useRemarkLanguage, RemarkLanguageSwitch, RemarkInput } from "./exams/DhivehiInput.jsx";
 import { REPORT_LANGUAGES, loadReportOverrides, reportTranslator } from "./exams/reportStrings.js";
 import { AdminLanguage } from "./LanguageAdmin.jsx";
+import { AdminMotivation } from "./MotivationAdmin.jsx";
 import { AdminNotifications } from "./notifications/NotificationsAdmin.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { AdminPaymentSlips, usePendingSlipCount } from "./payments/PaymentSlipsAdmin.jsx";
@@ -4849,6 +4850,7 @@ export default function App() {
           { key: "registrations", label: pendingRegistrations + pendingInfo > 0 ? `Registrations (${pendingRegistrations + pendingInfo})` : "Registrations", icon: UserPlus, onClick: () => setSection("registrations") },
           { key: "reviews", label: pendingReviews > 0 ? `Reviews (${pendingReviews})` : "Reviews", icon: Star, onClick: () => setSection("reviews") },
           { key: "language", label: "Language", icon: Languages, onClick: () => setSection("language") },
+          { key: "motivation", label: "Motivation", icon: Quote, onClick: () => setSection("motivation") },
           { key: "data", label: "Data", icon: Trash2, onClick: () => setSection("data") },
         ]}
         portalLabel="Admin Portal"
@@ -6696,6 +6698,7 @@ export default function App() {
 
               {/* ---------------- DATA (attendance & records cleanup) ---------------- */}
               {section === "language" && role === "admin" && <AdminLanguage students={students} showToast={showToast} />}
+              {section === "motivation" && role === "admin" && <AdminMotivation showToast={showToast} />}
 
               {section === "notifications" && role === "admin" && <AdminNotifications key={notificationsTab} students={students} teachers={teachers} classes={classes} showToast={showToast} initialTab={notificationsTab} />}
 
