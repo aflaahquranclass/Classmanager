@@ -6,7 +6,7 @@
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, surahsOnPages, juzOfPage } from "../hifz/quran.js";
 import { PAGE_FIRST_AYAH, TOTAL_AYAHS, SURAH_AYAH_COUNTS, SURAH_FIRST_AYAH } from "../hifz/ayahs.js";
 import { AYAH_START_LINE, AYAH_END_LINE } from "../hifz/ayahLines.js";
-import { computeStreak, diffDays, addDays } from "../hifz/engine.js";
+import { computeStreak, diffDays, addDays, localDate } from "../hifz/engine.js";
 
 export { TOTAL_PAGES };
 
@@ -124,6 +124,15 @@ export function goalCheck(goalDate, pagesLeft, pace, today) {
 export const ARABIC_LETTERS = ["ء", "ا", "ب", "ت", "ث", "ج", "ح", "خ", "د", "ذ", "ر", "ز", "س", "ش", "ص", "ض", "ط", "ظ", "ع", "غ", "ف", "ق", "ك", "ل", "م", "ن", "ه", "و", "ي"];
 // Only known letters, each once, in alphabet order.
 export const sortLetters = (letters) => ARABIC_LETTERS.filter((l) => letters.includes(l));
+
+// A class lesson: the whole class reads the same portion, and each student has
+// their own lesson (with their own marked words) for it. This finds the one a
+// student already has today for the portion, or null. today is "YYYY-MM-DD"
+// in timeZone.
+export function findClassLesson(assignments, { fromPage, toPage, instructions = "" }, today, timeZone) {
+  return assignments.find((a) => a.kind === "lesson" && a.fromPage === fromPage && a.toPage === toPage
+    && (a.instructions || "") === instructions && localDate(new Date(a.createdAt), timeZone) === today) || null;
+}
 
 // The letters in a word's Uthmani text. Harakat and Quranic marks are left
 // out; every alif form (and the small alif) counts as alif; hamza on a seat

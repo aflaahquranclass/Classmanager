@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, ARABIC_LETTERS, wordHasLetter, letterParts, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
+import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, ARABIC_LETTERS, wordHasLetter, letterParts, findClassLesson, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
 import { loadThilawa, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "../src/thilawa/service.js";
 import { createThilawaMemoryStore, createMemoryThilawaRepo } from "../src/thilawa/repos.js";
 
@@ -218,4 +218,20 @@ test("only the chosen letters of a word are picked out, with their harakat", () 
   assert.deepEqual(on("ٱلصَّلَوٰةَ", "ت"), ["ةَ"]);
   assert.equal(letterParts("كَمَا", ["ب"]).map((p) => p.text).join(""), "كَمَا");
   assert.deepEqual(letterParts("كَمَا", []), [{ text: "كَمَا", on: false }]);
+});
+
+test("a class lesson finds the student's own lesson for that portion today", () => {
+  const lesson = (id, fromPage, toPage, instructions, createdAt, kind = "lesson") => ({ id, kind, fromPage, toPage, instructions, createdAt });
+  const rows = [
+    lesson("old", 562, 563, "Al-Qalam 1–33", "2026-11-01T05:00:00Z"),
+    lesson("reading", 562, 563, "Al-Qalam 1–33", "2026-11-02T05:00:00Z", "reading"),
+    lesson("other", 564, 564, "", "2026-11-02T05:10:00Z"),
+    lesson("today", 562, 563, "Al-Qalam 1–33", "2026-11-02T05:20:00Z"),
+  ];
+  const portion = { fromPage: 562, toPage: 563, instructions: "Al-Qalam 1–33" };
+  assert.equal(findClassLesson(rows, portion, "2026-11-02", "Indian/Maldives")?.id, "today");
+  assert.equal(findClassLesson(rows, portion, "2026-11-03", "Indian/Maldives"), null);
+  assert.equal(findClassLesson(rows, { fromPage: 564, toPage: 564 }, "2026-11-02", "Indian/Maldives")?.id, "other");
+  // 23:30 in the Maldives on the 1st is the 1st there, though it's the 2nd in UTC+8.
+  assert.equal(findClassLesson([lesson("late", 1, 1, "", "2026-11-01T18:30:00Z")], { fromPage: 1, toPage: 1 }, "2026-11-01", "Indian/Maldives")?.id, "late");
 });

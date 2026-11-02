@@ -1,7 +1,8 @@
 // Teacher portal: Thilawa. The teacher listens to the reading their students
 // finish (or holds a lesson straight in the Mushaf) and marks the words to
 // correct, sets Tajweed and fluency levels, sets reading for the students to
-// tick off, and keeps notes (shared with the student or kept private).
+// tick off, and keeps notes (shared with the student or kept private). A class
+// lesson opens one portion for the whole class (see ClassLesson.jsx).
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { BookOpenCheck, Trophy, ListChecks, StickyNote, ChevronLeft, Trash2, Eye, EyeOff, Flame, History, Plus, Highlighter, BookOpen, CheckCircle2 } from "lucide-react";
@@ -16,6 +17,8 @@ import ClassBrowser from "./ClassBrowser.jsx";
 import ListenScreen from "./ListenScreen.jsx";
 import SurahAyahPicker from "./SurahAyahPicker.jsx";
 import { LetterChips } from "./LettersPanel.jsx";
+import ClassLesson, { ClassLessonForm } from "./ClassLesson.jsx";
+import { groupByClass } from "./programRules.js";
 
 const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -361,6 +364,8 @@ export function TeacherThilawa({ students, teacherId }) {
   const [query, setQuery] = useState("");
   const [openClass, setOpenClass] = useState(null); // class whose students are shown
   const [overview, setOverview] = useState(null); // studentId → summary
+  const [lessonClass, setLessonClass] = useState(null); // class choosing its portion for a class lesson
+  const [classLesson, setClassLesson] = useState(null); // { students, portion } open in the Mushaf
   const [error, setError] = useState("");
   const ids = useMemo(() => students.map((s) => s.id), [students]);
 
@@ -391,6 +396,7 @@ export function TeacherThilawa({ students, teacherId }) {
 
   const opened = students.find((s) => s.id === openId);
   const repo = useMemo(() => (opened ? createSupabaseThilawaRepo(supabase, opened.id, teacherId) : null), [opened, teacherId]);
+  const lessonStudents = lessonClass ? groupByClass(students).find((c) => c.name === lessonClass)?.students || [] : [];
 
   return (
     <div>
@@ -406,10 +412,17 @@ export function TeacherThilawa({ students, teacherId }) {
             </div>
           </div>
           {error && <div className="hz-error" role="alert">{error}</div>}
+          {lessonClass && openClass === lessonClass && !query && lessonStudents.length > 0 && (
+            <ClassLessonForm key={lessonClass} className={lessonClass} count={lessonStudents.length} onCancel={() => setLessonClass(null)}
+              onOpen={(portion) => setClassLesson({ students: lessonStudents, portion })} />
+          )}
+          {classLesson && <ClassLesson students={classLesson.students} teacherId={teacherId} portion={classLesson.portion}
+            onClose={() => { setClassLesson(null); setLessonClass(null); loadOverview(); }} />}
           {students.length === 0 ? (
             <div className="hz-card hz-muted">None of your students are enrolled in Thilawa yet. The admin chooses Hifz, Thilawa or both when adding a student.</div>
           ) : (
-            <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={setOpenClass} gridClass="tt-grid"
+            <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={(c) => { setOpenClass(c); setLessonClass(null); }} gridClass="tt-grid"
+              classActions={(c) => <button type="button" className="hz-btn hz-btn-primary" onClick={() => setLessonClass(c.name)}><BookOpen size={17} aria-hidden="true" />Class lesson</button>}
               summary={(list) => {
                 const os = list.map((s) => overview?.[s.id]).filter(Boolean);
                 const listen = os.reduce((n, o) => n + o.toListen.length, 0);

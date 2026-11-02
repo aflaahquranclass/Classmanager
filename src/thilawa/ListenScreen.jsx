@@ -4,6 +4,11 @@
 // word opens it again. Letters opens the Arabic letters table, to choose the
 // letters the student needs to work on. Finish saves that the teacher
 // listened, and the student is notified with how many words to correct.
+//
+// A class lesson (see ClassLesson.jsx) adds `classmates`: [{ id, name, done }]
+// for a dropdown of the class in place of the name, `onStudent(id)` to switch
+// to another student (their own marks show), and `onFinished` to call after
+// Finish instead of closing.
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -32,6 +37,11 @@ const CSS = `
   .lm-foot .hz-btn { min-height: 48px; padding: 0 22px; font-size: 15px; }
   .lm-abc { font: 500 18px/1 "Noto Naskh Arabic", "Geeza Pro", serif; font-style: normal; }
   .lm-letters { min-height: 38px; padding: 0 12px; font-size: 13px; gap: 6px; }
+  .lm-who { display: block; max-width: 100%; min-height: 34px; margin-top: 2px; padding: 0 30px 0 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.45); font: 700 15px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; color: #FFFFFF; cursor: pointer;
+    background: rgba(255,255,255,0.16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='white' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat right 10px center; appearance: none; -webkit-appearance: none; }
+  .lm-who:hover { background-color: rgba(255,255,255,0.26); }
+  .lm-who:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
+  .lm-who option { color: #123B67; background: #FFFFFF; }
   .lm-count { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #176FD1; color: #FFFFFF; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
   @media (max-width: 640px) {
     .lm-inner { padding: 10px 6px 20px; }
@@ -40,7 +50,7 @@ const CSS = `
   }
 `;
 
-export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose }) {
+export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose, classmates = null, onStudent = null, onFinished = null }) {
   const [page, setPage] = useState(a.fromPage);
   const [selectedKey, setSelectedKey] = useState(null);
   const [anchor, setAnchor] = useState(null); // the selected word on screen
@@ -63,6 +73,9 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
   const prev = () => turn(Math.max(a.fromPage, page - 1));
   const swipe = useMushafSwipe(next, prev);
 
+  // Another student of the class: nothing of the last one stays selected.
+  useEffect(() => { setSelectedKey(null); setError(""); }, [student.id]);
+
   useEffect(() => {
     const before = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -77,7 +90,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
     if (busy || open.some((m) => m.verseKey === w.verseKey && m.position === w.position)) return; // a marked word is only selected
     run(() => repo.addMistake({ assignmentId: a.id, page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text }));
   };
-  const finish = () => run(() => repo.setAssignmentChecked(a.id, true)).then((ok) => ok && onClose());
+  const finish = () => run(() => repo.setAssignmentChecked(a.id, true)).then((ok) => ok && (onFinished || onClose)());
   const onPage = open.filter((m) => m.page === page).length;
 
   return createPortal(
@@ -85,9 +98,17 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
       <style>{CSS}</style>
       <div className="lm-top">
         <button className="hz-btn" onClick={onClose}><ChevronLeft size={18} aria-hidden="true" /><span>Back</span></button>
-        <div className="lm-title">{lesson ? "Today's lesson" : "Listen & mark"} · {student.name}
-          <small>{describePages(a.fromPage, a.toPage)}</small>
-        </div>
+        {classmates ? (
+          <div className="lm-title">Class lesson · {describePages(a.fromPage, a.toPage)}
+            <select className="lm-who" value={student.id} disabled={busy} onChange={(e) => onStudent(e.target.value)} aria-label="Student reading">
+              {classmates.map((s) => <option key={s.id} value={s.id}>{s.name}{s.done ? " ✓" : ""}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div className="lm-title">{lesson ? "Today's lesson" : "Listen & mark"} · {student.name}
+            <small>{describePages(a.fromPage, a.toPage)}</small>
+          </div>
+        )}
       </div>
 
       <div className="lm-body">
@@ -132,7 +153,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
         <span className="hz-muted">{open.length} word{open.length === 1 ? "" : "s"} to correct</span>
         {a.checkedAt
           ? <button className="hz-btn hz-btn-primary" onClick={onClose}>Close</button>
-          : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={finish}><CheckCircle2 size={18} aria-hidden="true" />Finish</button>}
+          : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={finish}><CheckCircle2 size={18} aria-hidden="true" />{classmates ? `Finish ${student.name}` : "Finish"}</button>}
       </div>
     </div>,
     document.body,
