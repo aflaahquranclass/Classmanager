@@ -2,7 +2,8 @@
 // and the reviews sent through it. The website itself never links to the form.
 // Approving one puts it on the website's home page with its stars, under a
 // masked name (first two letters); the full name, Viber number and private
-// request are only ever shown here.
+// request are only ever shown here. The Social media tab turns approved
+// reviews into Instagram posts (ReviewPosts.jsx).
 
 import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, XCircle, RotateCw, Star, Trash2, Hourglass, Copy, Link2, Lock, LockOpen } from "lucide-react";
@@ -10,7 +11,13 @@ import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
+import { publicName } from "./reviewPost.js";
+import { ReviewPosts } from "./ReviewPosts.jsx";
 
+const VIEWS = [
+  { key: "reviews", label: "Reviews" },
+  { key: "social", label: "Social media" },
+];
 const FILTERS = [
   { key: "pending", label: "Waiting" },
   { key: "approved", label: "On website" },
@@ -29,8 +36,6 @@ const formUrl = (key) => {
   return `${base}${FORM_PATH}?k=${key}`;
 };
 const newKey = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-// Same masking as public_reviews() in the database: "Haathim Abdul Rahmaan" → "Ha*****".
-const publicName = (name) => `${[...name.trim()].slice(0, 2).join("")}*****`;
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 
 // Waiting-review count for the nav badge.
@@ -58,6 +63,7 @@ function StarRow({ rating }) {
 }
 
 export function AdminReviews({ showToast, onCountChange }) {
+  const [view, setView] = useState("reviews");
   const [filter, setFilter] = useState("pending");
   const [reviews, setReviews] = useState(null);
   const [error, setError] = useState("");
@@ -130,6 +136,12 @@ export function AdminReviews({ showToast, onCountChange }) {
   return (
     <div className="rv-wrap">
       <style>{rvCss()}</style>
+      <div className="tp-segment" role="group" aria-label="Reviews view" style={{ marginBottom: 0, alignSelf: "flex-start" }}>
+        {VIEWS.map((x) => (
+          <button key={x.key} type="button" aria-pressed={view === x.key} className={`tp-segment-btn ${view === x.key ? "tp-segment-btn-active" : ""}`} onClick={() => setView(x.key)}>{x.label}</button>
+        ))}
+      </div>
+      {view === "social" ? <ReviewPosts showToast={showToast} /> : <>
       <div className="tp-card rv-link">
         <div className="rv-link-head">
           <div className="rv-link-title"><Link2 size={18} aria-hidden="true" /> Review form</div>
@@ -195,6 +207,7 @@ export function AdminReviews({ showToast, onCountChange }) {
           );
         })}
       </div>
+      </>}
     </div>
   );
 }
