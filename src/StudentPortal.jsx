@@ -155,6 +155,34 @@ function StudentAvatarIcon({ size = 64 }) {
   );
 }
 
+// Closed Mushaf (blue cover, gold frame and star, page edges showing) for the
+// profile header. Still, unlike the animated QuranIcon on the progress bar.
+function MushafIcon() {
+  return (
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="sp-mushaf-cover" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={TP.gradStart} />
+          <stop offset="0.6" stopColor={TP.blue} />
+          <stop offset="1" stopColor={TP.gradEnd} />
+        </linearGradient>
+      </defs>
+      {/* page edges, right and bottom */}
+      <rect x="15" y="8" width="38" height="50" rx="3.5" fill="#FFF8E7" stroke="#E2CFA0" strokeWidth="1" />
+      <path d="M49 13v41M46 55h-28" stroke="#E2CFA0" strokeWidth="0.8" />
+      {/* cover */}
+      <rect x="11" y="5" width="38" height="50" rx="3.5" fill="url(#sp-mushaf-cover)" />
+      <rect x="11" y="5" width="6" height="50" rx="2" fill={TP.navy} opacity="0.35" />
+      <rect x="21" y="11" width="23" height="38" rx="2.5" fill="none" stroke="#E9C46A" strokeWidth="1.6" />
+      <g transform="translate(32.5 30)" fill="none" stroke="#F3D27A" strokeWidth="1.6" strokeLinejoin="round">
+        <rect x="-6" y="-6" width="12" height="12" />
+        <rect x="-6" y="-6" width="12" height="12" transform="rotate(45)" />
+        <circle r="2.2" fill="#F3D27A" stroke="none" />
+      </g>
+    </svg>
+  );
+}
+
 // Students sign in with their Student ID (e.g. AQC0001). Their Supabase login
 // is the hidden address <id>@students.aflaahqc.com (made by the student-login
 // Edge Function); an older login that is a real email still works as typed.
@@ -455,7 +483,7 @@ export default function StudentPortal() {
           background: radial-gradient(ellipse at 85% -20%, rgba(255,255,255,0.22), transparent 55%); }
         .sp-header-top { display: flex; align-items: center; gap: 18px; }
         .sp-avatar { flex-shrink: 0; width: clamp(64px, 17vw, 96px); aspect-ratio: 1; border-radius: 18px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
-        .sp-avatar svg { width: 62%; height: 62%; }
+        .sp-avatar svg { width: 76%; height: 76%; }
         .sp-ident { flex: 1 1 auto; min-width: 0; }
         .sp-name { font-size: clamp(18px, 4.6vw, 28px); font-weight: 700; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; }
         .sp-id { font-size: clamp(14px, 3.4vw, 20px); opacity: 0.9; margin-top: 6px; }
@@ -513,12 +541,11 @@ export default function StudentPortal() {
         /* ---------- animations ---------- */
         @keyframes sp-rise { from { opacity: 0; transform: translateY(18px) scale(0.98); } to { opacity: 1; transform: none; } }
         @keyframes sp-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(260%) skewX(-18deg); } }
-        @keyframes sp-flicker { 0%, 100% { transform: scale(1) rotate(-2deg); } 25% { transform: scale(1.08, 1.12) rotate(2deg); } 50% { transform: scale(0.96, 1.04) rotate(-1deg); } 75% { transform: scale(1.06) rotate(1.5deg); } }
-        @keyframes sp-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.18); opacity: 1; } 100% { transform: scale(1); } }
         @keyframes sp-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
         @keyframes sp-accent { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
-        .sp-wrap > * { animation: sp-rise 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        /* The profile header stays still: no animations on it. */
+        .sp-wrap > *:not(.sp-header) { animation: sp-rise 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
         .sp-wrap > *:nth-child(2) { animation-delay: 0.07s; }
         .sp-wrap > *:nth-child(3) { animation-delay: 0.14s; }
         .sp-wrap > *:nth-child(4) { animation-delay: 0.21s; }
@@ -532,16 +559,12 @@ export default function StudentPortal() {
         .sp-stat:nth-child(3) { animation-delay: 0.5s; }
 
         .sp-card, .sp-stat { transition: transform 0.25s ease, box-shadow 0.25s ease; }
-        .sp-card:not(.sp-login):hover, .sp-stat:hover { transform: translateY(-4px); box-shadow: 0 18px 38px rgba(13,79,133,0.18); }
+        .sp-card:not(.sp-login):not(.sp-header):hover, .sp-stat:hover { transform: translateY(-4px); box-shadow: 0 18px 38px rgba(13,79,133,0.18); }
         .sp-stat:hover .sp-stat-value svg { animation: sp-float 1.2s ease-in-out infinite; }
 
-        .sp-header::before, .sp-stat::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 35%; pointer-events: none; z-index: 2;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent); animation: sp-shine 5s ease-in-out 1s infinite; }
-        .sp-stat::before { animation-duration: 6s; animation-delay: 1.6s; }
-        .sp-flame { animation: sp-flicker 1.8s ease-in-out infinite; transform-origin: 50% 90%; filter: drop-shadow(0 0 6px rgba(255,200,120,0.55)); }
-        .sp-pop { animation: sp-pop 0.5s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
-        .sp-avatar { transition: transform 0.3s ease; }
-        .sp-header:hover .sp-avatar { transform: rotate(-4deg) scale(1.04); }
+        .sp-stat::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 35%; pointer-events: none; z-index: 2;
+          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent); animation: sp-shine 6s ease-in-out 1.6s infinite; }
+        .sp-flame { filter: drop-shadow(0 0 6px rgba(255,200,120,0.55)); }
 
         /* Quran icon riding at the end of the progress bar */
         /* Book icon: closed → cover opens → three pages turn → rests open → closes. 6s loop.
@@ -656,7 +679,7 @@ export default function StudentPortal() {
         <section className="sp-card sp-grad sp-header" aria-label="Student profile">
           <img src={PATTERN_ON_BLUE_URL} className="sp-blue-pattern" alt="" aria-hidden="true" />
           <div className="sp-header-top">
-            <div className="sp-avatar"><StudentAvatarIcon /></div>
+            <div className="sp-avatar"><MushafIcon /></div>
             <div className="sp-ident">
               <div className="sp-name">{student.name}</div>
               <div className="sp-id">{student.student_code}</div>
@@ -664,7 +687,7 @@ export default function StudentPortal() {
             <div className="sp-streak-box" title="Streak">
               <Flame className="sp-flame" strokeWidth={2} aria-hidden="true" />
               <span className="sp-sr">Streak:</span>
-              <strong key={streakNow} className="sp-pop"><CountUp value={streakNow} /></strong>
+              <strong>{streakNow}</strong>
               <span className="sp-sr">{streakNow === 1 ? "day" : "days"}</span>
             </div>
           </div>
