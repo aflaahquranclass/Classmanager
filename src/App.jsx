@@ -1208,7 +1208,7 @@ export default function App() {
   const [sClassId, setSClassId] = useState("");
   const [sFee, setSFee] = useState("");
   const [sPhone, setSPhone] = useState("");
-  const [sSharePercent, setSSharePercent] = useState("0");
+  const [sSharePercent, setSSharePercent] = useState("60"); // new students start at 60%
   const [sJoinedMonth, setSJoinedMonth] = useState("");
   const [sEmail, setSEmail] = useState("");
   const [sNic, setSNic] = useState("");
@@ -1957,7 +1957,7 @@ export default function App() {
 
   // ---- Students ----
   const resetStudentForm = () => {
-    setSName(""); setSClassId(""); setSFee(""); setSPhone(""); setSSharePercent("0");
+    setSName(""); setSClassId(""); setSFee(""); setSPhone(""); setSSharePercent("60");
     setSJoinedMonth(month); setSEmail(""); setSNic(""); setSAtollIsland(""); setSPrograms(["hifz"]); setStudentLinkError(""); setStudentOtp(null);
     setShowStudentForm(false); setEditingStudentId(null);
   };
@@ -1967,7 +1967,7 @@ export default function App() {
     const fee = parseFloat(sFee);
     if (!name || !Number.isFinite(fee) || fee < 0) return;
     let sharePercent = parseFloat(sSharePercent);
-    if (!Number.isFinite(sharePercent)) sharePercent = 0;
+    if (!Number.isFinite(sharePercent)) sharePercent = editingStudentId ? (students.find((x) => x.id === editingStudentId)?.sharePercent ?? 60) : 60;
     sharePercent = Math.min(100, Math.max(0, sharePercent));
     const cls = classes.find((c) => c.id === sClassId) || null;
     const schedule = cls && cls.days && cls.days.length > 0 && cls.startTime && cls.endTime
@@ -2361,15 +2361,18 @@ export default function App() {
     setAdminExamDeletingId(null);
   };
 
+  // The amount box starts at the student's fee; a paid month shows what was
+  // paid. (Marking unpaid saves 0, which must not become the next amount.)
   const getDraft = (studentId, fee) => {
     if (payDrafts[studentId] !== undefined) return payDrafts[studentId];
     const rec = monthData[studentId];
-    return rec && rec.amountPaid != null ? String(rec.amountPaid) : String(fee);
+    return rec && rec.paid && rec.amountPaid != null ? String(rec.amountPaid) : String(fee);
   };
 
   const markPaid = (studentId, fee) => {
-    const amt = parseFloat(getDraft(studentId, fee));
-    const amountPaid = Number.isFinite(amt) ? amt : fee;
+    const draft = String(getDraft(studentId, fee)).trim();
+    const amt = parseFloat(draft);
+    const amountPaid = draft !== "" && Number.isFinite(amt) ? amt : fee;
     saveMonthPayments(month, {
       ...monthData,
       [studentId]: { paid: true, amountPaid, paidDate: new Date().toISOString().slice(0, 10) },
