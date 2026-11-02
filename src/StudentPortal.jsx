@@ -474,9 +474,9 @@ export default function StudentPortal() {
         .sp-tracker-head { display: flex; align-items: center; gap: 14px; }
         .sp-tracker-head h2 { flex: 1; margin: 0; font-size: clamp(17px, 4vw, 24px); font-weight: 700; color: #0F2F8A; }
         .sp-tracker-head .sp-pct { font-size: clamp(22px, 5vw, 30px); font-weight: 700; color: #1452A8; }
-        .sp-bar-wrap { position: relative; margin: 22px 0 18px; }
+        .sp-bar-wrap { position: relative; margin: 26px 0 24px; }
         .sp-bar { height: 30px; border-radius: 999px; background: #E3EAF1; overflow: hidden; }
-        .sp-bar-icon { position: absolute; top: 50%; width: 60px; height: 44px; display: block; transform: translate(-50%, -50%); z-index: 1; pointer-events: none; }
+        .sp-bar-icon { position: absolute; top: 50%; width: 92px; height: 68px; display: block; transform: translate(-50%, -50%); z-index: 1; pointer-events: none; }
         .sp-bar-icon svg { display: block; width: 100%; height: 100%; overflow: visible; }
         .sp-bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, ${TP.gradStart} 0%, ${TP.blue} 45%, #22D3E0 100%); transition: width 0.8s ease; }
         .sp-tracker-foot { display: flex; justify-content: space-between; gap: 12px; font-size: clamp(13px, 3.2vw, 18px); color: #1452A8; }
