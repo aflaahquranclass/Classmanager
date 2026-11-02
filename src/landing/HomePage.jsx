@@ -54,8 +54,10 @@ export function Reviews({ reviews }) {
       <div className="ld-reviews">
         <Marquee
           items={reviews}
+          minItems={8}
+          secondsPerItem={4}
           render={(r, i, copy) => (
-            <figure key={`${copy}-${i}`} className="ld-review" aria-hidden={copy || undefined} style={{ margin: 0 }}>
+            <figure className="ld-review" aria-hidden={copy || undefined}>
               <div className="ld-review-top"><span className="ld-quote" aria-hidden="true">“</span><Stars size={14} rating={r.rating ?? 5} /></div>
               <p dir="auto">{r.text}</p>
               <figcaption className="ld-person">

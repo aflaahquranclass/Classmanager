@@ -67,8 +67,8 @@
 .ld-hero { position: relative; overflow: hidden; color: #fff; background: var(--grad-card); }
 .ld-hero-in { position: relative; display: grid; grid-template-columns: 1.25fr 1fr; align-items: center; gap: clamp(32px, 4.5vw, 72px); padding: clamp(28px, 3vw, 56px) var(--gutter) clamp(32px, 3.2vw, 60px); }
 /* Logo centred over the calligraphy. */
-.ld-hero-brand { width: min(100%, clamp(260px, 35vw, 520px)); }
-.ld-hero-logo { display: block; width: clamp(100px, 10vw, 180px); max-width: 45%; height: auto; margin: 0 auto 14px; }
+.ld-hero-brand { width: min(100%, clamp(280px, 39vw, 580px)); }
+.ld-hero-logo { display: block; width: clamp(108px, 11vw, 200px); max-width: 45%; height: auto; margin: 0 auto 14px; }
 .ld-callig-h1 { margin: 0 0 8px; line-height: 0; }
 .ld-callig { display: block; width: 100%; height: auto; }
 /* Everything under the calligraphy lines up with its edges: the
@@ -78,10 +78,10 @@
 .ld-hero-brand .ld-hero-actions .ld-btn { flex: 1 1 auto; }
 .ld-hero-brand .ld-rating { justify-content: center; }
 .ld-hero-brand .ld-hero-actions { gap: 10px; }
-.ld-hero-brand .ld-callig-tr { font-size: clamp(14px, 1.1vw, 18px); }
+.ld-hero-brand .ld-callig-tr { font-size: clamp(15px, 1.22vw, 20px); }
 @media (min-width: 1200px) {
   .ld-hero-brand .ld-hero-actions { flex-wrap: nowrap; }
-  .ld-hero-brand .ld-hero-actions .ld-btn { padding-left: clamp(10px, .9vw, 16px); padding-right: clamp(10px, .9vw, 16px); font-size: clamp(13px, 1.02vw, 16px); }
+  .ld-hero-brand .ld-hero-actions .ld-btn { padding-left: clamp(10px, .9vw, 16px); padding-right: clamp(10px, .9vw, 16px); font-size: clamp(14px, 1.12vw, 18px); }
 }
 .ld-callig-tr { margin: 0 0 20px; font-family: var(--serif); font-style: italic; font-size: clamp(15px, 1.25vw, 19px); line-height: 1.5; color: #D3E9F7; }
 .ld-hero h1 { margin: 0 0 20px; font-family: var(--serif); font-size: clamp(38px, 5.2vw, 62px); line-height: 1.06; font-weight: 600; letter-spacing: -.02em; }
@@ -167,7 +167,10 @@
 .ld-ticker-light .ld-chip svg { color: var(--teal); }
 
 .ld-reviews { overflow: hidden; margin-top: 36px; mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
-.ld-reviews .ld-track { gap: 20px; animation-duration: 60s; padding: 6px 0 14px; }
+/* Space after each card (not a gap) so the two halves are exactly equal and
+   the loop never jumps. */
+.ld-reviews .ld-track { padding: 6px 0 14px; }
+.ld-reviews .ld-review { margin: 0 20px 0 0; }
 .ld-review { width: 340px; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 26px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 1px 3px rgba(18, 59, 103, .06); }
 .ld-review-top { display: flex; justify-content: space-between; align-items: flex-start; }
 .ld-quote { font-family: var(--serif); font-size: 54px; line-height: .7; color: var(--teal); opacity: .5; }
@@ -603,8 +606,16 @@ select.ld-input { appearance: auto; }
 /* Mirror what points one way, and keep the moving strips running left. */
 .ld[dir="rtl"] .lucide-arrow-right { transform: scaleX(-1); }
 .ld[dir="rtl"] .ld-login-menu { right: auto; left: 0; }
+/* The strip's box also starts at the left, else it hangs off the right edge
+   and slides away, leaving the screen empty. */
+.ld[dir="rtl"] :is(.ld-reviews, .ld-ticker) { direction: ltr; }
 .ld[dir="rtl"] .ld-track { direction: ltr; }
 .ld[dir="rtl"] .ld-track > * { direction: rtl; }
+/* The hero keeps its two halves where they are in English (brand left, exam
+   report card right); only the text inside reads right to left. */
+.ld[dir="rtl"] .ld-hero-in { direction: ltr; }
+.ld[dir="rtl"] .ld-hero-in > * { direction: rtl; }
+.ld[dir="rtl"] .ld-hero-brand { margin-right: auto; }
 .ld[dir="rtl"] .ld-avatars span { margin-left: 0; margin-right: -10px; }
 .ld[dir="rtl"] .ld-avatars span:first-child { margin-right: 0; }
 .ld[dir="rtl"] .ld-person :is(b, small) { text-align: right; }
@@ -613,6 +624,8 @@ select.ld-input { appearance: auto; }
 /* Thaana in Faruma reads smaller than Latin at the same size. */
 .ld[lang="dv"] .ld-links { font-size: clamp(16px, 1.25vw, 19px); }
 .ld[lang="dv"] .ld-btn { font-size: clamp(15px, 1.15vw, 18px); }
+.ld[lang="dv"] .ld-hero-brand .ld-hero-actions .ld-btn { font-size: clamp(16px, 1.25vw, 20px); }
+.ld[lang="dv"] .ld-hero-brand .ld-rating { font-size: 16px; }
 .ld[lang="dv"] .ld-btn-sm { font-size: clamp(14px, 1.05vw, 16px); }
 .ld[lang="dv"] .ld-lead { font-size: clamp(17px, 1.35vw, 20px); }
 .ld[lang="dv"] :is(.ld-badge-label, .ld-badge-tag, .ld-rating, .ld-foot-col, .ld-copy) { font-size: 15px; }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { Flame, Star, BookOpen, Users, Mic, Baby, Award, LineChart, Smartphone, UserRound, Phone, Mail, MapPin } from "lucide-react";
 import { CONTACT, SHOW } from "./content.js";
 import { useLang } from "./i18n.jsx";
@@ -33,12 +33,19 @@ export function Stars({ size = 16, rating = 5 }) {
 }
 
 // Strip of items that scrolls sideways forever. The list is drawn twice so
-// the loop has no gap; the copy is hidden from screen readers.
-export function Marquee({ items, render, className = "" }) {
+// the loop has no gap; the copy is hidden from screen readers. With fewer
+// than minItems, the items repeat until there are at least that many, so the
+// strip is always wider than the screen and keeps moving; secondsPerItem
+// then keeps the speed the same however many there are.
+export function Marquee({ items, render, className = "", minItems = 0, secondsPerItem }) {
+  const n = items.length;
+  const count = n ? Math.ceil(Math.max(minItems, n) / n) * n : 0;
+  const one = Array.from({ length: count }, (_, k) => k);
   return (
-    <div className={`ld-track ${className}`}>
-      {items.map((item, i) => render(item, i, false))}
-      {items.map((item, i) => render(item, i, true))}
+    <div className={`ld-track ${className}`} style={secondsPerItem ? { animationDuration: `${count * secondsPerItem}s` } : undefined}>
+      {[false, true].map((copy) => one.map((k) => (
+        <Fragment key={`${copy}-${k}`}>{render(items[k % n], k % n, copy || k >= n)}</Fragment>
+      )))}
     </div>
   );
 }
