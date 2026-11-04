@@ -22,6 +22,8 @@ import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
 import { ProgramPicker, inProgramSection, classProgram } from "./thilawa/programs.jsx";
 import { hideSplash, LogoLoader } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
+import TeacherDashboard from "./teacher/TeacherDashboard.jsx";
+import TeacherStudents from "./teacher/TeacherStudents.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
 const TeacherThilawa = lazy(() => import("./thilawa/ThilawaTeacher.jsx").then((m) => ({ default: m.TeacherThilawa })));
 const TeacherHifz = lazy(() => import("./hifz/HifzTeacher.jsx").then((m) => ({ default: m.TeacherHifz })));
@@ -965,7 +967,7 @@ export default function App() {
         setAuthView("login");
         return;
       }
-      setRole("teacher"); setLoggedInTeacherId(teacherRow.id); setAuthView("app"); setSection("timetable");
+      setRole("teacher"); setLoggedInTeacherId(teacherRow.id); setAuthView("app"); setSection("dashboard");
       return;
     }
     await supabase.auth.signOut({ scope: "local" });
@@ -1021,7 +1023,7 @@ export default function App() {
     setRole("teacher");
     setLoggedInTeacherId(teacherRow.id);
     setAuthView("app");
-    setSection("timetable");
+    setSection("dashboard");
     setLoginEmail(""); setLoginPassword("");
     setTeacherLoginLoading(false);
   };
@@ -3511,17 +3513,80 @@ export default function App() {
         <TeacherPortalLayout
           activeSection={section}
           navItems={[
+            { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: () => setSection("dashboard") },
             { key: "timetable", label: "My timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
             { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAttendanceView("day"); } },
             { key: "exams", label: "Exams", icon: FileText, onClick: () => { setSection("exams"); setExamView("scheduled"); } },
             { key: "hifz", label: "Hifz", icon: BookOpen, onClick: () => setSection("hifz") },
             { key: "thilawa", label: "Thilawa", icon: BookOpenCheck, onClick: () => setSection("thilawa") },
+            { key: "students", label: "My students", icon: Users, onClick: () => setSection("students") },
           ]}
           teacherDisplayName={teacherName(loggedInTeacherId)}
           onLogout={() => { setSection("dashboard"); signOutUser(); }}
         >
           <div className="lc-main" key={`teacher-${section}`}>
             {saveError && <div style={{ color: C.b, fontSize: "13px", marginBottom: "14px" }}>{saveError}</div>}
+
+            {section === "dashboard" && (() => {
+              const today = maldivesToday();
+              const nowMv = new Intl.DateTimeFormat("en-GB", { timeZone: "Indian/Maldives", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date());
+              const myStudents = students.filter((s) => s.teacherId === loggedInTeacherId);
+              const classNames = new Set([
+                ...myStudents.map((s) => s.className).filter((n) => n && n !== "—"),
+                ...classes.filter((c) => c.teacherId === loggedInTeacherId).map((c) => c.name),
+              ]);
+              const holidayToday = isHoliday(today);
+              const recs = attendanceByDate[today] || {};
+              // Today's sessions, leaving out students whose class was moved to another day.
+              const sessions = holidayToday ? [] : getSessionsForDate(today).filter((r) => (recs[r.studentId] || {}).status !== "rescheduled");
+              const todayClasses = groupByClass(sessions).map(({ className, entries }) => {
+                const startTime = entries.reduce((m, r) => (r.startTime && (!m || r.startTime < m) ? r.startTime : m), "");
+                const endTime = entries.reduce((m, r) => (r.endTime && r.endTime > m ? r.endTime : m), "");
+                const marked = entries.every((r) => (recs[r.studentId] || {}).status);
+                const state = marked ? "marked"
+                  : nowMv >= startTime && nowMv < endTime ? "now"
+                  : endTime && nowMv >= endTime ? "unmarked" : "upcoming";
+                const code = classCode(className);
+                return { className, entries, startTime, endTime, count: new Set(entries.map((r) => r.studentId)).size, state, code, badge: classBadgeStyle(code) };
+              }).sort((a, b) => a.startTime.localeCompare(b.startTime));
+              const goTo = (key) => {
+                setSection(key);
+                if (key === "attendance") setAttendanceView("day");
+                if (key === "exams") setExamView("scheduled");
+              };
+              const openTodayClass = (className, entries) => {
+                const draft = {};
+                entries.forEach((r) => {
+                  const st = (recs[r.studentId] || {}).status;
+                  draft[r.studentId] = st === "present" || st === "absent" ? st : undefined;
+                });
+                setSection("attendance");
+                setAttendanceView("day");
+                setRecordDate(today);
+                setAttDraft(draft);
+                setOpenClassName(className);
+              };
+              return (
+                <TeacherDashboard
+                  teacherId={loggedInTeacherId}
+                  teacherName={teacherName(loggedInTeacherId)}
+                  today={today}
+                  isHoliday={holidayToday}
+                  studentCount={myStudents.length}
+                  classCount={classNames.size}
+                  todayClasses={todayClasses}
+                  onNavigate={goTo}
+                  onOpenClass={openTodayClass}
+                />
+              );
+            })()}
+
+            {section === "students" && (
+              <TeacherStudents
+                students={students.filter((s) => s.teacherId === loggedInTeacherId)}
+                classBadge={(className) => { const code = classCode(className); return { code, badge: classBadgeStyle(code) }; }}
+              />
+            )}
 
             {section === "hifz" && (
               <Suspense fallback={<LogoLoader label="Loading Hifz…" />}>
