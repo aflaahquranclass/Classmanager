@@ -23,6 +23,11 @@ export function summarizeThilawa({ settings, reading, assignments, assessments, 
   // in it that the student hasn't fixed yet (ticked) and the teacher hasn't cleared.
   const lastChecked = assignments.filter((a) => a.checkedAt).sort((a, b) => (a.checkedAt < b.checkedAt ? 1 : -1))[0] || null;
   const corrections = lastChecked ? mistakes.filter((m) => m.assignmentId === lastChecked.id && !m.correctedAt && !m.tickedAt) : [];
+  // The student's last recitation: the newest reading the teacher listened to,
+  // or lesson (made when the teacher first marks a word in class), and its marks.
+  const when = (a) => a.checkedAt || a.createdAt;
+  const lastRecitation = assignments.filter((a) => a.checkedAt || a.kind === "lesson").sort((a, b) => (when(a) < when(b) ? 1 : -1))[0] || null;
+  const lastMarks = lastRecitation ? mistakes.filter((m) => m.assignmentId === lastRecitation.id && !m.correctedAt && !m.tickedAt) : [];
   return {
     settings,
     today,
@@ -34,6 +39,8 @@ export function summarizeThilawa({ settings, reading, assignments, assessments, 
     toListen: readings.filter((a) => a.completedAt && !a.checkedAt).sort((a, b) => (a.completedAt < b.completedAt ? -1 : 1)),
     lastChecked,
     corrections,
+    lastRecitation,
+    lastMarks,
     assessments,
     notes: [...notes].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
     progress,

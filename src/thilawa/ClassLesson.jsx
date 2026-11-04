@@ -4,10 +4,13 @@
 // their own lesson, made the first time the teacher marks a word, chooses
 // letters or finishes them (a student who didn't read gets nothing). Opening
 // the same portion again the same day picks up the lessons already made.
+// A class mostly carries on with the part it read last time, so the form
+// offers that first (at the page where the class stopped), and a new part
+// only when the teacher asks for one. Pages turn freely in the Mushaf.
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { BookOpen, X } from "lucide-react";
+import { BookOpen, X, Plus, ArrowRight } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { localDate } from "../hifz/engine.js";
 import { TOTAL_PAGES, describePages, findClassLesson } from "./engine.js";
@@ -16,9 +19,28 @@ import { createSupabaseThilawaRepo } from "./repos.js";
 import ListenScreen from "./ListenScreen.jsx";
 import SurahAyahPicker from "./SurahAyahPicker.jsx";
 
-// The portion for the whole class: surah and ayahs, or pages.
-// onOpen({ fromPage, toPage, instructions }).
-export function ClassLessonForm({ className, count, onOpen, onCancel }) {
+const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+// Where a class stopped in the Mushaf, kept on this device per class:
+// { fromPage, toPage, instructions, page }. The page only counts for the same part.
+const stopKey = (className) => `thilawa-class-stop:${className}`;
+const samePart = (a, b) => a && b && a.fromPage === b.fromPage && a.toPage === b.toPage && (a.instructions || "") === (b.instructions || "");
+export function classStopPage(className, portion) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(stopKey(className)) || "null");
+    return samePart(saved, portion) ? saved.page : null;
+  } catch { return null; }
+}
+export function saveClassStop(className, portion, page) {
+  try { localStorage.setItem(stopKey(className), JSON.stringify({ ...portion, page })); } catch { /* storage off: it opens at the part's first page */ }
+}
+
+// The portion for the whole class: the last part to carry on with (last:
+// { fromPage, toPage, instructions, createdAt } or null, stopPage: where the
+// class stopped in it), or a new one by surah and ayahs or pages.
+// onOpen({ fromPage, toPage, instructions }, startPage).
+export function ClassLessonForm({ className, count, last = null, stopPage = null, onOpen, onCancel }) {
+  const [picking, setPicking] = useState(!last);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [ayahs, setAyahs] = useState(null);
@@ -28,8 +50,9 @@ export function ClassLessonForm({ className, count, onOpen, onCancel }) {
     const a = Math.round(+from);
     const b = Math.round(+(to || from));
     if (!(a >= 1 && a <= TOTAL_PAGES && b >= a && b <= TOTAL_PAGES)) { setError(`Pages must be between 1 and ${TOTAL_PAGES}, with the last page not before the first.`); return; }
-    onOpen({ fromPage: a, toPage: b, instructions: ayahs || "" });
+    onOpen({ fromPage: a, toPage: b, instructions: ayahs || "" }, a);
   };
+  const carryOn = () => onOpen({ fromPage: last.fromPage, toPage: last.toPage, instructions: last.instructions }, stopPage ?? last.fromPage);
   const valid = +from >= 1 && +from <= TOTAL_PAGES && (+to || +from) >= +from && (+to || +from) <= TOTAL_PAGES;
   return (
     <section className="hz-card" aria-label={`Class lesson for ${className}`}>
@@ -37,7 +60,22 @@ export function ClassLessonForm({ className, count, onOpen, onCancel }) {
         <h2 className="hz-h2" style={{ margin: 0 }}><BookOpen size={22} aria-hidden="true" />Class lesson · {className}</h2>
         <button className="tt-icon-btn" onClick={onCancel} aria-label="Cancel"><X size={16} aria-hidden="true" /></button>
       </div>
-      <p className="hz-muted">The whole class reads the same portion. Choose it once, then switch between the {count} students in the Mushaf. Each student's marked words are saved for them alone.</p>
+      <p className="hz-muted">The whole class reads the same part. Switch between the {count} students in the Mushaf; each student's marked words are saved for them alone. Turn the pages freely.</p>
+      {last && (
+        <div className="cl-carry">
+          <div>
+            <small>Carry on with the last part · {fmtWhen(last.createdAt)}</small>
+            <b>{last.instructions || describePages(last.fromPage, last.toPage)}</b>
+            <span>{last.instructions ? `${describePages(last.fromPage, last.toPage)} · ` : ""}{stopPage && stopPage !== last.fromPage ? `stopped at page ${stopPage}` : `starts at page ${last.fromPage}`}</span>
+          </div>
+          <button className="hz-btn hz-btn-primary" onClick={carryOn}>Carry on<ArrowRight size={18} aria-hidden="true" /></button>
+        </div>
+      )}
+      {last && !picking && (
+        <button className="hz-btn hz-btn-outline" style={{ marginTop: 12 }} onClick={() => setPicking(true)}><Plus size={17} aria-hidden="true" />New part</button>
+      )}
+      {picking && <>
+      {last && <h3 className="hz-h2" style={{ fontSize: 15, margin: "16px 0 8px" }}><Plus size={18} aria-hidden="true" />New part</h3>}
       <div className="tt-form">
         <div className="tt-wide"><SurahAyahPicker id="tt-class" onPick={pick} /></div>
         <div className="hz-field">
@@ -52,8 +90,18 @@ export function ClassLessonForm({ className, count, onOpen, onCancel }) {
       {valid && <p className="hz-muted" style={{ marginBottom: 0 }}>{ayahs ? `${ayahs} · ` : ""}{describePages(+from, +(to || from))}</p>}
       {error && <div className="hz-error" role="alert" style={{ marginTop: 12 }}>{error}</div>}
       <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 12 }}>
+        {last && <button className="hz-btn hz-btn-ghost" onClick={() => setPicking(false)}>Cancel</button>}
         <button className="hz-btn hz-btn-primary" disabled={!from} onClick={open}><BookOpen size={18} aria-hidden="true" />Open Mushaf</button>
       </div>
+      </>}
+      <style>{`
+        .cl-carry { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 14px 16px; border-radius: 14px; border: 1px solid #BFDDF6; background: linear-gradient(135deg, #EEF6FE, #FFFFFF); }
+        .cl-carry > div { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 3px; }
+        .cl-carry small { color: #567493; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+        .cl-carry b { color: #123B67; font-size: 18px; }
+        .cl-carry span { color: #567493; font-size: 13px; }
+        .cl-carry .hz-btn { min-height: 48px; padding: 0 22px; }
+      `}</style>
     </section>
   );
 }
@@ -61,7 +109,7 @@ export function ClassLessonForm({ className, count, onOpen, onCancel }) {
 // The Mushaf for the class lesson. students: the class (app shape), in the
 // order the dropdown shows them. makeRepo(studentId): a student's Thilawa repo
 // (Supabase unless given, e.g. the in-memory one).
-export default function ClassLesson({ students, teacherId, portion, onClose, makeRepo = null }) {
+export default function ClassLesson({ students, teacherId, portion, onClose, makeRepo = null, startPage = null, onPage = null }) {
   const repos = useMemo(() => new Map(students.map((s) => [s.id, makeRepo ? makeRepo(s.id) : createSupabaseThilawaRepo(supabase, s.id, teacherId)])), [students, teacherId, makeRepo]);
   const [studentId, setStudentId] = useState(students[0]?.id);
   const [data, setData] = useState({}); // student id → { assignments, mistakes }
@@ -116,7 +164,7 @@ export default function ClassLesson({ students, teacherId, portion, onClose, mak
   return (
     <ListenScreen student={student} repo={lessonRepo} mistakes={data[studentId].mistakes}
       assignment={lesson || { id: null, kind: "lesson", ...portion, letters: [], checkedAt: null }}
-      refresh={() => load([studentId])} onClose={onClose}
+      refresh={() => load([studentId])} onClose={onClose} startPage={startPage} onPage={onPage}
       classmates={classmates} onStudent={setStudentId} onFinished={next} />
   );
 }

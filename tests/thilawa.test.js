@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, ARABIC_LETTERS, wordHasLetter, letterParts, findClassLesson, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
+import { khatamProgress, completedCounts, goalCheck, readingStreak, recentPace, ayahsOnPages, describePages, ayahPages, searchSurahs, ARABIC_LETTERS, wordHasLetter, letterParts, findClassLesson, lastClassPortion, pagesWithMarks, levelLabel, latestLevels, nextFreePage } from "../src/thilawa/engine.js";
 import { loadThilawa, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "../src/thilawa/service.js";
 import { createThilawaMemoryStore, createMemoryThilawaRepo } from "../src/thilawa/repos.js";
 
@@ -234,4 +234,39 @@ test("a class lesson finds the student's own lesson for that portion today", () 
   assert.equal(findClassLesson(rows, { fromPage: 564, toPage: 564 }, "2026-11-02", "Indian/Maldives")?.id, "other");
   // 23:30 in the Maldives on the 1st is the 1st there, though it's the 2nd in UTC+8.
   assert.equal(findClassLesson([lesson("late", 1, 1, "", "2026-11-01T18:30:00Z")], { fromPage: 1, toPage: 1 }, "2026-11-01", "Indian/Maldives")?.id, "late");
+});
+
+test("a class carries on with its newest lesson's part", () => {
+  assert.equal(lastClassPortion([]), null);
+  const rows = [
+    { kind: "lesson", fromPage: 562, toPage: 563, instructions: "Al-Qalam 1–33", createdAt: "2026-11-01T05:00:00Z" },
+    { kind: "reading", fromPage: 600, toPage: 600, instructions: "", createdAt: "2026-11-03T05:00:00Z" },
+    { kind: "lesson", fromPage: 564, toPage: 566, instructions: "Al-Haqqah", createdAt: "2026-11-02T05:00:00Z" },
+  ];
+  assert.deepEqual(lastClassPortion(rows), { fromPage: 564, toPage: 566, instructions: "Al-Haqqah", createdAt: "2026-11-02T05:00:00Z" });
+});
+
+test("a recitation shows on its own pages and every page a word was marked on", () => {
+  const a = { fromPage: 562, toPage: 563 };
+  assert.deepEqual(pagesWithMarks(a, []), { fromPage: 562, toPage: 563 });
+  assert.deepEqual(pagesWithMarks(a, [{ page: 563 }, { page: 565 }]), { fromPage: 562, toPage: 565 });
+  assert.deepEqual(pagesWithMarks(a, [{ page: 560 }]), { fromPage: 560, toPage: 563 });
+});
+
+test("the last recitation is the newest lesson or listened reading, with its open marks", async () => {
+  const store = createThilawaMemoryStore();
+  const teacher = createMemoryThilawaRepo(store, "s1", { teacherId: "t1" });
+  assert.equal((await loadThilawa(teacher)).lastRecitation, null);
+  const reading = await teacher.addAssignment({ fromPage: 5, toPage: 5 });
+  assert.equal((await loadThilawa(teacher)).lastRecitation, null); // not listened to yet
+  await teacher.addMistake({ assignmentId: reading.id, page: 5, verseKey: "2:30", position: 2 });
+  await teacher.setAssignmentChecked(reading.id, true);
+  let d = await loadThilawa(teacher);
+  assert.equal(d.lastRecitation.id, reading.id);
+  // A class lesson shows as soon as the teacher marks in it, before Finish.
+  const lesson = await teacher.addAssignment({ fromPage: 6, toPage: 6, kind: "lesson" });
+  await teacher.addMistake({ assignmentId: lesson.id, page: 7, verseKey: "2:40", position: 1 });
+  d = await loadThilawa(teacher);
+  assert.equal(d.lastRecitation.id, lesson.id);
+  assert.deepEqual(d.lastMarks.map((m) => m.verseKey), ["2:40"]);
 });

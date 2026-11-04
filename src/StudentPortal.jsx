@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Target, Presentation, Eye, EyeOff } from "lucide-react";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Presentation, ArrowRight, Trophy, Eye, EyeOff } from "lucide-react";
 import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
 import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog } from "./HifzTracker.jsx";
@@ -15,7 +15,7 @@ import AuthShell from "./AuthShell.jsx";
 import { StudentExams } from "./exams/ExamUI.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
-import { ThilawaTracker, AssignedReading, FreeReading, LevelMeter, THILAWA_HADITH, thilawaCss, fmtDate } from "./thilawa/ThilawaStudent.jsx";
+import { ThilawaTracker, LastRecitation, AssignedReading, FreeReading, LevelMeter, THILAWA_HADITH, thilawaCss } from "./thilawa/ThilawaStudent.jsx";
 import { TeacherThilawaStudent } from "./thilawa/ThilawaTeacher.jsx";
 import { loadThilawa } from "./thilawa/service.js";
 import { createSupabaseThilawaRepo, createThilawaMemoryStore, createMemoryThilawaRepo } from "./thilawa/repos.js";
@@ -45,6 +45,13 @@ if (DEMO) {
   t.addAssessment({ tajweed: 60, fluency: 58, comment: "Good improvement on the madd rules." });
   t.addAssignment({ fromPage: 582, toPage: 583, instructions: "Read Surah An-Naba slowly. Watch the ghunnah on noon and meem.", dueDate: null })
     .then((a) => t.setAssignmentLetters(a.id, ["ن", "م"]));
+  // A class lesson the teacher listened to, with words to correct.
+  t.addAssignment({ fromPage: 582, toPage: 582, kind: "lesson", instructions: "An-Naba 1–16" }).then(async (l) => {
+    for (const [verseKey, position] of [["78:2", 2], ["78:6", 3], ["78:10", 2]]) await t.addMistake({ assignmentId: l.id, page: 582, verseKey, position });
+    const [m] = await t.listMistakes();
+    await t.setMistakeCategory(m.id, "madd");
+    await t.setAssignmentChecked(l.id, true);
+  });
   t.addNote({ body: "Practise reading 2 pages every day before class.", visibleToStudent: true });
   t.addNote({ body: "Private: needs help with qalqalah.", visibleToStudent: false });
   const h = createMemoryHifzRepo(hifzDemoStore, "demo", { teacherId: "demo-teacher" });
@@ -296,7 +303,7 @@ async function loadStudentForUser(userId) {
 const NAV = [
   { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText, program: "hifz" },
-  { key: "thilawa", label: "Thilawa Tracker", Icon: BookOpenCheck, program: "thilawa" },
+  { key: "thilawa", label: "Thilawa", Icon: BookOpenCheck, program: "thilawa" },
   { key: "thilawa-assigned", label: "Teacher's Reading", Icon: ListChecks, program: "thilawa" },
   { key: "thilawa-free", label: "Free Reading", Icon: BookMarked, program: "thilawa" },
   { key: "attendance", label: "Attendance", Icon: CalendarCheck },
@@ -430,11 +437,6 @@ export default function StudentPortal() {
     { label: "Target Year", Icon: CalendarDays, value: summary?.stats.goalYear ?? "—" },
   ];
   const th = thilawa;
-  const thStats = [
-    { label: "Surah’s read", Icon: BookOpen, value: <><CountUp value={th?.counts.surahs ?? 0} /> / {TOTAL_SURAHS}</> },
-    { label: "Juz read", Icon: Layers, value: <><CountUp value={th?.counts.juz ?? 0} /> / {TOTAL_JUZ}</> },
-    { label: "Khatam goal", Icon: Target, value: th?.settings ? fmtDate(th.settings.goalDate).replace(/^\d+ /, "") : "—" },
-  ];
   const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
   const week = thisWeek(maldivesToday(), (dash === "thilawa" ? th?.streak.calendar : summary?.streak.calendar) || []);
   const quotes = useMotivation(ready && !DEMO);
@@ -536,8 +538,19 @@ export default function StudentPortal() {
         .sp-switch button:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
         .sp-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; padding: 18px; }
         .sp-goal-line { margin: 12px 0 0; font-size: 15px; color: #1452A8; }
-        .sp-todo { display: flex; align-items: center; gap: 14px; padding: 16px 18px; flex-wrap: wrap; color: ${TP.navy}; font-size: 16px; }
-        .sp-todo span { flex: 1; min-width: 180px; }
+        .sp-levels-title { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin: 0; font-size: clamp(17px, 4vw, 22px); font-weight: 700; color: #0F2F8A; }
+        .sp-levels-title svg { color: ${TP.blue}; }
+        .sp-quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+        .sp-quick-tile { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 18px; font: inherit; text-align: left; cursor: pointer; color: ${TP.navy}; }
+        .sp-quick-tile.sp-grad { color: #FFFFFF; }
+        .sp-quick-tile:focus-visible { outline: 3px solid ${TP.blue}; outline-offset: 2px; }
+        .sp-quick-tile:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(13,79,133,0.2); }
+        .sp-quick-icon { flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: #E8F2FC; color: ${TP.blue}; }
+        .sp-grad .sp-quick-icon { background: rgba(255,255,255,0.2); color: #FFFFFF; }
+        .sp-quick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        .sp-quick-text b { font-size: 17px; }
+        .sp-quick-text small { font-size: 14px; opacity: 0.85; }
+        .sp-quick-tile > svg { flex-shrink: 0; opacity: 0.8; }
         /* ---------- animations ---------- */
         @keyframes sp-rise { from { opacity: 0; transform: translateY(18px) scale(0.98); } to { opacity: 1; transform: none; } }
         @keyframes sp-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(260%) skewX(-18deg); } }
@@ -702,7 +715,7 @@ export default function StudentPortal() {
         </section>
 
         {view === "hifz" && doesHifz && <HifzTracker repo={repo} />}
-        {view === "thilawa" && doesThilawa && <ThilawaTracker repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} onGo={setView} />}
+        {view === "thilawa" && doesThilawa && <ThilawaTracker data={thilawa} onGo={setView} />}
         {view === "thilawa-assigned" && doesThilawa && <AssignedReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "thilawa-free" && doesThilawa && <FreeReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "demo-teacher-hifz" && DEMO && (
@@ -724,61 +737,27 @@ export default function StudentPortal() {
         )}
 
         {view === "dashboard" && dash === "thilawa" && <>
-        <section className="sp-card sp-tracker" aria-label="Khatam progress">
-          <div className="sp-tracker-head">
-            <BookOpenCheck size={44} color="#1452A8" strokeWidth={1.8} aria-hidden="true" />
-            <h2>Thilawa Khatam Tracker</h2>
-            <span className="sp-pct"><CountUp value={th?.progress.percent ?? 0} />%</span>
-          </div>
-          <div className="sp-bar-wrap">
-            <div className="sp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={th?.progress.percent ?? 0}>
-              <div className="sp-bar-fill" style={{ width: `${th?.progress.percent ?? 0}%` }} />
-            </div>
-            <span className="sp-bar-icon" style={{ left: `clamp(16px, ${th?.progress.percent ?? 0}%, calc(100% - 16px))` }} aria-hidden="true">
-              <QuranIcon />
-            </span>
-          </div>
-          <div className="sp-tracker-foot">
-            <span><CountUp value={th?.progress.count ?? 0} /> / 604 pages</span>
-            <span>{th?.progress.khatams ? `${th.progress.khatams} khatam${th.progress.khatams === 1 ? "" : "s"} done` : <><CountUp value={th?.progress.percent ?? 0} />% completed</>}</span>
-          </div>
-          {th && !th.settings && (
-            <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("thilawa")}>Set your khatam goal</button>
-          )}
-          {th?.settings && th.goal && !th.goal.passed && th.progress.count < 604 && (
-            <p className="sp-goal-line">Read about <b>{th.goal.neededPerDay} page{th.goal.neededPerDay === 1 ? "" : "s"} a day</b> to finish by {fmtDate(th.settings.goalDate)}.</p>
-          )}
+        {th ? <LastRecitation data={th} /> : <section className="sp-card hz-muted" style={{ padding: 18 }}>Loading your Thilawa…</section>}
+
+        <section className="sp-quick" aria-label="Read now">
+          <button type="button" className={`sp-quick-tile ${th?.openAssignments ? "sp-grad" : "sp-card"}`} onClick={() => setView("thilawa-assigned")}>
+            <span className="sp-quick-icon"><ListChecks size={24} aria-hidden="true" /></span>
+            <span className="sp-quick-text"><b>Teacher's reading</b>
+              <small>{th?.openAssignments ? `${th.openAssignments} reading${th.openAssignments === 1 ? "" : "s"} waiting for you` : "All done. MashaAllah!"}</small></span>
+            <ArrowRight size={20} aria-hidden="true" />
+          </button>
+          <button type="button" className="sp-quick-tile sp-card" onClick={() => setView("thilawa-free")}>
+            <span className="sp-quick-icon"><BookMarked size={24} aria-hidden="true" /></span>
+            <span className="sp-quick-text"><b>Free reading</b><small>Carry on from page {th?.nextFreePage ?? 1}</small></span>
+            <ArrowRight size={20} aria-hidden="true" />
+          </button>
         </section>
 
         <section className="sp-card sp-levels" aria-label="Tajweed and fluency levels">
+          <h3 className="sp-levels-title"><Trophy size={22} aria-hidden="true" />My levels</h3>
           <LevelMeter kind="tajweed" value={th?.levels.latest?.tajweed} change={th?.levels.tajweedChange} />
           <LevelMeter kind="fluency" value={th?.levels.latest?.fluency} change={th?.levels.fluencyChange} />
         </section>
-
-        <section className="sp-card sp-motivation" aria-label="My motivation">
-          <span className="sp-accent" aria-hidden="true" />
-          <p {...motivationTextProps(quotes.thilawa)}>{quotes.thilawa.body}</p>
-        </section>
-
-        <section className="sp-stats" aria-label="Thilawa summary">
-          {thStats.map(({ label, Icon, value }) => (
-            <div key={label} className="sp-grad sp-stat">
-              <div className="sp-stat-label">{label}</div>
-              <div className="sp-stat-value">
-                <Icon strokeWidth={1.8} aria-hidden="true" />
-                <span>{value}</span>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {th?.openAssignments > 0 && (
-          <section className="sp-card sp-todo" aria-label="Reading from your teacher">
-            <ListChecks size={30} color="#1452A8" aria-hidden="true" />
-            <span>Your teacher set <b>{th.openAssignments} reading{th.openAssignments === 1 ? "" : "s"}</b> for you.</span>
-            <button className="hz-btn hz-btn-primary" onClick={() => setView("thilawa-assigned")}>Read now</button>
-          </section>
-        )}
 
         {!DEMO && <div><StudentExams /></div>}
 

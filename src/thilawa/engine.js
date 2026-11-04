@@ -134,6 +134,22 @@ export function findClassLesson(assignments, { fromPage, toPage, instructions = 
     && (a.instructions || "") === instructions && localDate(new Date(a.createdAt), timeZone) === today) || null;
 }
 
+// The portion a class carries on with: the newest lesson among the class's
+// students (lessons: their assignments of kind "lesson"), or null.
+// → { fromPage, toPage, instructions, createdAt }
+export function lastClassPortion(lessons) {
+  const last = lessons.filter((a) => a.kind === "lesson").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))[0];
+  return last ? { fromPage: last.fromPage, toPage: last.toPage, instructions: last.instructions || "", createdAt: last.createdAt } : null;
+}
+
+// Pages turn freely while the teacher listens, so a word can be marked outside
+// the lesson's own pages. The pages to show it on: its own, widened to every
+// marked page.
+export function pagesWithMarks(a, marks) {
+  const pages = marks.map((m) => m.page);
+  return { fromPage: Math.min(a.fromPage, ...pages), toPage: Math.max(a.toPage, ...pages) };
+}
+
 // The letters in a word's Uthmani text. Harakat and Quranic marks are left
 // out; every alif form (and the small alif) counts as alif; hamza on a seat
 // counts as hamza and its seat; small waw / yaa as waw / yaa; alif maqsurah as

@@ -1,17 +1,16 @@
-// Student portal: Thilawa (reading the Quran by looking). Three screens —
-// the tracker (khatam goal, Tajweed and fluency levels, streak, teacher's
-// notes), the reading the teacher set (ticked when done) and free reading.
+// Student portal: Thilawa (reading the Quran by looking). Kept simple, three
+// screens — the student's last recitation in the Mushaf with the words to
+// correct highlighted (plus levels and the teacher's notes), the reading the
+// teacher set (ticked when done) and free reading.
 // Uses the .hz-* styles from HifzTracker.jsx plus the .th-* styles below.
 
 import { useState, useEffect } from "react";
-import { BookOpenCheck, Target, AudioLines, Gauge, Flame, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Pencil, X, AlertTriangle, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
+import { AudioLines, Gauge, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
-import { addDays } from "../hifz/engine.js";
-import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, mistakeColors } from "./engine.js";
-import { MistakeTag } from "./MistakeCategories.jsx";
+import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, pagesWithMarks, mistakeCategory, mistakeColors } from "./engine.js";
 import { LetterChips } from "./LettersPanel.jsx";
-import { browserTimezone, markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "./service.js";
+import { markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "./service.js";
 
 export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
@@ -58,6 +57,38 @@ export const thilawaCss = () => `
   .th-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
   .th-today { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .th-today span { background: #DDF5E9; color: #156B45; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
+  .th-recite { padding: 0 !important; overflow: hidden; border-radius: 20px; }
+  .th-recite-head { position: relative; display: flex; align-items: center; gap: 16px; padding: 20px 22px; color: #FFFFFF; overflow: hidden;
+    background: linear-gradient(120deg, #0D4F85 0%, #176FD1 55%, #0A94B1 100%); }
+  .th-recite-head::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 90% -30%, rgba(255,255,255,0.28), transparent 60%); }
+  .th-recite-head > * { position: relative; z-index: 1; }
+  .th-recite-icon { flex-shrink: 0; width: 54px; height: 54px; border-radius: 16px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center; }
+  .th-recite-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .th-recite-title small { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
+  .th-recite-title h2 { margin: 0; font-size: clamp(20px, 4.6vw, 28px); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+  .th-recite-title span { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; opacity: 0.92; }
+  .th-recite-count { flex-shrink: 0; min-width: 96px; padding: 10px 14px; border-radius: 16px; background: #FFFFFF; color: #123B67; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; box-shadow: 0 8px 20px rgba(8,40,80,0.25); }
+  .th-recite-count b { font-size: 34px; line-height: 1; color: #C2410C; }
+  .th-recite-count span { font-size: 12px; font-weight: 700; color: #567493; }
+  .th-recite-ok { color: #1E8A5A; }
+  .th-recite-ok span { color: #1E8A5A; }
+  .th-recite-body { padding: 16px 20px 20px; }
+  .th-recite-empty { margin: 0; padding: 16px 22px 20px; color: #567493; font-size: 15px; line-height: 1.5; }
+  .th-recite-hint { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: #123B67; font-size: 15px; font-weight: 600; }
+  .th-recite-hint svg { color: #176FD1; flex-shrink: 0; }
+  .th-recite-key { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+  .th-recite-key span { display: inline-flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
+  .th-recite-key .th-key-ar { font-family: "Noto Naskh Arabic", "Geeza Pro", serif; font-size: 15px; font-weight: 600; }
+  .th-recite-key b { min-width: 22px; height: 22px; border-radius: 999px; background: rgba(255,255,255,0.75); display: inline-flex; align-items: center; justify-content: center; font: 700 12px/1 Inter, system-ui, sans-serif; }
+  @media (max-width: 520px) {
+    .th-recite-head { flex-wrap: wrap; padding: 16px; gap: 12px; }
+    .th-recite-icon { width: 44px; height: 44px; border-radius: 13px; }
+    .th-recite-count { flex-direction: row; gap: 8px; min-width: 0; width: 100%; justify-content: center; padding: 8px 12px; }
+    .th-recite-count b { font-size: 26px; }
+    .th-recite-body { padding: 12px 6px 14px; }
+    .th-recite-body > .th-recite-hint, .th-recite-body > .th-recite-key, .th-recite-body > .lc { margin-left: 8px !important; margin-right: 8px !important; }
+    .th-recite .mp-page { padding: 4% 2.5% 2%; border-radius: 10px; }
+  }
   .th-hadith { background: linear-gradient(135deg, #FFFBF0, #FFFFFF); border: 1px solid #F1E0B0; border-radius: 14px; padding: 14px 16px; color: #5C4410; font-size: 14px; line-height: 1.6; }
   .th-hadith b { display: block; color: #7A5410; margin-bottom: 4px; }
   @media (max-width: 520px) {
@@ -90,167 +121,72 @@ export function LevelMeter({ kind, value, change = 0 }) {
   );
 }
 
-// The student's khatam goal: the date they want to finish reading the Quran by.
-function GoalEditor({ repo, settings, today, pagesLeft, onSaved, onCancel }) {
-  const [goalDate, setGoalDate] = useState(settings?.goalDate || addDays(today, 89));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const quick = [["1 month", 29], ["3 months", 89], ["6 months", 181], ["1 year", 364]];
-  const days = goalDate >= today ? Math.round((Date.parse(goalDate) - Date.parse(today)) / 86400000) + 1 : 0;
-  const save = async () => {
-    if (!goalDate || goalDate < today) { setError("Choose a date from today onward."); return; }
-    setBusy(true);
-    try {
-      await repo.saveSettings({ timezone: settings?.timezone || browserTimezone(), goalDate });
-      onSaved();
-    } catch (e) { setError(e.message); } finally { setBusy(false); }
-  };
-  return (
-    <section className="hz-card" aria-label="Khatam goal">
-      <div className="hz-row" style={{ marginBottom: 6 }}>
-        <h2 className="hz-h2" style={{ margin: 0 }}><Target size={22} aria-hidden="true" />{settings ? "Change your khatam goal" : "Set your khatam goal"}</h2>
-        {onCancel && <button className="hz-btn hz-btn-ghost" onClick={onCancel} aria-label="Close"><X size={18} aria-hidden="true" /></button>}
-      </div>
-      <p className="hz-q">By when do you want to finish reading the whole Quran?</p>
-      <div className="hz-chips" style={{ marginTop: 10 }}>
-        {quick.map(([label, n]) => {
-          const d = addDays(today, n);
-          return <button key={label} className="hz-chip" style={{ padding: "0 14px" }} aria-pressed={goalDate === d} onClick={() => setGoalDate(d)}>{label}</button>;
-        })}
-      </div>
-      <div className="hz-field">
-        <label htmlFor="th-goal-date">Or pick a date</label>
-        <input id="th-goal-date" className="hz-input" type="date" min={today} value={goalDate} onChange={(e) => setGoalDate(e.target.value)} />
-      </div>
-      {days > 0 && <p className="hz-muted" style={{ marginBottom: 0 }}>That's {days} day{days === 1 ? "" : "s"}: about <b>{Math.ceil((pagesLeft / days) * 10) / 10} page{pagesLeft / days === 1 ? "" : "s"} a day</b> for the {pagesLeft} pages left.</p>}
-      {error && <div className="hz-error" style={{ marginTop: 12 }} role="alert">{error}</div>}
-      <div className="hz-wiz-nav" style={{ justifyContent: "flex-end" }}>
-        <button className="hz-btn hz-btn-primary" onClick={save} disabled={busy}>{busy ? "Saving…" : "Save goal"}</button>
-      </div>
-    </section>
-  );
-}
-
-// ---------- corrections from the teacher ----------
-// The words the teacher marked in the reading or lesson they listened to last.
-// The student ticks each one off once they've fixed it.
-export function Corrections({ repo, data, refresh }) {
-  const { busy, error, run } = useAction(refresh);
-  const [showing, setShowing] = useState(false);
+// ---------- last recitation ----------
+// The reading or lesson the teacher listened to last, open in the Mushaf with
+// the words to correct highlighted (no list: the highlights are the list).
+export function LastRecitation({ data }) {
+  const a = data?.lastRecitation;
+  const marks = data?.lastMarks || [];
   const [page, setPage] = useState(null);
-  const a = data?.lastChecked;
-  if (!a) return null;
-  const list = data.corrections;
-  const marks = list;
-  const at = page ?? list[0]?.page ?? a.fromPage;
+  if (!a) {
+    return (
+      <section className="hz-card th-recite" aria-label="Your last recitation">
+        <header className="th-recite-head">
+          <span className="th-recite-icon"><BookOpen size={26} aria-hidden="true" /></span>
+          <div className="th-recite-title"><small>Your last recitation</small><h2>Nothing yet</h2></div>
+        </header>
+        <p className="th-recite-empty">When your teacher listens to you read, the page shows here with the words to correct highlighted.</p>
+      </section>
+    );
+  }
+  const { fromPage, toPage } = pagesWithMarks(a, marks);
+  const at = page ?? marks.map((m) => m.page).sort((x, y) => x - y)[0] ?? a.fromPage;
+  // The highlighter key: each kind of mistake marked, with how many.
+  const kinds = [];
+  for (const m of marks) {
+    const c = mistakeCategory(m.category);
+    const k = kinds.find((x) => x.id === (c?.id ?? null));
+    if (k) k.n += 1;
+    else kinds.push({ id: c?.id ?? null, label: c?.ar ?? "To correct", ar: !!c, style: c ? mistakeColors(c.id) : { background: "#FBD5CC", color: "#8A2E1A", boxShadow: "0 0 0 1px #F2A595" }, n: 1 });
+  }
   return (
-    <section className="hz-card th-reader-card" aria-label="Corrections from your teacher">
-      <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Corrections from your teacher</h2>
-      <p className="hz-muted" style={{ marginTop: 0 }}>{a.kind === "lesson" ? "Lesson" : "Reading"} · {describePages(a.fromPage, a.toPage)} · listened {fmtWhen(a.checkedAt)}</p>
-      <LetterChips letters={a.letters} style={{ marginBottom: 12 }} inMushaf={showing} />
-      {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
-      {list.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No words to correct. MashaAllah!</p> : (
-        <ul className="hz-list">
-          {list.map((m) => (
-            <li key={m.id}>
-              <span className="hz-ar hz-mark" lang="ar" style={mistakeColors(m.category)}>{m.wordText || "—"}</span>
-              <div>Page {m.page} · Ayah {m.verseKey}<MistakeTag category={m.category} /></div>
-              <button className="hz-tick" disabled={busy} onClick={() => run(() => repo.setMistakeTicked(m.id, true))} aria-label={`Tick off ${m.wordText || "this word"} as fixed`} title="Fixed it"><CheckCircle2 size={22} aria-hidden="true" /></button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <button className="hz-btn hz-btn-outline" style={{ marginTop: 12 }} onClick={() => setShowing((v) => !v)}><BookOpen size={16} aria-hidden="true" />{showing ? "Hide the Mushaf" : "Show in the Mushaf"}</button>
-      {showing && <div style={{ marginTop: 12 }}><Reader from={a.fromPage} to={a.toPage} page={at} onPage={setPage} marks={marks} letters={a.letters} /></div>}
+    <section className="hz-card th-recite" aria-label="Your last recitation">
+      <header className="th-recite-head">
+        <span className="th-recite-icon"><BookOpen size={26} aria-hidden="true" /></span>
+        <div className="th-recite-title">
+          <small>Your last recitation</small>
+          <h2>{a.instructions || describePages(a.fromPage, a.toPage).split(" · ")[0]}</h2>
+          <span><CalendarDays size={14} aria-hidden="true" /> {fmtWhen(a.checkedAt || a.createdAt)} · {a.fromPage === a.toPage ? `Page ${a.fromPage}` : `Pages ${a.fromPage}–${a.toPage}`}</span>
+        </div>
+        {marks.length
+          ? <div className="th-recite-count"><b>{marks.length}</b><span>word{marks.length === 1 ? "" : "s"} to correct</span></div>
+          : <div className="th-recite-count th-recite-ok"><CheckCircle2 size={28} aria-hidden="true" /><span>MashaAllah!</span></div>}
+      </header>
+      <div className="th-recite-body">
+        <p className="th-recite-hint">{marks.length
+          ? <><Highlighter size={16} aria-hidden="true" /> Practise the highlighted words before your next class.</>
+          : <><CheckCircle2 size={16} aria-hidden="true" /> No words to correct this time. Keep it up!</>}</p>
+        {kinds.length > 0 && (
+          <div className="th-recite-key" aria-label="Highlighter colours">
+            {kinds.map((k) => <span key={k.id ?? "plain"} style={k.style} lang={k.ar ? "ar" : undefined} className={k.ar ? "th-key-ar" : undefined}>{k.label}<b>{k.n}</b></span>)}
+          </div>
+        )}
+        <LetterChips letters={a.letters} style={{ margin: "0 0 12px" }} inMushaf />
+        <Reader from={fromPage} to={toPage} page={at} onPage={setPage} marks={marks} letters={a.letters} />
+      </div>
     </section>
   );
 }
 
 // ---------- Thilawa tracker ----------
 
-export function ThilawaTracker({ repo, data, refresh, onGo }) {
-  const [editingGoal, setEditingGoal] = useState(false);
+export function ThilawaTracker({ data, onGo }) {
   if (!data) return <div className="hz"><div className="hz-card hz-muted">Loading your Thilawa…</div></div>;
-  const { progress, goal, settings, streak, today, levels, notes, counts, pace } = data;
-  const pagesLeft = TOTAL_PAGES - progress.count;
+  const { levels, notes } = data;
   const last = levels.latest;
-  if (!settings || editingGoal) {
-    return (
-      <div className="hz">
-        {!editingGoal && <Corrections repo={repo} data={data} refresh={refresh} />}
-        <GoalEditor repo={repo} settings={settings} today={today} pagesLeft={pagesLeft}
-          onCancel={settings ? () => setEditingGoal(false) : null}
-          onSaved={() => { setEditingGoal(false); refresh(); }} />
-      </div>
-    );
-  }
   return (
     <div className="hz">
-      <Corrections repo={repo} data={data} refresh={refresh} />
-
-      <section className="hz-card" aria-label="Khatam progress">
-        <div className="hz-row">
-          <h2 className="hz-h2" style={{ margin: 0 }}><BookOpenCheck size={22} aria-hidden="true" />Khatam Progress</h2>
-          <button className="hz-btn hz-btn-outline" onClick={() => setEditingGoal(true)}><Pencil size={16} aria-hidden="true" />Change goal</button>
-        </div>
-        <div className="hz-row" style={{ margin: "14px 0 10px" }}>
-          <span className="hz-muted">{progress.count} of {TOTAL_PAGES} pages read{progress.khatams ? ` in khatam ${progress.khatams + 1}` : ""}</span>
-          <span className="hz-big">{progress.percent}%</span>
-        </div>
-        <div className="hz-bar" role="progressbar" aria-label="Khatam progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}><div style={{ width: `${progress.percent}%` }} /></div>
-        <div className="hz-kv">
-          <div><span>Pages left</span><strong>{pagesLeft}</strong></div>
-          <div><span>Khatam goal</span><strong>{fmtDate(settings.goalDate)}</strong></div>
-          <div><span>Needed per day</span><strong>{goal.passed ? "Goal date passed" : `${goal.neededPerDay} page${goal.neededPerDay === 1 ? "" : "s"}`}</strong></div>
-          <div><span>Estimated finish</span><strong>{goal.estimatedDate ? fmtDate(goal.estimatedDate) : "Start reading to see"}</strong></div>
-          <div><span>Surahs read</span><strong>{counts.surahs} / 114</strong></div>
-          <div><span>Khatams completed</span><strong>{progress.khatams}{progress.lastKhatamOn ? ` · last ${fmtDate(progress.lastKhatamOn)}` : ""}</strong></div>
-        </div>
-        {(goal.passed || !goal.onTrack) && progress.count < TOTAL_PAGES && (
-          <div className="hz-note"><AlertTriangle size={18} aria-hidden="true" />
-            <span>{goal.passed
-              ? "Your goal date has passed. Choose a new date to keep going."
-              : pace > 0
-                ? `At your pace (about ${Math.round(pace * 10) / 10} pages a day) you'd finish after your goal. Reading ${goal.neededPerDay} pages a day will reach it.`
-                : `Read ${goal.neededPerDay} pages a day to reach your goal.`}</span>
-          </div>
-        )}
-      </section>
-
-      <section className="hz-card" aria-label="Tajweed and fluency levels">
-        <h2 className="hz-h2"><Trophy size={22} aria-hidden="true" />My Levels</h2>
-        <div className="th-levels">
-          <LevelMeter kind="tajweed" value={last?.tajweed} change={levels.tajweedChange} />
-          <LevelMeter kind="fluency" value={last?.fluency} change={levels.fluencyChange} />
-        </div>
-        <p className="hz-muted" style={{ marginBottom: 0 }}>
-          {last ? <>Assessed by your teacher on {fmtDate(last.assessedOn)}.{last.comment && <> “{last.comment}”</>}</> : "Your teacher will assess your Tajweed and how fluently you read. Your levels show here."}
-        </p>
-      </section>
-
-      <section className="hz-card" aria-label="Teacher's notes">
-        <h2 className="hz-h2"><StickyNote size={22} aria-hidden="true" />Teacher's Notes</h2>
-        {notes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No notes from your teacher yet.</p> : (
-          <ul className="th-notes">
-            {notes.map((n) => <li key={n.id}>{n.body}<small>{fmtWhen(n.createdAt)}</small></li>)}
-          </ul>
-        )}
-      </section>
-
-      <section className="hz-card" aria-label="Streaks">
-        <h2 className="hz-h2"><Flame size={22} aria-hidden="true" />Reading Streak</h2>
-        <div className="hz-streak">
-          <div><strong>{streak.current}</strong><span>Current streak</span></div>
-          <div><strong>{streak.longest}</strong><span>Longest streak</span></div>
-          <div><strong style={{ fontSize: 15, lineHeight: "28px" }}>{streak.lastActive ? fmtDate(streak.lastActive) : "—"}</strong><span>Last read</span></div>
-        </div>
-        <div className="hz-cal" aria-label="Reading in the last 5 weeks">
-          {streak.calendar.map((d) => (
-            <div key={d.date} className={`${d.active ? "on" : ""} ${d.date === today ? "today" : ""}`} title={`${fmtDate(d.date)}${d.active ? ": read" : ""}`}>{+d.date.slice(8)}</div>
-          ))}
-        </div>
-        <p className="hz-muted" style={{ marginBottom: 0 }}>Read at least one page a day to keep your streak. It survives one missed day and resets after two missed days in a row.</p>
-      </section>
+      <LastRecitation data={data} />
 
       <section className="hz-card" aria-label="Read now">
         <h2 className="hz-h2"><BookMarked size={22} aria-hidden="true" />Read now</h2>
@@ -266,8 +202,27 @@ export function ThilawaTracker({ repo, data, refresh, onGo }) {
             <button className="hz-btn hz-btn-outline" onClick={() => onGo("thilawa-free")}>Open<ArrowRight size={16} aria-hidden="true" /></button>
           </div>
         </div>
-        <div className="th-hadith" style={{ marginTop: 14 }}><b>{THILAWA_HADITH.short}</b>{THILAWA_HADITH.text} {THILAWA_HADITH.source}</div>
       </section>
+
+      <section className="hz-card" aria-label="Tajweed and fluency levels">
+        <h2 className="hz-h2"><Trophy size={22} aria-hidden="true" />My Levels</h2>
+        <div className="th-levels">
+          <LevelMeter kind="tajweed" value={last?.tajweed} change={levels.tajweedChange} />
+          <LevelMeter kind="fluency" value={last?.fluency} change={levels.fluencyChange} />
+        </div>
+        <p className="hz-muted" style={{ marginBottom: 0 }}>
+          {last ? <>Assessed by your teacher on {fmtDate(last.assessedOn)}.{last.comment && <> “{last.comment}”</>}</> : "Your teacher will assess your Tajweed and how fluently you read. Your levels show here."}
+        </p>
+      </section>
+
+      {notes.length > 0 && (
+        <section className="hz-card" aria-label="Teacher's notes">
+          <h2 className="hz-h2"><StickyNote size={22} aria-hidden="true" />Teacher's Notes</h2>
+          <ul className="th-notes">
+            {notes.map((n) => <li key={n.id}>{n.body}<small>{fmtWhen(n.createdAt)}</small></li>)}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
@@ -285,11 +240,13 @@ function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, foo
   useEffect(() => { window.scrollTo?.({ top: 0, behavior: "smooth" }); }, [page]);
   return (
     <MushafPresent><div className="th-reader">
-      <div className="th-reader-nav">
-        <button className="hz-btn hz-btn-outline" disabled={page >= to} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
-        <div className="th-reader-title">{pageLabel(page)}{to > from && <small>Page {page - from + 1} of {to - from + 1}</small>}</div>
-        <button className="hz-btn hz-btn-outline" disabled={page <= from} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
-      </div>
+      {to > from ? (
+        <div className="th-reader-nav">
+          <button className="hz-btn hz-btn-outline" disabled={page >= to} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
+          <div className="th-reader-title">{pageLabel(page)}<small>Page {page - from + 1} of {to - from + 1}</small></div>
+          <button className="hz-btn hz-btn-outline" disabled={page <= from} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
+        </div>
+      ) : <div className="th-reader-title">{pageLabel(page)}</div>}
       <div {...swipe}><MushafPage page={page} marks={marks} letters={letters} /></div>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
@@ -330,6 +287,7 @@ export function AssignedReading({ repo, data, refresh }) {
     const a = [...assignments, ...data.lessons].find((x) => x.id === open) || null;
     if (!a) { setOpen(null); return null; }
     const lesson = a.kind === "lesson";
+    const span = pagesWithMarks(a, marksOf(a)); // marked pages show too
     return (
       <div className="hz">
         <section className="hz-card th-reader-card" aria-label="Reading from your teacher">
@@ -341,7 +299,7 @@ export function AssignedReading({ repo, data, refresh }) {
           <LetterChips letters={a.letters} style={{ marginBottom: 12 }} inMushaf />
           {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
           {a.checkedAt && <div className="hz-muted" style={{ marginBottom: 10 }}><Highlighter size={14} aria-hidden="true" /> {listenedLabel(a)}. Marked words are highlighted.</div>}
-          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage} marks={marksOf(a)} letters={a.letters}
+          <Reader from={span.fromPage} to={span.toPage} page={page} onPage={setPage} marks={marksOf(a)} letters={a.letters}
             footer={lesson ? null : a.completedAt
               ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />Done · tap to undo</button>
               : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />I've finished this reading</button>} />
@@ -354,7 +312,7 @@ export function AssignedReading({ repo, data, refresh }) {
     <div className="hz">
       <section className="hz-card" aria-label="Reading from your teacher">
         <h2 className="hz-h2"><ListChecks size={22} aria-hidden="true" />Teacher's Reading</h2>
-        <p className="hz-muted" style={{ marginTop: 0 }}>Read what your teacher set, then tick it. Ticked pages count towards your khatam.</p>
+        <p className="hz-muted" style={{ marginTop: 0 }}>Read what your teacher set, then tick it.</p>
         {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
         {assignments.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>Your teacher hasn't set any reading yet.</p> : (
           <div className="th-list">
@@ -435,7 +393,7 @@ export function FreeReading({ repo, data, refresh }) {
     <div className="hz">
       <section className="hz-card" aria-label="Choose where to read">
         <h2 className="hz-h2"><BookMarked size={22} aria-hidden="true" />Free Reading</h2>
-        <p className="hz-muted" style={{ margin: 0 }}>Read anywhere you like. Tick each page you read and it counts towards your khatam.</p>
+        <p className="hz-muted" style={{ margin: 0 }}>Read anywhere you like, and tick each page you read.</p>
         <div className="th-pick">
           <label className="hz-field" style={{ marginTop: 0 }}><span>Surah</span>
             <select className="hz-select" value={surahIndex} onChange={(e) => setPage(SURAHS[+e.target.value].startPage)}>

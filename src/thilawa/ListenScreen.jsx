@@ -4,6 +4,9 @@
 // word opens it again. Letters opens the Arabic letters table, to choose the
 // letters the student needs to work on. Finish saves that the teacher
 // listened, and the student is notified with how many words to correct.
+// Pages turn freely past the portion (the class often reads on); the portion's
+// pages are only where it opens. startPage opens it elsewhere, and onPage(page)
+// hears every turn.
 //
 // A class lesson (see ClassLesson.jsx) adds `classmates`: [{ id, name, done }]
 // for a dropdown of the class in place of the name, `onStudent(id)` to switch
@@ -14,7 +17,7 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
-import { describePages, pageLabel } from "./engine.js";
+import { TOTAL_PAGES, describePages, pageLabel } from "./engine.js";
 import { MistakePopup, MistakeLegend } from "./MistakeCategories.jsx";
 import LettersPanel, { LetterChips } from "./LettersPanel.jsx";
 
@@ -42,6 +45,9 @@ const CSS = `
   .lm-who:hover { background-color: rgba(255,255,255,0.26); }
   .lm-who:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
   .lm-who option { color: #123B67; background: #FFFFFF; }
+  .lm-goto { width: 76px; min-height: 34px; margin-top: 4px; padding: 0 8px; border-radius: 9px; border: 1px solid #C7DDF4; background: #FFFFFF; color: #123B67; font: 600 14px/1 Inter, ui-sans-serif, system-ui, sans-serif; text-align: center; }
+  .lm-goto:focus-visible { outline: 2px solid #176FD1; outline-offset: 1px; }
+  .lm-out { color: #8A5A00 !important; font-weight: 600; }
   .lm-count { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #176FD1; color: #FFFFFF; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
   @media (max-width: 640px) {
     .lm-inner { padding: 10px 6px 20px; }
@@ -50,8 +56,9 @@ const CSS = `
   }
 `;
 
-export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose, classmates = null, onStudent = null, onFinished = null }) {
-  const [page, setPage] = useState(a.fromPage);
+export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose, classmates = null, onStudent = null, onFinished = null, startPage = null, onPage: onPageTurn = null }) {
+  const [page, setPage] = useState(startPage ?? a.fromPage);
+  const [goto, setGoto] = useState(null); // the page number being typed
   const [selectedKey, setSelectedKey] = useState(null);
   const [anchor, setAnchor] = useState(null); // the selected word on screen
   const [lettersOpen, setLettersOpen] = useState(false);
@@ -68,9 +75,15 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
     try { await fn(); await refresh(); return true; } catch (e) { setError(e.message); return false; } finally { setBusy(false); }
   };
   // Like a printed Mushaf: the next page is to the left.
-  const turn = (to) => { setSelectedKey(null); setPage(to); };
-  const next = () => turn(Math.min(a.toPage, page + 1));
-  const prev = () => turn(Math.max(a.fromPage, page - 1));
+  const turn = (to) => { setSelectedKey(null); setPage(to); onPageTurn?.(to); };
+  const next = () => turn(Math.min(TOTAL_PAGES, page + 1));
+  const prev = () => turn(Math.max(1, page - 1));
+  const jump = () => {
+    const p = Math.round(+goto);
+    if (p >= 1 && p <= TOTAL_PAGES && p !== page) turn(p);
+    setGoto(null);
+  };
+  const inPortion = page >= a.fromPage && page <= a.toPage;
   const swipe = useMushafSwipe(next, prev);
 
   // Another student of the class: nothing of the last one stays selected.
@@ -129,13 +142,18 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
               <i className="lm-abc" lang="ar" aria-hidden="true">أ ب</i>Letters{a.letters.length > 0 && <b className="lm-count" aria-hidden="true">{a.letters.length}</b>}
             </button>
           }>
-          {a.toPage > a.fromPage ? (
-            <div className="lm-nav">
-              <button className="hz-btn hz-btn-outline" disabled={page >= a.toPage} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
-              <div className="lm-nav-title">{pageLabel(page)}<small>Page {page - a.fromPage + 1} of {a.toPage - a.fromPage + 1}{onPage ? ` · ${onPage} marked here` : ""}</small></div>
-              <button className="hz-btn hz-btn-outline" disabled={page <= a.fromPage} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
+          <div className="lm-nav">
+            <button className="hz-btn hz-btn-outline" disabled={page >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
+            <div className="lm-nav-title">{pageLabel(page)}
+              <small className={inPortion ? undefined : "lm-out"}>{inPortion
+                ? (a.toPage > a.fromPage ? `Page ${page - a.fromPage + 1} of ${a.toPage - a.fromPage + 1} of the part` : "The part's page")
+                : <>Past the part · <button type="button" className="hz-btn hz-btn-ghost" style={{ minHeight: 0, padding: "0 4px", fontSize: 13 }} onClick={() => turn(a.fromPage)}>back to page {a.fromPage}</button></>}
+                {onPage ? ` · ${onPage} marked here` : ""}</small>
+              <input className="lm-goto" type="number" inputMode="numeric" min="1" max={TOTAL_PAGES} aria-label="Go to page" title="Go to page"
+                value={goto ?? page} onChange={(e) => setGoto(e.target.value)} onBlur={jump} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }} />
             </div>
-          ) : <div className="lm-nav"><div className="lm-nav-title">{pageLabel(page)}</div></div>}
+            <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
+          </div>
           <div {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected letters={a.letters} /></div>
           {selected && (
             <MistakePopup key={selected.id} anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}

@@ -40,9 +40,10 @@ export const MOTIVATION_DEFAULTS = {
   thilawa: { body: "Every letter I read is a reward, multiplied by ten", lang: "en", font: "georgia", size: 48 },
 };
 
+// Only the Hifz dashboard shows a quote (the Thilawa one was taken off; its
+// saved row and default stay, unused).
 const PROGRAMS = [
   { key: "hifz", label: "Hifz dashboard" },
-  { key: "thilawa", label: "Thilawa dashboard" },
 ];
 
 const pick = ({ body, lang, font, size }) => ({ body, lang, font, size });
@@ -153,7 +154,7 @@ export function AdminMotivation({ showToast }) {
           <span className="tp-title-icon" aria-hidden="true"><Quote size={22} /></span>
           <div>
             <h1 className="tp-title">Motivation</h1>
-            <div className="tp-subtext" style={{ margin: 0 }}>The quote students see on their dashboard. Choose its words, language, font and size.</div>
+            <div className="tp-subtext" style={{ margin: 0 }}>The quote students see on their Hifz dashboard. Choose its words, language, font and size.</div>
           </div>
         </div>
         <div className="tp-actions">
