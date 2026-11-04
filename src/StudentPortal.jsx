@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Presentation, ArrowRight, Trophy, Eye, EyeOff } from "lucide-react";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText } from "lucide-react";
 import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
 import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog } from "./HifzTracker.jsx";
@@ -15,7 +15,8 @@ import AuthShell from "./AuthShell.jsx";
 import { StudentExams } from "./exams/ExamUI.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
-import { ThilawaTracker, LastRecitation, AssignedReading, FreeReading, LevelMeter, THILAWA_HADITH, thilawaCss } from "./thilawa/ThilawaStudent.jsx";
+import ThilawaHome from "./thilawa/ThilawaHome.jsx";
+import { ThilawaTracker, AssignedReading, FreeReading, THILAWA_HADITH, thilawaCss } from "./thilawa/ThilawaStudent.jsx";
 import { TeacherThilawaStudent } from "./thilawa/ThilawaTeacher.jsx";
 import { loadThilawa } from "./thilawa/service.js";
 import { createSupabaseThilawaRepo, createThilawaMemoryStore, createMemoryThilawaRepo } from "./thilawa/repos.js";
@@ -162,34 +163,6 @@ function StudentAvatarIcon({ size = 64 }) {
   );
 }
 
-// Closed Mushaf (blue cover, gold frame and star, page edges showing) for the
-// profile header. Still, unlike the animated QuranIcon on the progress bar.
-function MushafIcon() {
-  return (
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="sp-mushaf-cover" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={TP.gradStart} />
-          <stop offset="0.6" stopColor={TP.blue} />
-          <stop offset="1" stopColor={TP.gradEnd} />
-        </linearGradient>
-      </defs>
-      {/* page edges, right and bottom */}
-      <rect x="15" y="8" width="38" height="50" rx="3.5" fill="#FFF8E7" stroke="#E2CFA0" strokeWidth="1" />
-      <path d="M49 13v41M46 55h-28" stroke="#E2CFA0" strokeWidth="0.8" />
-      {/* cover */}
-      <rect x="11" y="5" width="38" height="50" rx="3.5" fill="url(#sp-mushaf-cover)" />
-      <rect x="11" y="5" width="6" height="50" rx="2" fill={TP.navy} opacity="0.35" />
-      <rect x="21" y="11" width="23" height="38" rx="2.5" fill="none" stroke="#E9C46A" strokeWidth="1.6" />
-      <g transform="translate(32.5 30)" fill="none" stroke="#F3D27A" strokeWidth="1.6" strokeLinejoin="round">
-        <rect x="-6" y="-6" width="12" height="12" />
-        <rect x="-6" y="-6" width="12" height="12" transform="rotate(45)" />
-        <circle r="2.2" fill="#F3D27A" stroke="none" />
-      </g>
-    </svg>
-  );
-}
-
 // Students sign in with their Student ID (e.g. AQC0001). Their Supabase login
 // is the hidden address <id>@students.aflaahqc.com (made by the student-login
 // Edge Function); an older login that is a real email still works as typed.
@@ -303,10 +276,11 @@ async function loadStudentForUser(userId) {
 const NAV = [
   { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText, program: "hifz" },
-  { key: "thilawa", label: "Thilawa", Icon: BookOpenCheck, program: "thilawa" },
+  { key: "thilawa", label: "Thilawa progress", Icon: BookOpenCheck, program: "thilawa" },
   { key: "thilawa-assigned", label: "Teacher's Reading", Icon: ListChecks, program: "thilawa" },
   { key: "thilawa-free", label: "Free Reading", Icon: BookMarked, program: "thilawa" },
   { key: "attendance", label: "Attendance", Icon: CalendarCheck },
+  { key: "exams", label: "Exams", Icon: FileText },
   { key: "finance", label: "Finance", Icon: Wallet },
 ];
 
@@ -451,14 +425,12 @@ export default function StudentPortal() {
     <div className={`sp-page ${ready ? "sp-page-shell" : ""}`}>
       <style>{`
         .sp-page { position: relative; overflow: hidden; min-height: 100vh; box-sizing: border-box; padding: 24px 16px 40px; font-family: Inter, system-ui, sans-serif; color: ${TP.navy};
-          background: radial-gradient(circle at 15% 0%, #FFFFFF 0%, transparent 45%), linear-gradient(180deg, #E4F1FC 0%, ${TP.bg} 45%, #F5FAFD 100%); }
+          background: #F3F7FB; }
         .sp-page-pattern { position: absolute; width: 320px; max-width: 70%; height: auto; opacity: 0.18; pointer-events: none; user-select: none; z-index: 0; }
         .sp-page-pattern-top { top: 0; right: 0; }
         .sp-page-pattern-bottom { bottom: 0; left: 0; transform: rotate(180deg); }
-        .sp-blue-pattern { position: absolute; height: auto; opacity: 0.1; pointer-events: none; user-select: none; z-index: 0; }
-        .sp-header .sp-blue-pattern { right: 0; bottom: 0; width: 340px; transform: scaleX(-1); }
-        .sp-header > *:not(.sp-blue-pattern), .sp-stat > *:not(.sp-blue-pattern) { position: relative; z-index: 1; }
-        .sp-wrap { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+        .sp-header > *, .sp-stat > * { position: relative; z-index: 1; }
+        .sp-wrap { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
         /* Signed in: Teacher/Admin-style shell (sidebar on desktop, drawer on
            phones) with the page using the full width of the screen. */
@@ -467,8 +439,8 @@ export default function StudentPortal() {
         .sp-content { padding: clamp(16px, 3vw, 36px); box-sizing: border-box; }
         .sp-content .sp-wrap { max-width: 1280px; width: 100%; }
         @media (min-width: 1100px) {
-          .sp-content .sp-name { font-size: 28px; }
-          .sp-content .sp-id, .sp-content .sp-tracker-foot { font-size: 18px; }
+          .sp-content .sp-name { font-size: 30px; }
+          .sp-content .sp-tracker-foot { font-size: 18px; }
           .sp-content .sp-stat-label { font-size: 17px; }
           .sp-content .sp-stat-value { font-size: 28px; }
         }
@@ -477,27 +449,23 @@ export default function StudentPortal() {
         }
         .sp-shell .tp-avatar svg { width: 30px; height: 30px; }
         ${RECORDS_CSS}
-        .sp-card { position: relative; background: rgba(255,255,255,0.92); border: 1px solid #DCEBF8; border-radius: 18px; box-shadow: 0 10px 30px rgba(18,59,103,0.08); }
-        .sp-grad { background: linear-gradient(120deg, ${TP.gradStart} 0%, ${TP.blue} 55%, ${TP.gradEnd} 100%); color: #FFFFFF; border: none; box-shadow: 0 12px 28px rgba(13,79,133,0.25); }
+        .sp-card { position: relative; background: #FFFFFF; border: 1px solid #E3ECF5; border-radius: 16px; box-shadow: 0 1px 2px rgba(16,40,70,0.04), 0 4px 16px rgba(16,40,70,0.05); }
+        .sp-grad { background: linear-gradient(135deg, ${TP.gradStart} 0%, ${TP.blue} 100%); color: #FFFFFF; border: none; box-shadow: 0 1px 2px rgba(13,79,133,0.10), 0 8px 24px rgba(13,79,133,0.16); }
 
-        .sp-header { display: flex; flex-direction: column; gap: 16px; padding: 16px 18px 14px; overflow: hidden; }
-        .sp-header::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-          background: radial-gradient(ellipse at 85% -20%, rgba(255,255,255,0.22), transparent 55%); }
+        .sp-header { display: flex; flex-direction: column; gap: 16px; padding: 20px 20px 16px; overflow: hidden; border-radius: 18px; }
         .sp-header-top { display: flex; align-items: center; gap: 18px; }
-        .sp-avatar { flex-shrink: 0; width: clamp(64px, 17vw, 96px); aspect-ratio: 1; border-radius: 18px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
-        .sp-avatar svg { width: 76%; height: 76%; }
         .sp-ident { flex: 1 1 auto; min-width: 0; }
-        .sp-name { font-size: clamp(18px, 4.6vw, 28px); font-weight: 700; line-height: 1.2; overflow-wrap: break-word; hyphens: auto; }
-        .sp-id { font-size: clamp(14px, 3.4vw, 20px); opacity: 0.9; margin-top: 6px; }
-        .sp-streak-box { flex-shrink: 0; display: flex; align-items: center; gap: 8px; border: 2px solid rgba(255,255,255,0.85); border-radius: 14px; padding: 8px 14px; }
-        .sp-streak-box strong { font-size: clamp(22px, 5vw, 30px); line-height: 1.15; }
+        .sp-name { font-size: clamp(22px, 5.6vw, 28px); font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; overflow-wrap: break-word; hyphens: auto; }
+        .sp-id { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75; margin-top: 6px; }
+        .sp-streak-box { flex-shrink: 0; display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.28); border-radius: 999px; padding: 6px 14px 6px 10px; }
+        .sp-streak-box strong { font-size: clamp(18px, 4.4vw, 22px); line-height: 1.15; }
         .sp-flame { width: clamp(20px, 4.6vw, 26px); height: auto; color: #F5B942; }
-        .sp-week { display: flex; justify-content: space-between; gap: 6px; margin: 0; padding: 12px 0 0; list-style: none; border-top: 1px solid rgba(255,255,255,0.35); }
+        .sp-week { display: flex; justify-content: space-between; gap: 6px; margin: 0; padding: 14px 0 0; list-style: none; border-top: 1px solid rgba(255,255,255,0.18); }
         .sp-day { width: clamp(22px, 5.4vw, 28px); aspect-ratio: 1; border-radius: 50%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: clamp(11px, 2.8vw, 13px); font-weight: 700; }
         .sp-day-done { background: #FFFFFF; color: ${TP.gradStart}; }
         .sp-day-today { border: 2px solid #FFFFFF; }
-        .sp-day-missed { border: 1.5px solid rgba(255,255,255,0.4); color: rgba(255,255,255,0.65); }
-        .sp-day-future { border: 1.5px dashed rgba(255,255,255,0.65); }
+        .sp-day-missed { border: 1px solid rgba(255,255,255,0.3); color: rgba(255,255,255,0.6); }
+        .sp-day-future { border: 1px dashed rgba(255,255,255,0.5); color: rgba(255,255,255,0.85); }
         .sp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
         .sp-tracker { padding: 22px 22px 18px; }
@@ -523,42 +491,29 @@ export default function StudentPortal() {
         .sp-stat-value { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: clamp(17px, 4.4vw, 28px); font-weight: 700; white-space: nowrap; }
         .sp-stat-value svg { width: clamp(22px, 5.4vw, 36px); height: auto; flex-shrink: 0; }
 
-        .sp-hadith { padding: 22px 26px 24px 58px; }
-        .sp-hadith h3 { margin: 0 0 14px; font-size: clamp(18px, 4.2vw, 24px); font-weight: 700; color: #0F2F8A; }
-        .sp-hadith p { margin: 0; text-align: center; font-size: clamp(14px, 3.4vw, 18px); line-height: 1.6; color: #0F2F8A; }
-        .sp-hadith .sp-hadith-src { margin-top: 12px; font-weight: 700; }
+        .sp-hadith { padding: 18px 20px 18px 34px; }
+        .sp-hadith h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6B819A; }
+        .sp-hadith p { margin: 0; font-size: clamp(15px, 3.6vw, 17px); line-height: 1.65; color: #1F3A5A; }
+        .sp-hadith .sp-hadith-src { margin-top: 10px; font-size: 13px; font-weight: 600; color: #6B819A; }
+        .sp-hadith .sp-accent { left: 18px; top: 18px; bottom: 18px; width: 3px; }
 
         .sp-setup-btn { margin-top: 14px; width: 100%; }
         ${HIFZ_CSS}
         ${thilawaCss()}
         ${MOTIVATION_FONT_CSS}
-        .sp-switch { display: flex; gap: 6px; padding: 6px; border-radius: 16px; background: rgba(255,255,255,0.92); border: 1px solid #DCEBF8; box-shadow: 0 6px 18px rgba(18,59,103,0.06); }
+        .sp-switch { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E3ECF5; box-shadow: 0 1px 2px rgba(16,40,70,0.04); }
         .sp-switch button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; border: none; border-radius: 12px; background: transparent; color: ${TP.navy}; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
-        .sp-switch button[aria-selected="true"] { background: linear-gradient(120deg, ${TP.gradStart}, ${TP.blue}); color: #FFFFFF; box-shadow: 0 6px 14px rgba(13,79,133,0.25); }
+        .sp-switch button[aria-selected="true"] { background: ${TP.gradStart}; color: #FFFFFF; box-shadow: none; }
         .sp-switch button:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
-        .sp-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; padding: 18px; }
         .sp-goal-line { margin: 12px 0 0; font-size: 15px; color: #1452A8; }
-        .sp-levels-title { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin: 0; font-size: clamp(17px, 4vw, 22px); font-weight: 700; color: #0F2F8A; }
-        .sp-levels-title svg { color: ${TP.blue}; }
-        .sp-quick { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
-        .sp-quick-tile { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 18px; font: inherit; text-align: left; cursor: pointer; color: ${TP.navy}; }
-        .sp-quick-tile.sp-grad { color: #FFFFFF; }
-        .sp-quick-tile:focus-visible { outline: 3px solid ${TP.blue}; outline-offset: 2px; }
-        .sp-quick-tile:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(13,79,133,0.2); }
-        .sp-quick-icon { flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: #E8F2FC; color: ${TP.blue}; }
-        .sp-grad .sp-quick-icon { background: rgba(255,255,255,0.2); color: #FFFFFF; }
-        .sp-quick-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-        .sp-quick-text b { font-size: 17px; }
-        .sp-quick-text small { font-size: 14px; opacity: 0.85; }
-        .sp-quick-tile > svg { flex-shrink: 0; opacity: 0.8; }
         /* ---------- animations ---------- */
-        @keyframes sp-rise { from { opacity: 0; transform: translateY(18px) scale(0.98); } to { opacity: 1; transform: none; } }
+        @keyframes sp-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
         @keyframes sp-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(260%) skewX(-18deg); } }
         @keyframes sp-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
         @keyframes sp-accent { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
         /* The profile header stays still: no animations on it. */
-        .sp-wrap > *:not(.sp-header) { animation: sp-rise 0.65s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .sp-wrap > *:not(.sp-header) { animation: sp-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
         .sp-wrap > *:nth-child(2) { animation-delay: 0.07s; }
         .sp-wrap > *:nth-child(3) { animation-delay: 0.14s; }
         .sp-wrap > *:nth-child(4) { animation-delay: 0.21s; }
@@ -571,8 +526,8 @@ export default function StudentPortal() {
         .sp-stat:nth-child(2) { animation-delay: 0.4s; }
         .sp-stat:nth-child(3) { animation-delay: 0.5s; }
 
-        .sp-card, .sp-stat { transition: transform 0.25s ease, box-shadow 0.25s ease; }
-        .sp-card:not(.sp-login):not(.sp-header):hover, .sp-stat:hover { transform: translateY(-4px); box-shadow: 0 18px 38px rgba(13,79,133,0.18); }
+        .sp-card, .sp-stat { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        button.sp-card:hover { border-color: #C9DAEC; box-shadow: 0 1px 2px rgba(16,40,70,0.05), 0 8px 24px rgba(16,40,70,0.08); }
         .sp-stat:hover .sp-stat-value svg { animation: sp-float 1.2s ease-in-out infinite; }
 
         .sp-stat::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 35%; pointer-events: none; z-index: 2;
@@ -612,7 +567,6 @@ export default function StudentPortal() {
         @media (max-width: 520px) {
           .sp-header { gap: 12px; padding: 12px; }
           .sp-header-top { gap: 12px; }
-          .sp-avatar { width: 64px; }
         }
         @media (max-width: 420px) {
           .sp-streak-box { padding: 6px 10px; }
@@ -687,12 +641,9 @@ export default function StudentPortal() {
         </div>
 
       <div className="tp-content sp-content">
-      <img src={PATTERN_MAIN_URL} className="sp-page-pattern sp-page-pattern-top" alt="" aria-hidden="true" />
       <main key={view} className="sp-wrap">
         <section className="sp-card sp-grad sp-header" aria-label="Student profile">
-          <img src={PATTERN_ON_BLUE_URL} className="sp-blue-pattern" alt="" aria-hidden="true" />
           <div className="sp-header-top">
-            <div className="sp-avatar"><MushafIcon /></div>
             <div className="sp-ident">
               <div className="sp-name">{student.name}</div>
               <div className="sp-id">{student.student_code}</div>
@@ -727,6 +678,9 @@ export default function StudentPortal() {
         )}
         {view === "attendance" && <StudentAttendance records={records} />}
         {view === "finance" && <StudentFinance student={student} records={records} demo={DEMO} />}
+        {view === "exams" && (DEMO
+          ? <section className="sp-card hz-muted" style={{ padding: 18 }}>Exams aren't shown in demo mode.</section>
+          : <StudentExams emptyText="No exams scheduled for you yet." />)}
 
         {view === "dashboard" && doesHifz && doesThilawa && (
           <div className="sp-switch" role="tablist" aria-label="Dashboard">
@@ -736,38 +690,16 @@ export default function StudentPortal() {
           </div>
         )}
 
-        {view === "dashboard" && dash === "thilawa" && <>
-        {th ? <LastRecitation data={th} /> : <section className="sp-card hz-muted" style={{ padding: 18 }}>Loading your Thilawa…</section>}
-
-        <section className="sp-quick" aria-label="Read now">
-          <button type="button" className={`sp-quick-tile ${th?.openAssignments ? "sp-grad" : "sp-card"}`} onClick={() => setView("thilawa-assigned")}>
-            <span className="sp-quick-icon"><ListChecks size={24} aria-hidden="true" /></span>
-            <span className="sp-quick-text"><b>Teacher's reading</b>
-              <small>{th?.openAssignments ? `${th.openAssignments} reading${th.openAssignments === 1 ? "" : "s"} waiting for you` : "All done. MashaAllah!"}</small></span>
-            <ArrowRight size={20} aria-hidden="true" />
-          </button>
-          <button type="button" className="sp-quick-tile sp-card" onClick={() => setView("thilawa-free")}>
-            <span className="sp-quick-icon"><BookMarked size={24} aria-hidden="true" /></span>
-            <span className="sp-quick-text"><b>Free reading</b><small>Carry on from page {th?.nextFreePage ?? 1}</small></span>
-            <ArrowRight size={20} aria-hidden="true" />
-          </button>
-        </section>
-
-        <section className="sp-card sp-levels" aria-label="Tajweed and fluency levels">
-          <h3 className="sp-levels-title"><Trophy size={22} aria-hidden="true" />My levels</h3>
-          <LevelMeter kind="tajweed" value={th?.levels.latest?.tajweed} change={th?.levels.tajweedChange} />
-          <LevelMeter kind="fluency" value={th?.levels.latest?.fluency} change={th?.levels.fluencyChange} />
-        </section>
-
-        {!DEMO && <div><StudentExams /></div>}
-
-        <section className="sp-card sp-hadith" aria-label="Hadith">
-          <span className="sp-accent" aria-hidden="true" />
-          <h3>Hadith</h3>
-          <p>{THILAWA_HADITH.text}</p>
-          <p className="sp-hadith-src">{THILAWA_HADITH.source}</p>
-        </section>
-        </>}
+        {view === "dashboard" && dash === "thilawa" && (
+          <ThilawaHome data={th} onGo={setView}>
+            <section className="sp-card sp-hadith" aria-label="Hadith">
+              <span className="sp-accent" aria-hidden="true" />
+              <h3>Hadith</h3>
+              <p>{THILAWA_HADITH.text}</p>
+              <p className="sp-hadith-src">{THILAWA_HADITH.source}</p>
+            </section>
+          </ThilawaHome>
+        )}
 
         {view === "dashboard" && dash === "hifz" && <>
         <section className="sp-card sp-tracker" aria-label="Hifz progress">

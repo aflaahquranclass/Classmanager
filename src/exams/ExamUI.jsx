@@ -758,12 +758,17 @@ export function TeacherScheduledExams({ teacherId, onStart, onEdit, showToast })
 
 // ---------- student: my exams ----------
 
-export function StudentExams() {
-  const [rows, setRows] = useState([]);
+// With emptyText (the Exams page) it says when there are none; without it
+// (the Hifz dashboard) it shows nothing until there's an exam.
+export function StudentExams({ emptyText } = {}) {
+  const [rows, setRows] = useState(null);
   useEffect(() => {
-    supabase.rpc("my_exam_schedule").then(({ data, error }) => { if (!error && data) setRows(data); });
+    supabase.rpc("my_exam_schedule").then(({ data, error }) => setRows(!error && data ? data : []));
   }, []);
-  if (!rows.length) return null;
+  if (!rows || !rows.length) {
+    if (!emptyText) return null;
+    return <section className="sp-card" style={{ padding: 20, color: TP.secondaryText }}>{rows ? emptyText : "Loading your exams…"}</section>;
+  }
   return (
     <section className="sp-card sp-exams" aria-label="My exams">
       <style>{`
