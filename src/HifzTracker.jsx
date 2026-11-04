@@ -7,7 +7,7 @@
 // HIFZ_CSS and PositionPicker are shared with the teacher's screens.
 
 import { useState, useEffect, useCallback } from "react";
-import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock } from "lucide-react";
+import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2 } from "lucide-react";
 import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { unitsOf, intersect } from "./hifz/engine.js";
@@ -357,31 +357,87 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
 const statusOf = (task, today) => (task.completedAt ? "completed" : task.studentDoneAt ? "submitted" : task.taskDate < today ? "partial" : "pending");
 const STATUS_LABEL = { completed: "Done", submitted: "Finished", partial: "Not done yet", pending: "To do" };
 
-function StudentTaskCard({ task, today, mistakes, open, onOpen, onToggle, busy }) {
+// The student's own task card (the teacher screens use their own): one
+// compact row — icon, name and portion, then a Mushaf button and a tick to
+// finish (Undo once finished). The teacher's note, mistakes to fix and
+// "waiting for your teacher" show as small lines under the row.
+function StudentTaskCard({ task, step, today, mistakes, open, onOpen, onToggle, busy }) {
   const { title, Icon } = ACTIVITY_INFO[task.activity];
   const status = statusOf(task, today);
+  const finished = status === "completed" || status === "submitted";
   const count = mistakesForTask(task, mistakes).length;
+  const r = [task.start, task.end];
+  const extras = task.taskDate !== today || task.notes || count > 0 || status === "submitted";
   return (
-    <article className={`hz-task ${status === "completed" ? "hz-task-done" : status === "submitted" ? "hz-task-submitted" : ""} ${open ? "hz-task-open" : ""}`} aria-label={title}>
-      <div className="hz-task-head">
-        <span className="hz-task-icon">{status === "completed" ? <CheckCircle2 size={20} aria-hidden="true" /> : <Icon size={20} aria-hidden="true" />}</span>
-        <span className="hz-task-title">{title}</span>
-        <span className={`hz-badge hz-badge-${status}`}>{STATUS_LABEL[status]}</span>
-      </div>
-      {task.taskDate !== today && <span className="hz-muted"><CalendarDays size={13} aria-hidden="true" /> Set for {fmtDay(task.taskDate)}</span>}
-      <PortionText task={task} />
-      {task.notes && <div className="hz-task-notes">{task.notes}</div>}
-      {count > 0 && <span className="hz-mistake-badge"><Highlighter size={13} aria-hidden="true" />{count} mistake{count === 1 ? "" : "s"} to fix</span>}
-      {status === "submitted" && <span className="hz-wait"><Clock size={15} aria-hidden="true" />Waiting for your teacher to listen and approve</span>}
-      <div className="hz-task-actions">
-        <button className="hz-btn hz-btn-outline" onClick={onOpen} aria-expanded={open}><BookOpen size={17} aria-hidden="true" />{open ? "Close Mushaf" : "Open Mushaf"}</button>
+    <article id={`hzs-task-${task.id}`} className={`hzs-task hzs-${status} ${open ? "hzs-open" : ""}`} aria-label={`Step ${step}: ${title}, ${STATUS_LABEL[status]}`}>
+      <div className="hzs-row">
+        <span className="hzs-icon" aria-hidden="true">{finished ? <CheckCircle2 size={20} /> : <Icon size={20} strokeWidth={1.9} />}</span>
+        <div className="hzs-text">
+          <b>{title}</b>
+          <span className="hzs-pages">{describeRange(r)}</span>
+          <span>{describeAyahs(r)}</span>
+        </div>
+        <button type="button" className={`hzs-ib hzs-ib-outline ${open ? "hzs-ib-on" : ""}`} onClick={onOpen} aria-expanded={open}
+          aria-label={open ? `Close the Mushaf for ${title}` : `Open the Mushaf for ${title}`} title={open ? "Close Mushaf" : "Open Mushaf"}>
+          {open ? <X size={18} aria-hidden="true" /> : <BookOpen size={18} aria-hidden="true" />}
+        </button>
         {status === "completed" ? null : status === "submitted"
-          ? <button className="hz-btn hz-btn-ghost" disabled={busy} onClick={() => onToggle(task, false)}>Undo</button>
-          : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onToggle(task, true)}><CheckCircle2 size={17} aria-hidden="true" />I've finished</button>}
+          ? <button type="button" className="hzs-ib hzs-ib-undo" disabled={busy} onClick={() => onToggle(task, false)} aria-label={`Undo: ${title} not finished yet`} title="Undo"><Undo2 size={18} aria-hidden="true" /></button>
+          : <button type="button" className="hzs-ib hzs-ib-done" disabled={busy} onClick={() => onToggle(task, true)} aria-label={`I've finished ${title}`} title="I've finished"><Check size={20} strokeWidth={2.6} aria-hidden="true" /></button>}
       </div>
+      {extras && (
+        <div className="hzs-extra">
+          {task.taskDate !== today && <span className="hzs-line"><CalendarDays size={13} aria-hidden="true" />Set for {fmtDay(task.taskDate)}</span>}
+          {task.notes && <span className="hzs-note">{task.notes}</span>}
+          {count > 0 && <span className="hz-mistake-badge"><Highlighter size={13} aria-hidden="true" />{count} mistake{count === 1 ? "" : "s"} to fix</span>}
+          {status === "submitted" && <span className="hzs-line hzs-wait"><Clock size={13} aria-hidden="true" />Waiting for your teacher to listen and approve</span>}
+        </div>
+      )}
     </article>
   );
 }
+
+const STUDENT_CSS = `
+  .hzs-progress { margin: 0 0 14px; }
+  .hzs-progress-top { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 600; color: #1F3A5A; margin-bottom: 6px; }
+  .hzs-progress-top span:last-child { color: #6B819A; font-weight: 500; }
+  .hzs-done-note { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin-bottom: 12px; border-radius: 12px; background: #E9F7EF; color: #1E7A43; font-size: 14px; font-weight: 600; }
+  .hzs-tasks { display: flex; flex-direction: column; gap: 8px; }
+  .hzs-task { padding: 12px; border: 1px solid #E3ECF5; border-radius: 14px; background: #FFFFFF; scroll-margin-top: 16px; transition: border-color 0.2s, box-shadow 0.2s; }
+  .hzs-open { border-color: ${TP.blue}; box-shadow: 0 0 0 1px ${TP.blue}; }
+  .hzs-submitted { background: #F6FAFE; }
+  .hzs-row { display: flex; align-items: center; gap: 10px; }
+  .hzs-icon { flex-shrink: 0; width: 38px; height: 38px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: #EEF4FB; color: ${TP.blue}; }
+  .hzs-submitted .hzs-icon, .hzs-completed .hzs-icon { background: #E3F5EA; color: #1E7A43; }
+  .hzs-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .hzs-text b { font-size: 15px; color: ${TP.navy}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hzs-text span { font-size: 12.5px; color: #6B819A; line-height: 1.35; }
+  .hzs-text .hzs-pages { font-size: 13px; font-weight: 600; color: #1F3A5A; }
+  .hzs-ib { flex-shrink: 0; width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; font: inherit; transition: filter 0.15s, background 0.15s; }
+  .hzs-ib:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
+  .hzs-ib:disabled { opacity: 0.6; cursor: default; }
+  .hzs-ib-outline { background: #FFFFFF; border: 1px solid #D5E3F2; color: ${TP.navy}; }
+  .hzs-ib-outline:hover { background: #F3F8FD; }
+  .hzs-ib-on { background: #EEF4FB; border-color: ${TP.blue}; color: ${TP.blue}; }
+  .hzs-ib-done { background: linear-gradient(135deg, ${TP.gradStart}, ${TP.blue}); color: #FFFFFF; box-shadow: 0 4px 10px rgba(13,79,133,0.2); }
+  .hzs-ib-done:hover { filter: brightness(1.08); }
+  .hzs-ib-undo { background: #E3F5EA; color: #1E7A43; }
+  .hzs-extra { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin: 8px 0 0 48px; }
+  .hzs-line { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #6B819A; }
+  .hzs-wait { color: #1D5FA8; font-weight: 600; }
+  .hzs-note { font-size: 13px; color: #1F3A5A; background: #F3F8FD; border-radius: 8px; padding: 5px 9px; white-space: pre-wrap; }
+  .hzs-inline-reader { margin-top: -2px; box-shadow: none; }
+  @media (max-width: 900px) { .hzs-task { scroll-margin-top: 76px; } }
+  @media (max-width: 640px) {
+    .hzs-inline-reader { padding: 10px 2px; }
+    #hz-today.hz-card { padding-left: 12px; padding-right: 12px; }
+    .hzs-task { padding: 10px; }
+    .hzs-row { gap: 8px; }
+    .hzs-icon { width: 34px; height: 34px; border-radius: 10px; }
+    .hzs-ib { width: 40px; height: 40px; }
+    .hzs-extra { margin-left: 42px; }
+  }
+`;
 
 // Keeps a summary loaded and fresh: reloads on the teacher's changes (live)
 // and when the student comes back to the app.
@@ -478,6 +534,20 @@ function StudentHistory({ done, today, onOpen }) {
 
 // ---------- student tracker ----------
 
+// Mistakes from the last lesson: words the teacher marked in the most
+// recently finished day's tasks, until corrected. The next lesson replaces them.
+// A mistake the student ticks off leaves their list (the teacher's mark stays
+// on the Mushaf until the teacher clears it). Also used by the dashboard.
+export function lastLesson({ tasks, mistakes }) {
+  const done = tasks.filter((t) => t.completedAt).sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1));
+  const lessonDay = done[0]?.taskDate || null;
+  const lessonTasks = done.filter((t) => t.taskDate === lessonDay);
+  const lessonIds = new Set(lessonTasks.map((t) => t.id));
+  const lessonTaskOf = (m) => lessonTasks.find((t) => t.id === m.taskId) || lessonTasks.find((t) => mistakeInTask(m, t));
+  const lessonMistakes = mistakes.filter((m) => !m.correctedAt && !m.tickedAt && (lessonIds.has(m.taskId) || (!m.taskId && lessonTaskOf(m))));
+  return { done, lessonDay, lessonTaskOf, lessonMistakes };
+}
+
 export default function HifzTracker({ repo, onSummary }) {
   const { state, error, setError, refresh } = useHifz(repo, onSummary);
   const [busy, setBusy] = useState(false);
@@ -510,39 +580,48 @@ export default function HifzTracker({ repo, onSummary }) {
   const dayName = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", timeZone: "UTC" });
   const mainTitle = !mainDate || mainDate === today ? "Today's Hifz" : `${dayName(mainDate)}'s Hifz`;
 
-  // Mistakes from the last lesson: words the teacher marked in the most
-  // recently finished day's tasks, until corrected. The next lesson replaces them.
-  const done = tasks.filter((t) => t.completedAt).sort((a, b) => (a.completedAt < b.completedAt ? 1 : -1));
-  const lessonDay = done[0]?.taskDate || null;
-  const lessonTasks = done.filter((t) => t.taskDate === lessonDay);
-  const lessonIds = new Set(lessonTasks.map((t) => t.id));
-  const lessonTaskOf = (m) => lessonTasks.find((t) => t.id === m.taskId) || lessonTasks.find((t) => mistakeInTask(m, t));
-  // A mistake the student ticks off leaves their list (the teacher's mark stays
-  // on the Mushaf until the teacher clears it).
-  const lessonMistakes = mistakes.filter((m) => !m.correctedAt && !m.tickedAt && (lessonIds.has(m.taskId) || (!m.taskId && lessonTaskOf(m))));
+  const { done, lessonDay, lessonTaskOf, lessonMistakes } = lastLesson(state);
   const tickMistake = async (m) => {
     setBusy(true);
     try { await repo.setMistakeTicked(m.id, true); await refresh(); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const counts = completedCounts(state.memorized);
-  const card = (t) => (
-    <StudentTaskCard key={t.id} task={t} today={today} mistakes={mistakes} busy={busy} open={openId === t.id}
+  const card = (t, step) => (
+    <StudentTaskCard key={t.id} task={t} step={step} today={today} mistakes={mistakes} busy={busy} open={openId === t.id}
       onOpen={() => (openId === t.id ? setOpenId(null) : openTask(t.id))} onToggle={toggle} />
   );
-  const reader = opened && (
-    <section className="hz-card hz-reader-card" aria-label="Mushaf" id="hz-reader">
-      <div className="hz-row" style={{ marginBottom: 8 }}>
-        <h2 className="hz-h2" style={{ margin: 0 }}><BookOpen size={22} aria-hidden="true" />{ACTIVITY_INFO[opened.activity].title} <span className="hz-muted" style={{ fontWeight: 400 }}>· {describeRange([opened.start, opened.end])}</span></h2>
-        <button className="hz-btn hz-btn-ghost" onClick={() => { setOpenId(null); setFocusPage(null); }} aria-label="Close Mushaf"><X size={18} aria-hidden="true" /></button>
-      </div>
-      {opened.notes && <div className="hz-task-notes" style={{ marginBottom: 10 }}>{opened.notes}</div>}
+  // How far through the day's tasks: approved ones have moved to History but still count.
+  const dayList = mainDate === today ? [...main, ...state.todayTasks.filter((t) => t.completedAt)] : main;
+  const finishedCount = dayList.filter((t) => t.completedAt || t.studentDoneAt).length;
+  const allFinished = dayList.length > 0 && finishedCount === dayList.length;
+  // Finishing from the Mushaf closes it and goes on to the next task.
+  const finishFromReader = async (t) => {
+    await toggle(t, true);
+    setOpenId(null);
+    setFocusPage(null);
+    const next = main.find((x) => x.id !== t.id && !x.studentDoneAt && !x.completedAt);
+    if (next) setTimeout(() => document.getElementById(`hzs-task-${next.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+  };
+  const openedInMain = opened && main.some((t) => t.id === opened.id);
+  const nextTask = main.find((t) => !t.studentDoneAt);
+  // Under its task card (inline) the Mushaf needs no title, notes or close
+  // button of its own — the card above shows them.
+  const readerFor = (inline) => opened && (
+    <section className={`hz-card hz-reader-card ${inline ? "hzs-inline-reader" : ""}`} aria-label={`Mushaf: ${ACTIVITY_INFO[opened.activity].title}`} id="hz-reader">
+      {!inline && (
+        <div className="hz-row" style={{ marginBottom: 8 }}>
+          <h2 className="hz-h2" style={{ margin: 0 }}><BookOpen size={22} aria-hidden="true" />{ACTIVITY_INFO[opened.activity].title} <span className="hz-muted" style={{ fontWeight: 400 }}>· {describeRange([opened.start, opened.end])}</span></h2>
+          <button className="hz-btn hz-btn-ghost" onClick={() => { setOpenId(null); setFocusPage(null); }} aria-label="Close Mushaf"><X size={18} aria-hidden="true" /></button>
+        </div>
+      )}
+      {!inline && opened.notes && <div className="hz-task-notes" style={{ marginBottom: 10 }}>{opened.notes}</div>}
       <div className="hz-legend" style={{ marginBottom: 10 }}>
         <span><i style={{ background: "#1A1F36" }} />Your portion (other lines are faded)</span>
         <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />Mistake your teacher marked</span>
       </div>
       <TaskReader task={opened} page={focusPage} mistakes={mistakes} />
       {!opened.completedAt && !opened.studentDoneAt && (
-        <button className="hz-btn hz-btn-primary" style={{ width: "100%", marginTop: 12 }} disabled={busy} onClick={() => toggle(opened, true)}>
+        <button className="hz-btn hz-btn-primary" style={{ width: "100%", marginTop: 12 }} disabled={busy} onClick={() => finishFromReader(opened)}>
           <CheckCircle2 size={18} aria-hidden="true" />I've finished {ACTIVITY_INFO[opened.activity].title}
         </button>
       )}
@@ -551,40 +630,29 @@ export default function HifzTracker({ repo, onSummary }) {
 
   return (
     <div className="hz">
+      <style>{STUDENT_CSS}</style>
       {error && <div className="hz-error" role="alert">{error}</div>}
 
       {editingGoal && <GoalYearDialog initial={stats.goalYear} onClose={() => setEditingGoal(false)} onSave={async (y) => { await repo.saveGoal(y); await refresh(); }} />}
 
-      <section className="hz-card" aria-label="Overall memorization">
-        <h2 className="hz-h2"><BookOpenText size={22} aria-hidden="true" />Overall Memorization</h2>
-        <div className="hz-row" style={{ margin: "4px 0 10px" }}>
-          <span className="hz-muted">{describeAmount(stats.memorizedUnits)} of 604 pages · {stats.ayahs} of 6236 ayahs</span>
-          <span className="hz-big">{stats.percent}%</span>
-        </div>
-        <div className="hz-bar" role="progressbar" aria-label="Quran memorized" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.percent}><div style={{ width: `${stats.percent}%` }} /></div>
-        <div className="hz-kv">
-          <div><span>Juz completed</span><strong>{counts.juz} / 30</strong></div>
-          <div><span>Surahs completed</span><strong>{counts.surahs} / 114</strong></div>
-          <div><span>Remaining</span><strong>{describeAmount(stats.remainingUnits)}</strong></div>
-          <div><span>Completion goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not chosen yet"}{" "}
-            <button type="button" className="hz-btn hz-btn-ghost" style={{ minHeight: 28, padding: "0 4px", fontSize: 13 }} onClick={() => setEditingGoal(true)}>Change</button></strong></div>
-        </div>
-        {!state.hasProfile && state.tasks.length === 0 && (
-          <div className="hz-note"><CalendarClock size={18} aria-hidden="true" /><span>Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set.</span></div>
-        )}
-      </section>
-
-      <section className="hz-card" aria-label={mainTitle}>
+      <section className="hz-card" aria-label={mainTitle} id="hz-today">
         <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />{mainTitle} {mainDate && <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDate(mainDate)}</span>}</h2>
+        {dayList.length > 0 && (
+          <div className="hzs-progress">
+            <div className="hzs-progress-top"><span>{finishedCount} of {dayList.length} finished</span>{nextTask && <span>Next: {ACTIVITY_INFO[nextTask.activity].title}</span>}</div>
+            <div className="hz-bar hz-bar-sm" role="progressbar" aria-label="Tasks finished" aria-valuemin={0} aria-valuemax={dayList.length} aria-valuenow={finishedCount}><div style={{ width: `${(finishedCount / dayList.length) * 100}%` }} /></div>
+          </div>
+        )}
+        {allFinished && main.length > 0 && <div className="hzs-done-note"><CheckCircle2 size={18} aria-hidden="true" />All finished. Your teacher will listen and approve.</div>}
         {main.length === 0
           ? <p className="hz-muted" style={{ margin: 0 }}>{done.length ? "All done. Your next tasks show here as soon as your teacher sets them." : "Nothing set yet."}</p>
-          : <div className="hz-tasks">{main.map(card)}</div>}
+          : <div className="hzs-tasks">{main.map((t, i) => [card(t, i + 1), openId === t.id && <div key={`r-${t.id}`}>{readerFor(true)}</div>])}</div>}
       </section>
 
-      {reader}
+      {!openedInMain && readerFor(false)}
 
       {lessonDay && (
-        <section className="hz-card" aria-label="Mistakes from your last lesson">
+        <section className="hz-card" aria-label="Mistakes from your last lesson" id="hz-mistakes">
           <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Mistakes from your last lesson <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDay(lessonDay)}</span></h2>
           {lessonMistakes.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>No mistakes left from your last lesson. MashaAllah!</p> : (
             <ul className="hz-list">
@@ -618,9 +686,28 @@ export default function HifzTracker({ repo, onSummary }) {
         </section>
       )}
 
+      <section className="hz-card" aria-label="Overall memorization">
+        <h2 className="hz-h2"><BookOpenText size={22} aria-hidden="true" />Overall Memorization</h2>
+        <div className="hz-row" style={{ margin: "4px 0 10px" }}>
+          <span className="hz-muted">{describeAmount(stats.memorizedUnits)} of 604 pages · {stats.ayahs} of 6236 ayahs</span>
+          <span className="hz-big">{stats.percent}%</span>
+        </div>
+        <div className="hz-bar" role="progressbar" aria-label="Quran memorized" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.percent}><div style={{ width: `${stats.percent}%` }} /></div>
+        <div className="hz-kv">
+          <div><span>Juz completed</span><strong>{counts.juz} / 30</strong></div>
+          <div><span>Surahs completed</span><strong>{counts.surahs} / 114</strong></div>
+          <div><span>Remaining</span><strong>{describeAmount(stats.remainingUnits)}</strong></div>
+          <div><span>Completion goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not chosen yet"}{" "}
+            <button type="button" className="hz-btn hz-btn-ghost" style={{ minHeight: 28, padding: "0 4px", fontSize: 13 }} onClick={() => setEditingGoal(true)}>Change</button></strong></div>
+        </div>
+        {!state.hasProfile && state.tasks.length === 0 && (
+          <div className="hz-note"><CalendarClock size={18} aria-hidden="true" /><span>Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set.</span></div>
+        )}
+      </section>
+
       <StudentHistory done={done} today={today} onOpen={(id) => openTask(id)} />
 
-      <section className="hz-card" aria-label="Revision tracking">
+      <section className="hz-card" aria-label="Revision tracking" id="hz-revision">
         <h2 className="hz-h2"><RotateCw size={22} aria-hidden="true" />Revision Tracking</h2>
         <div className="hz-rev">
           <div>

@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText } from "lucide-react";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2 } from "lucide-react";
 import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
-import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog } from "./HifzTracker.jsx";
+import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
+import { HOME_CSS, NextStepButton, QuickTiles } from "./StudentHome.jsx";
 import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
 import { pageToUnit } from "./hifz/quran.js";
@@ -404,11 +405,44 @@ export default function StudentPortal() {
   const percent = hasPlan ? summary.stats.percent : 0;
   const counts = hasPlan ? completedCounts(summary.memorized) : { surahs: 0, juz: 0 };
   const todayHifz = summary?.todayTasks || [];
-  const todayHifzDone = todayHifz.filter((t) => t.completedAt || t.studentDoneAt).length;
   const stats = [
-    { label: "Surah’s completed", Icon: BookOpen, value: <><CountUp value={counts.surahs} /> / {TOTAL_SURAHS}</> },
-    { label: "Juz completed", Icon: Layers, value: <><CountUp value={counts.juz} /> / {TOTAL_JUZ}</> },
-    { label: "Target Year", Icon: CalendarDays, value: summary?.stats.goalYear ?? "—" },
+    { label: "Surahs", Icon: BookOpen, value: <><CountUp value={counts.surahs} /> / {TOTAL_SURAHS}</> },
+    { label: "Juz", Icon: Layers, value: <><CountUp value={counts.juz} /> / {TOTAL_JUZ}</> },
+    { label: "Target year", Icon: CalendarDays, value: summary?.stats.goalYear ?? "—" },
+  ];
+  // Hifz dashboard: the "do this next" button and the quick-access buttons.
+  // Buttons for parts of the Hifz Tracker open it and scroll to that part
+  // (it loads its own data, so wait until it has loaded — "Today's Hifz" is
+  // always there then). A part that isn't shown (no mistakes section before
+  // the first lesson) falls back to Today's Hifz. Scrolled again once the
+  // cards have settled, so the part ends up at the top.
+  const goHifz = (id) => {
+    setView("hifz");
+    let tries = 0;
+    const find = () => {
+      if (!document.getElementById("hz-today")) { if (++tries < 40) setTimeout(find, 100); return; }
+      const go = () => (document.getElementById(id) || document.getElementById("hz-today"))?.scrollIntoView({ block: "start" });
+      go();
+      setTimeout(go, 450);
+    };
+    setTimeout(find, 50);
+  };
+  const notDone = (t) => !t.completedAt && !t.studentDoneAt;
+  const hifzDue = summary ? [...summary.overdue, ...summary.todayTasks].filter(notDone) : [];
+  const hifzLate = summary ? summary.overdue.filter(notDone).length : 0;
+  const hifzMistakes = summary ? lastLesson(summary).lessonMistakes.length : 0;
+  const hifzStep = !summary ? null
+    : hifzDue.length ? { Icon: Play, kicker: hifzLate ? "Still to finish" : "Today's Hifz", title: `${hifzDue.length} task${hifzDue.length === 1 ? "" : "s"} waiting for you`, go: "Start", onClick: () => goHifz("hz-today") }
+    : hifzMistakes ? { Icon: PenLine, kicker: "Practise", title: `${hifzMistakes} mistake${hifzMistakes === 1 ? "" : "s"} to fix from your last lesson`, go: "Open", onClick: () => goHifz("hz-mistakes") }
+    : todayHifz.length ? { Icon: CheckCircle2, kicker: "Today's Hifz", title: "All done. MashaAllah!", go: "View", onClick: () => goHifz("hz-today") }
+    : { Icon: RotateCw, kicker: "Hifz", title: "No tasks today. Keep revising what you know", go: "Open", onClick: () => goHifz("hz-revision") };
+  const hifzTiles = [
+    { key: "today", label: "Today's Hifz", Icon: ListChecks, dot: hifzDue.length, onClick: () => goHifz("hz-today") },
+    { key: "mistakes", label: "Mistakes", Icon: PenLine, dot: hifzMistakes, onClick: () => goHifz("hz-mistakes") },
+    { key: "revision", label: "Revision", Icon: RotateCw, onClick: () => goHifz("hz-revision") },
+    { key: "attendance", label: "Attendance", Icon: CalendarCheck, onClick: () => setView("attendance") },
+    { key: "exams", label: "Exams", Icon: FileText, onClick: () => setView("exams") },
+    { key: "finance", label: "Fees", Icon: Wallet, onClick: () => setView("finance") },
   ];
   const th = thilawa;
   const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
@@ -441,8 +475,8 @@ export default function StudentPortal() {
         @media (min-width: 1100px) {
           .sp-content .sp-name { font-size: 30px; }
           .sp-content .sp-tracker-foot { font-size: 18px; }
-          .sp-content .sp-stat-label { font-size: 17px; }
-          .sp-content .sp-stat-value { font-size: 28px; }
+          .sp-content .sp-stat-label { font-size: 12.5px; }
+          .sp-content .sp-stat-value { font-size: 24px; }
         }
         @media (min-width: 901px) {
           .sp-shell .tp-sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
@@ -468,28 +502,31 @@ export default function StudentPortal() {
         .sp-day-future { border: 1px dashed rgba(255,255,255,0.5); color: rgba(255,255,255,0.85); }
         .sp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-        .sp-tracker { padding: 22px 22px 18px; }
-        .sp-tracker-head { display: flex; align-items: center; gap: 14px; }
-        .sp-tracker-head h2 { flex: 1; margin: 0; font-size: clamp(17px, 4vw, 24px); font-weight: 700; color: #0F2F8A; }
-        .sp-tracker-head .sp-pct { font-size: clamp(22px, 5vw, 30px); font-weight: 700; color: #1452A8; }
-        .sp-bar-wrap { position: relative; margin: 26px 0 24px; }
-        .sp-bar { height: 30px; border-radius: 999px; background: #E3EAF1; overflow: hidden; }
-        .sp-bar-icon { position: absolute; top: 50%; width: 92px; height: 68px; display: block; transform: translate(-50%, -50%); z-index: 1; pointer-events: none; }
+        .sp-tracker { display: block; width: 100%; padding: 18px 20px 16px; font: inherit; text-align: left; color: inherit; cursor: pointer; }
+        .sp-tracker:focus-visible { outline: 3px solid ${TP.blue}; outline-offset: 2px; }
+        .sp-tracker-head { display: flex; align-items: center; gap: 12px; }
+        .sp-tracker-icon { flex-shrink: 0; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #EEF4FB; color: ${TP.blue}; }
+        .sp-tracker-head h2 { flex: 1; margin: 0; font-size: 16px; font-weight: 600; color: #1F3A5A; }
+        .sp-tracker-head .sp-pct { font-size: clamp(22px, 5vw, 28px); font-weight: 700; color: ${TP.navy}; letter-spacing: -0.01em; }
+        .sp-bar-wrap { position: relative; margin: 26px 0 20px; }
+        .sp-bar { height: 22px; border-radius: 999px; background: #E8EFF6; overflow: hidden; }
+        .sp-bar-icon { position: absolute; top: 50%; width: 76px; height: 56px; display: block; transform: translate(-50%, -50%); z-index: 1; pointer-events: none; }
         .sp-bar-icon svg { display: block; width: 100%; height: 100%; overflow: visible; }
         .sp-bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, ${TP.gradStart} 0%, ${TP.blue} 45%, #22D3E0 100%); transition: width 0.8s ease; }
-        .sp-tracker-foot { display: flex; justify-content: space-between; gap: 12px; font-size: clamp(13px, 3.2vw, 18px); color: #1452A8; }
+        .sp-tracker-foot { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: #6B819A; }
 
         .sp-accent { position: absolute; left: 20px; top: 18px; bottom: 18px; width: 9px; border-radius: 999px; background: linear-gradient(180deg, ${TP.teal}, ${TP.gradStart}); }
-        .sp-motivation { min-height: 190px; display: flex; align-items: center; justify-content: center; padding: 28px 28px 28px 52px; }
+        .sp-motivation { min-height: 120px; display: flex; align-items: center; justify-content: center; padding: 22px 24px 22px 40px; }
+        .sp-motivation .sp-accent { left: 18px; top: 18px; bottom: 18px; width: 3px; }
         .sp-motivation p { margin: 0; text-align: center; font-family: Georgia, "Times New Roman", serif; font-weight: 700; letter-spacing: -0.01em;
           font-size: clamp(28px, 7.4vw, 48px); line-height: 1.15;
           background: linear-gradient(90deg, #0F2FA8, ${TP.blue} 50%, #0F2FA8); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
-        .sp-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-        .sp-stat { position: relative; overflow: hidden; border-radius: 16px; padding: 18px 10px 20px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
-        .sp-stat-label { font-size: clamp(12px, 2.9vw, 17px); opacity: 0.95; }
-        .sp-stat-value { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: clamp(17px, 4.4vw, 28px); font-weight: 700; white-space: nowrap; }
-        .sp-stat-value svg { width: clamp(22px, 5.4vw, 36px); height: auto; flex-shrink: 0; }
+        .sp-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .sp-stat { position: relative; overflow: hidden; padding: 14px 8px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .sp-stat-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B819A; }
+        .sp-stat-value { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: clamp(16px, 4.2vw, 22px); font-weight: 700; color: ${TP.navy}; white-space: nowrap; }
+        .sp-stat-value svg { width: 18px; height: 18px; flex-shrink: 0; color: ${TP.blue}; }
 
         .sp-hadith { padding: 18px 20px 18px 34px; }
         .sp-hadith h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6B819A; }
@@ -497,7 +534,6 @@ export default function StudentPortal() {
         .sp-hadith .sp-hadith-src { margin-top: 10px; font-size: 13px; font-weight: 600; color: #6B819A; }
         .sp-hadith .sp-accent { left: 18px; top: 18px; bottom: 18px; width: 3px; }
 
-        .sp-setup-btn { margin-top: 14px; width: 100%; }
         ${HIFZ_CSS}
         ${thilawaCss()}
         ${MOTIVATION_FONT_CSS}
@@ -506,10 +542,11 @@ export default function StudentPortal() {
         .sp-switch button[aria-selected="true"] { background: ${TP.gradStart}; color: #FFFFFF; box-shadow: none; }
         .sp-switch button:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
         .sp-goal-line { margin: 12px 0 0; font-size: 15px; color: #1452A8; }
+        /* Dashboard buttons scroll to these parts of the Hifz Tracker; keep them clear of the phone's top bar. */
+        #hz-today, #hz-mistakes, #hz-revision { scroll-margin-top: 16px; }
+        @media (max-width: 900px) { #hz-today, #hz-mistakes, #hz-revision { scroll-margin-top: 76px; } }
         /* ---------- animations ---------- */
         @keyframes sp-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-        @keyframes sp-shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(260%) skewX(-18deg); } }
-        @keyframes sp-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
         @keyframes sp-accent { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
         /* The profile header stays still: no animations on it. */
@@ -528,10 +565,7 @@ export default function StudentPortal() {
 
         .sp-card, .sp-stat { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
         button.sp-card:hover { border-color: #C9DAEC; box-shadow: 0 1px 2px rgba(16,40,70,0.05), 0 8px 24px rgba(16,40,70,0.08); }
-        .sp-stat:hover .sp-stat-value svg { animation: sp-float 1.2s ease-in-out infinite; }
 
-        .sp-stat::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 35%; pointer-events: none; z-index: 2;
-          background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent); animation: sp-shine 6s ease-in-out 1.6s infinite; }
         .sp-flame { filter: drop-shadow(0 0 6px rgba(255,200,120,0.55)); }
 
         /* Quran icon riding at the end of the progress bar */
@@ -701,11 +735,17 @@ export default function StudentPortal() {
           </ThilawaHome>
         )}
 
-        {view === "dashboard" && dash === "hifz" && <>
-        <section className="sp-card sp-tracker" aria-label="Hifz progress">
+        {view === "dashboard" && dash === "hifz" && (
+        <div className="sh">
+        <style>{HOME_CSS}</style>
+        <NextStepButton step={hifzStep} loading="Loading your Hifz…" />
+        <QuickTiles tiles={hifzTiles} />
+
+        <h2 className="sh-label">My progress</h2>
+        <button type="button" className="sp-card sp-tracker" aria-label={`Hifz progress: ${percent}% memorised. Open Hifz Tracker`} onClick={() => setView("hifz")}>
           <div className="sp-tracker-head">
-            <BookOpenText size={44} color="#1452A8" strokeWidth={1.8} aria-hidden="true" />
-            <h2>Hifz percentage Tracker</h2>
+            <span className="sp-tracker-icon" aria-hidden="true"><BookOpenText size={22} strokeWidth={1.9} /></span>
+            <h2>Hifz progress</h2>
             <span className="sp-pct"><CountUp value={percent} />%</span>
           </div>
           <div className="sp-bar-wrap">
@@ -721,13 +761,18 @@ export default function StudentPortal() {
             <span><CountUp value={ayahsMemorized} /> / {TOTAL_AYAHS} ayaat</span>
             <span><CountUp value={percent} />% completed</span>
           </div>
-          {summary && (
-            <button className="hz-btn hz-btn-primary sp-setup-btn" onClick={() => setView("hifz")}>
-              {todayHifz.length
-                ? (todayHifzDone === todayHifz.length ? `Today's Hifz done (${todayHifzDone}/${todayHifz.length}). MashaAllah!` : `Today's Hifz: ${todayHifzDone} of ${todayHifz.length} done · Open`)
-                : summary.overdue.length ? `${summary.overdue.length} Hifz task${summary.overdue.length === 1 ? "" : "s"} still to finish · Open` : "Open Hifz Tracker"}
-            </button>
-          )}
+        </button>
+
+        <section className="sp-stats" aria-label="Progress summary">
+          {stats.map(({ label, Icon, value }) => (
+            <div key={label} className="sp-card sp-stat">
+              <div className="sp-stat-label">{label}</div>
+              <div className="sp-stat-value">
+                <Icon strokeWidth={1.9} aria-hidden="true" />
+                <span>{value}</span>
+              </div>
+            </div>
+          ))}
         </section>
 
         <section className="sp-card sp-motivation" aria-label="My motivation">
@@ -735,19 +780,7 @@ export default function StudentPortal() {
           <p {...motivationTextProps(quotes.hifz)}>{quotes.hifz.body}</p>
         </section>
 
-        <section className="sp-stats" aria-label="Progress summary">
-          {stats.map(({ label, Icon, value }) => (
-            <div key={label} className="sp-grad sp-stat">
-              <div className="sp-stat-label">{label}</div>
-              <div className="sp-stat-value">
-                <Icon strokeWidth={1.8} aria-hidden="true" />
-                <span>{value}</span>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        {!DEMO && <div><StudentExams /></div>}
+        {!DEMO && <StudentExams />}
 
         <section className="sp-card sp-hadith" aria-label="Hadith">
           <span className="sp-accent" aria-hidden="true" />
@@ -755,7 +788,8 @@ export default function StudentPortal() {
           <p>{HADITH.text}</p>
           <p className="sp-hadith-src">{HADITH.source}</p>
         </section>
-        </>}
+        </div>
+        )}
       </main>
       </div>
       </div>
