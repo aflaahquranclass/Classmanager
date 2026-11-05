@@ -30,9 +30,10 @@ import { hasProgram } from "./thilawa/programs.jsx";
 const PATTERN_MAIN_URL = "/images/tp-pattern-main.png";
 const PATTERN_ON_BLUE_URL = "/images/tp-pattern-sidebar.png";
 
+// Shown on the Hifz progress page. Narrated by 'Abdullah ibn 'Amr.
 const HADITH = {
-  text: "It will said to the one who had memorised the quran [ and acted upon it ] : Recite the quran .......",
-  source: "( HADITH )",
+  text: "It will be said to the companion of the Qur'an: Recite, and rise in rank, and recite as you used to recite in the world, for your rank will be at the last verse you recite.",
+  source: "( Sunan Abi Dawud 1464, Jami' at-Tirmidhi 2914 )",
 };
 
 // On localhost, ?portal=student&demo=1 runs the portal on in-browser sample
