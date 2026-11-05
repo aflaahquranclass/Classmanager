@@ -24,8 +24,15 @@ export const HOME_CSS = `
     font: inherit; font-size: 13.5px; font-weight: 600; color: #1F3A5A; text-align: center; cursor: pointer;
   }
   .sh-tile:focus-visible { outline: 3px solid #176FD1; outline-offset: 2px; }
-  /* One accent colour for every button; red is kept for "waiting" only. */
+  /* Each button has its own light colour (in order: blue, teal, purple,
+     green, amber, rose); red is kept for the "waiting" number only. */
   .sh-ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #EEF4FB; color: #176FD1; }
+  .sh-tone-0 { background: #E8F1FD; color: #3B7DD8; }
+  .sh-tone-1 { background: #E3F6F4; color: #2A9D92; }
+  .sh-tone-2 { background: #F0EAFB; color: #8360C3; }
+  .sh-tone-3 { background: #E6F6EC; color: #3A9E64; }
+  .sh-tone-4 { background: #FDF3E1; color: #C98A1B; }
+  .sh-tone-5 { background: #FCEBEE; color: #D0607A; }
   .sh-dot {
     position: absolute; top: 8px; right: 10px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; box-sizing: border-box;
     background: #E5484D; color: #FFFFFF; font-size: 11px; font-weight: 700; box-shadow: 0 0 0 2px #FFFFFF;
@@ -62,10 +69,10 @@ export function QuickTiles({ tiles }) {
     <>
       <h2 className="sh-label">Quick access</h2>
       <nav className="sh-tiles" aria-label="Quick access">
-        {tiles.map(({ key, label, Icon, dot = 0, onClick }) => (
+        {tiles.map(({ key, label, Icon, dot = 0, onClick }, i) => (
           <button key={key} type="button" className="sh-tile sp-card" onClick={onClick}>
             {dot > 0 && <span className="sh-dot" aria-label={`${dot} waiting`}>{dot}</span>}
-            <span className="sh-ic" aria-hidden="true"><Icon size={21} strokeWidth={1.9} /></span>
+            <span className={`sh-ic sh-tone-${i % 6}`} aria-hidden="true"><Icon size={21} strokeWidth={1.9} /></span>
             {label}
           </button>
         ))}

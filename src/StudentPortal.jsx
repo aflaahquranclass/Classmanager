@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2 } from "lucide-react";
+import { BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2, LineChart } from "lucide-react";
 import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
-import HifzTracker, { HIFZ_CSS, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
+import HifzTracker, { HifzProgress, HIFZ_CSS, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
 import { HOME_CSS, NextStepButton, QuickTiles } from "./StudentHome.jsx";
 import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
@@ -277,6 +277,7 @@ async function loadStudentForUser(userId) {
 const NAV = [
   { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText, program: "hifz" },
+  { key: "hifz-progress", label: "Hifz progress", Icon: LineChart, program: "hifz" },
   { key: "thilawa", label: "Thilawa progress", Icon: BookOpenCheck, program: "thilawa" },
   { key: "thilawa-assigned", label: "Teacher's Reading", Icon: ListChecks, program: "thilawa" },
   { key: "thilawa-free", label: "Free Reading", Icon: BookMarked, program: "thilawa" },
@@ -440,13 +441,13 @@ export default function StudentPortal() {
     { key: "exams", label: "Exams", Icon: FileText, onClick: () => setView("exams") },
     { key: "finance", label: "Fees", Icon: Wallet, onClick: () => setView("finance") },
   ];
-  // Phone bottom bar (in place of the top bar): Home, each program's main page,
-  // and Attendance when there's room; Alerts and More are added by the bar.
+  // Phone bottom bar (in place of the top bar): Home, each program's main page
+  // and Fees; Alerts and More are added by the bar. Attendance is under More.
   const studentTabs = [
     { key: "dashboard", label: "Home", Icon: LayoutDashboard },
     ...(doesHifz ? [{ key: "hifz", label: "Hifz", Icon: BookOpenText, dot: hifzDue.length }] : []),
     ...(doesThilawa ? [{ key: "thilawa-assigned", label: "Reading", Icon: ListChecks, dot: thilawa?.openAssignments || 0 }] : []),
-    ...(doesHifz && doesThilawa ? [] : [{ key: "attendance", label: "Attendance", Icon: CalendarCheck }]),
+    { key: "finance", label: "Fees", Icon: Wallet },
   ].map((t) => ({ ...t, active: view === t.key, onClick: () => setView(t.key) }));
   const th = thilawa;
   const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
@@ -676,8 +677,9 @@ export default function StudentPortal() {
           </ol>
         </section>
 
-        {view === "hifz" && doesHifz && (
-          <HifzTracker repo={repo}>
+        {view === "hifz" && doesHifz && <HifzTracker repo={repo} />}
+        {view === "hifz-progress" && doesHifz && (
+          <HifzProgress repo={repo}>
             <section className="sp-card sp-motivation" aria-label="My motivation">
               <span className="sp-accent" aria-hidden="true" />
               <p {...motivationTextProps(quotes.hifz)}>{quotes.hifz.body}</p>
@@ -688,7 +690,7 @@ export default function StudentPortal() {
               <p>{HADITH.text}</p>
               <p className="sp-hadith-src">{HADITH.source}</p>
             </section>
-          </HifzTracker>
+          </HifzProgress>
         )}
         {view === "thilawa" && doesThilawa && <ThilawaTracker data={thilawa} onGo={setView} />}
         {view === "thilawa-assigned" && doesThilawa && <AssignedReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
@@ -732,7 +734,7 @@ export default function StudentPortal() {
         <QuickTiles tiles={hifzTiles} />
 
         <h2 className="sh-label">My progress</h2>
-        <button type="button" className="sp-card sp-tracker" aria-label={`Hifz progress: ${percent}% memorised. Open Hifz Tracker`} onClick={() => setView("hifz")}>
+        <button type="button" className="sp-card sp-tracker" aria-label={`Hifz progress: ${percent}% memorised. Open Hifz progress`} onClick={() => setView("hifz-progress")}>
           <div className="sp-tracker-head">
             <span className="sp-tracker-icon" aria-hidden="true"><BookOpenText size={22} strokeWidth={1.9} /></span>
             <h2>Hifz progress</h2>

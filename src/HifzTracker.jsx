@@ -548,15 +548,47 @@ export function lastLesson({ tasks, mistakes }) {
   return { done, lessonDay, lessonTaskOf, lessonMistakes };
 }
 
-// children: shown under Overall Memorization (the student portal puts the
-// student's motivation quote and the hadith there).
-export default function HifzTracker({ repo, onSummary, children }) {
+// The student's "Hifz progress" page: Overall Memorization (with the goal
+// year to change), then `children` (the portal puts the motivation quote and
+// the hadith there). Kept apart from the Hifz Tracker, which is for the
+// day's tasks.
+export function HifzProgress({ repo, children }) {
+  const { state, error, refresh } = useHifz(repo);
+  const [editingGoal, setEditingGoal] = useState(false);
+  if (error && !state) return <div className="hz"><div className="hz-error" role="alert">{error}</div></div>;
+  if (!state) return <div className="hz"><div className="hz-card hz-muted">Loading your Hifz…</div></div>;
+  const { stats } = state;
+  const counts = completedCounts(state.memorized);
+  return (
+    <div className="hz">
+      {editingGoal && <GoalYearDialog initial={stats.goalYear} onClose={() => setEditingGoal(false)} onSave={async (y) => { await repo.saveGoal(y); await refresh(); }} />}
+      <section className="hz-card" aria-label="Overall memorization">
+        <h2 className="hz-h2"><BookOpenText size={22} aria-hidden="true" />Overall Memorization</h2>
+        <div className="hz-row" style={{ margin: "4px 0 10px" }}>
+          <span className="hz-muted">{describeAmount(stats.memorizedUnits)} of 604 pages · {stats.ayahs} of 6236 ayahs</span>
+          <span className="hz-big">{stats.percent}%</span>
+        </div>
+        <div className="hz-bar" role="progressbar" aria-label="Quran memorized" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.percent}><div style={{ width: `${stats.percent}%` }} /></div>
+        <div className="hz-kv">
+          <div><span>Juz completed</span><strong>{counts.juz} / 30</strong></div>
+          <div><span>Surahs completed</span><strong>{counts.surahs} / 114</strong></div>
+          <div><span>Remaining</span><strong>{describeAmount(stats.remainingUnits)}</strong></div>
+          <div><span>Completion goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not chosen yet"}{" "}
+            <button type="button" className="hz-btn hz-btn-ghost" style={{ minHeight: 28, padding: "0 4px", fontSize: 13 }} onClick={() => setEditingGoal(true)}>Change</button></strong></div>
+        </div>
+      </section>
+
+      {children}
+    </div>
+  );
+}
+
+export default function HifzTracker({ repo, onSummary }) {
   const { state, error, setError, refresh } = useHifz(repo, onSummary);
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState(null); // task shown in the Mushaf
   const [focusPage, setFocusPage] = useState(null); // page to open on (a mistake's page)
   useBackLayer(!!openId, () => { setOpenId(null); setFocusPage(null); }, "hifz-mushaf");
-  const [editingGoal, setEditingGoal] = useState(false);
 
   if (error && !state) return <div className="hz"><div className="hz-error" role="alert">{error}</div></div>;
   if (!state) return <div className="hz"><div className="hz-card hz-muted">Loading your Hifz…</div></div>;
@@ -588,7 +620,6 @@ export default function HifzTracker({ repo, onSummary, children }) {
     setBusy(true);
     try { await repo.setMistakeTicked(m.id, true); await refresh(); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
-  const counts = completedCounts(state.memorized);
   const card = (t, step) => (
     <StudentTaskCard key={t.id} task={t} step={step} today={today} mistakes={mistakes} busy={busy} open={openId === t.id}
       onOpen={() => (openId === t.id ? setOpenId(null) : openTask(t.id))} onToggle={toggle} />
@@ -636,7 +667,6 @@ export default function HifzTracker({ repo, onSummary, children }) {
       <style>{STUDENT_CSS}</style>
       {error && <div className="hz-error" role="alert">{error}</div>}
 
-      {editingGoal && <GoalYearDialog initial={stats.goalYear} onClose={() => setEditingGoal(false)} onSave={async (y) => { await repo.saveGoal(y); await refresh(); }} />}
 
       <section className="hz-card" aria-label={mainTitle} id="hz-today">
         <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />{mainTitle} {mainDate && <span className="hz-muted" style={{ fontWeight: 400 }}>· {fmtDate(mainDate)}</span>}</h2>
@@ -648,7 +678,7 @@ export default function HifzTracker({ repo, onSummary, children }) {
         )}
         {allFinished && main.length > 0 && <div className="hzs-done-note"><CheckCircle2 size={18} aria-hidden="true" />All finished. Your teacher will listen and approve.</div>}
         {main.length === 0
-          ? <p className="hz-muted" style={{ margin: 0 }}>{done.length ? "All done. Your next tasks show here as soon as your teacher sets them." : "Nothing set yet."}</p>
+          ? <p className="hz-muted" style={{ margin: 0 }}>{done.length ? "All done. Your next tasks show here as soon as your teacher sets them." : "Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set."}</p>
           : <div className="hzs-tasks">{main.map((t, i) => [card(t, i + 1), openId === t.id && <div key={`r-${t.id}`}>{readerFor(true)}</div>])}</div>}
       </section>
 
@@ -688,27 +718,6 @@ export default function HifzTracker({ repo, onSummary, children }) {
           </ul>
         </section>
       )}
-
-      <section className="hz-card" aria-label="Overall memorization">
-        <h2 className="hz-h2"><BookOpenText size={22} aria-hidden="true" />Overall Memorization</h2>
-        <div className="hz-row" style={{ margin: "4px 0 10px" }}>
-          <span className="hz-muted">{describeAmount(stats.memorizedUnits)} of 604 pages · {stats.ayahs} of 6236 ayahs</span>
-          <span className="hz-big">{stats.percent}%</span>
-        </div>
-        <div className="hz-bar" role="progressbar" aria-label="Quran memorized" aria-valuemin={0} aria-valuemax={100} aria-valuenow={stats.percent}><div style={{ width: `${stats.percent}%` }} /></div>
-        <div className="hz-kv">
-          <div><span>Juz completed</span><strong>{counts.juz} / 30</strong></div>
-          <div><span>Surahs completed</span><strong>{counts.surahs} / 114</strong></div>
-          <div><span>Remaining</span><strong>{describeAmount(stats.remainingUnits)}</strong></div>
-          <div><span>Completion goal</span><strong>{stats.goalYear ? `End of ${stats.goalYear}` : "Not chosen yet"}{" "}
-            <button type="button" className="hz-btn hz-btn-ghost" style={{ minHeight: 28, padding: "0 4px", fontSize: 13 }} onClick={() => setEditingGoal(true)}>Change</button></strong></div>
-        </div>
-        {!state.hasProfile && state.tasks.length === 0 && (
-          <div className="hz-note"><CalendarClock size={18} aria-hidden="true" /><span>Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set.</span></div>
-        )}
-      </section>
-
-      {children}
 
       <StudentHistory done={done} today={today} onOpen={(id) => openTask(id)} />
 
