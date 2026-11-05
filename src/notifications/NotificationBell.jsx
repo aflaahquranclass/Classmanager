@@ -31,8 +31,10 @@ function fmtWhen(iso) {
 }
 
 // className styles the trigger button; `onDark` gives it the translucent
-// look used on the portal's blue gradient (sidebar / mobile bar).
-export function NotificationBell({ className = "", onDark = false }) {
+// look used on the portal's blue gradient (sidebar / mobile bar). `tab`
+// draws it as a tab of the phone's bottom bar ("Alerts"), with the inbox
+// opening above it.
+export function NotificationBell({ className = "", onDark = false, tab = false }) {
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null); // panel's { top, left }, under the bell
@@ -96,7 +98,8 @@ export function NotificationBell({ className = "", onDark = false }) {
     if (next) {
       const r = buttonRef.current.getBoundingClientRect();
       const width = Math.min(380, window.innerWidth - 32);
-      setPos({ top: r.bottom + 8, left: Math.max(16, Math.min(r.left, window.innerWidth - width - 16)) });
+      const left = Math.max(16, Math.min(r.left, window.innerWidth - width - 16));
+      setPos(tab ? { bottom: window.innerHeight - r.top + 8, left } : { top: r.bottom + 8, left });
     }
     setOpen(next);
     if (next) clearAppBadge();
@@ -142,13 +145,22 @@ export function NotificationBell({ className = "", onDark = false }) {
       <button
         ref={buttonRef}
         type="button"
-        className={`nb-trigger no-print ${onDark ? "nb-on-dark" : ""} ${className}`}
+        className={`nb-trigger no-print ${onDark ? "nb-on-dark" : ""} ${tab ? "mtb-tab" : ""} ${className}`}
         aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         onClick={toggle}
       >
-        <Bell size={18} aria-hidden="true" />
-        {unread > 0 && <span className="nb-count" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}
+        {tab ? (
+          <>
+            <span className="mtb-ic"><Bell size={22} aria-hidden="true" />{unread > 0 && <span className="nb-count" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}</span>
+            Alerts
+          </>
+        ) : (
+          <>
+            <Bell size={18} aria-hidden="true" />
+            {unread > 0 && <span className="nb-count" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}
+          </>
+        )}
       </button>
       {open && (
         <div ref={panelRef} className="nb-panel" role="dialog" aria-label="Notifications" style={pos || undefined}>

@@ -23,6 +23,7 @@ import { ProgramPicker, inProgramSection, classProgram } from "./thilawa/program
 import { hideSplash, LogoLoader } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
 import { useBackNav, useBackLayer } from "./useBackNav.js";
+import MobileTabBar from "./MobileTabBar.jsx";
 import TeacherDashboard from "./teacher/TeacherDashboard.jsx";
 import TeacherStudents from "./teacher/TeacherStudents.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
@@ -664,7 +665,8 @@ function LoginScreen({
 // records): gradient sidebar with avatar + nav, collapsing to an accessible
 // drawer on mobile. Page content is passed as children — this component only
 // owns navigation chrome, not page-specific layout.
-function TeacherPortalLayout({ activeSection, navItems, teacherDisplayName, onLogout, children }) {
+// tabs: the phone's bottom bar (MobileTabBar) — it replaces the blue top bar.
+function TeacherPortalLayout({ activeSection, navItems, tabs, teacherDisplayName, onLogout, children }) {
   const [navOpen, setNavOpen] = useState(false);
   useBackLayer(navOpen, () => setNavOpen(false), "portal-menu");
 
@@ -711,32 +713,15 @@ function TeacherPortalLayout({ activeSection, navItems, teacherDisplayName, onLo
   );
 
   return (
-    <div className="tp-shell">
+    <div className="tp-shell tp-has-tabs">
       <style>{TP_SHARED_STYLES}</style>
-      <div className="tp-mobile-bar no-print">
-        <span className="tp-mobile-bar-brand">
-          <img src={LOGO_WHITE_DATA_URI} alt="" />
-          Teacher Portal
-        </span>
-        <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        <span className="tp-bell-mobile"><NotificationBell onDark /></span>
-        <button
-          type="button"
-          className="tp-mobile-toggle"
-          aria-label={navOpen ? "Close menu" : "Open menu"}
-          aria-expanded={navOpen}
-          onClick={() => setNavOpen((v) => !v)}
-        >
-          {navOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
-        </button>
-        </span>
-      </div>
       {navOpen && <div className="tp-backdrop no-print" onClick={() => setNavOpen(false)} />}
       <div className={`tp-sidebar-wrap no-print ${navOpen ? "tp-sidebar-wrap-open" : ""}`}>{sidebar}</div>
       <div className={`tp-content ${activeSection === "timetable" ? "tp-content-tinted" : ""}`}>
         <img src={TP_PATTERN_MAIN_URL} className="tp-page-pattern" alt="" aria-hidden="true" />
         {children}
       </div>
+      <MobileTabBar tabs={tabs} onMore={() => setNavOpen(true)} moreActive={!tabs.some((t) => t.active)} />
     </div>
   );
 }
@@ -3526,6 +3511,16 @@ export default function App() {
             { key: "thilawa", label: "Thilawa", icon: BookOpenCheck, onClick: () => setSection("thilawa") },
             { key: "students", label: "My students", icon: Users, onClick: () => setSection("students") },
           ]}
+          tabs={(() => {
+            const mine = students.filter((s) => s.teacherId === loggedInTeacherId);
+            const inProg = (p) => mine.some((s) => inProgramSection(s, p, classes.find((c) => c.id === s.classId)?.program));
+            return [
+              { key: "dashboard", label: "Home", Icon: LayoutDashboard, onClick: () => setSection("dashboard") },
+              { key: "attendance", label: "Attendance", Icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAttendanceView("day"); } },
+              ...(inProg("hifz") ? [{ key: "hifz", label: "Hifz", Icon: BookOpen, onClick: () => setSection("hifz") }] : []),
+              ...(inProg("thilawa") ? [{ key: "thilawa", label: "Thilawa", Icon: BookOpenCheck, onClick: () => setSection("thilawa") }] : []),
+            ].map((t) => ({ ...t, active: section === t.key }));
+          })()}
           teacherDisplayName={teacherName(loggedInTeacherId)}
           onLogout={() => { setSection("dashboard"); signOutUser(); }}
         >

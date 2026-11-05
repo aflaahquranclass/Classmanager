@@ -48,7 +48,12 @@ export function useBackNav(value, setValue, key) {
     if (fromBack.current) { fromBack.current = false; return; }
     const state = window.history.state || {};
     if (state[key] == null) window.history.replaceState({ ...state, [key]: value }, "");
-    else if (state[key] !== value) window.history.pushState({ ...withoutLayers(state), [key]: value }, "");
+    else if (state[key] !== value) {
+      // Leaving a page while something was open on it (e.g. a menu link):
+      // the new page takes that entry's place, so Back needs no extra press.
+      const overLayer = Object.keys(state).some((k) => k.startsWith(LAYER));
+      window.history[overLayer ? "replaceState" : "pushState"]({ ...withoutLayers(state), [key]: value }, "");
+    }
   }, [key, value]);
 }
 

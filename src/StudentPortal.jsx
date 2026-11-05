@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, Menu, X, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2 } from "lucide-react";
-import { TP, TP_SHARED_STYLES, LOGO_WHITE_DATA_URI, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
+import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2 } from "lucide-react";
+import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
 import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
 import { HOME_CSS, NextStepButton, QuickTiles } from "./StudentHome.jsx";
@@ -15,6 +15,7 @@ import { hideSplash } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
 import { StudentExams } from "./exams/ExamUI.jsx";
 import { useBackNav, useBackLayer } from "./useBackNav.js";
+import MobileTabBar from "./MobileTabBar.jsx";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
 import ThilawaHome from "./thilawa/ThilawaHome.jsx";
@@ -447,6 +448,14 @@ export default function StudentPortal() {
     { key: "exams", label: "Exams", Icon: FileText, onClick: () => setView("exams") },
     { key: "finance", label: "Fees", Icon: Wallet, onClick: () => setView("finance") },
   ];
+  // Phone bottom bar (in place of the top bar): Home, each program's main page,
+  // and Attendance when there's room; Alerts and More are added by the bar.
+  const studentTabs = [
+    { key: "dashboard", label: "Home", Icon: LayoutDashboard },
+    ...(doesHifz ? [{ key: "hifz", label: "Hifz", Icon: BookOpenText, dot: hifzDue.length }] : []),
+    ...(doesThilawa ? [{ key: "thilawa-assigned", label: "Reading", Icon: ListChecks, dot: thilawa?.openAssignments || 0 }] : []),
+    ...(doesHifz && doesThilawa ? [] : [{ key: "attendance", label: "Attendance", Icon: CalendarCheck }]),
+  ].map((t) => ({ ...t, active: view === t.key, onClick: () => setView(t.key) }));
   const th = thilawa;
   const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
   const week = thisWeek(maldivesToday(), (dash === "thilawa" ? th?.streak.calendar : summary?.streak.calendar) || []);
@@ -547,7 +556,6 @@ export default function StudentPortal() {
         .sp-goal-line { margin: 12px 0 0; font-size: 15px; color: #1452A8; }
         /* Dashboard buttons scroll to these parts of the Hifz Tracker; keep them clear of the phone's top bar. */
         #hz-today, #hz-mistakes, #hz-revision { scroll-margin-top: 16px; }
-        @media (max-width: 900px) { #hz-today, #hz-mistakes, #hz-revision { scroll-margin-top: 76px; } }
         /* ---------- animations ---------- */
         @keyframes sp-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
         @keyframes sp-accent { from { transform: scaleY(0); } to { transform: scaleY(1); } }
@@ -625,20 +633,8 @@ export default function StudentPortal() {
         <GoalYearDialog required onSave={async (y) => { await repo.saveGoal(y); await refreshHifz(); }} />
       )}
       {ready && (
-      <div className="tp-shell sp-shell">
+      <div className="tp-shell sp-shell tp-has-tabs">
         <style>{TP_SHARED_STYLES}</style>
-        <div className="tp-mobile-bar">
-          <span className="tp-mobile-bar-brand">
-            <img src={LOGO_WHITE_DATA_URI} alt="" />
-            Student Portal
-          </span>
-          <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            {!DEMO && <NotificationBell onDark />}
-            <button type="button" className="tp-mobile-toggle" aria-label={navOpen ? "Close menu" : "Open menu"} aria-expanded={navOpen} onClick={() => setNavOpen((v) => !v)}>
-              {navOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
-            </button>
-          </span>
-        </div>
         {navOpen && <div className="tp-backdrop" onClick={() => setNavOpen(false)} />}
         <div className={`tp-sidebar-wrap ${navOpen ? "tp-sidebar-wrap-open" : ""}`}>
           <nav className="tp-sidebar" aria-label="Student portal navigation">
@@ -795,6 +791,7 @@ export default function StudentPortal() {
         )}
       </main>
       </div>
+      <MobileTabBar tabs={studentTabs} onMore={() => setNavOpen(true)} moreActive={!studentTabs.some((t) => t.active)} showAlerts={!DEMO} />
       </div>
       )}
     </div>

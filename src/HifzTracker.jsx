@@ -428,7 +428,6 @@ const STUDENT_CSS = `
   .hzs-wait { color: #1D5FA8; font-weight: 600; }
   .hzs-note { font-size: 13px; color: #1F3A5A; background: #F3F8FD; border-radius: 8px; padding: 5px 9px; white-space: pre-wrap; }
   .hzs-inline-reader { margin-top: -2px; box-shadow: none; }
-  @media (max-width: 900px) { .hzs-task { scroll-margin-top: 76px; } }
   @media (max-width: 640px) {
     .hzs-inline-reader { padding: 10px 2px; }
     #hz-today.hz-card { padding-left: 12px; padding-right: 12px; }
