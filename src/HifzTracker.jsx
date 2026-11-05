@@ -548,7 +548,9 @@ export function lastLesson({ tasks, mistakes }) {
   return { done, lessonDay, lessonTaskOf, lessonMistakes };
 }
 
-export default function HifzTracker({ repo, onSummary }) {
+// children: shown under Overall Memorization (the student portal puts the
+// student's motivation quote and the hadith there).
+export default function HifzTracker({ repo, onSummary, children }) {
   const { state, error, setError, refresh } = useHifz(repo, onSummary);
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState(null); // task shown in the Mushaf
@@ -705,6 +707,8 @@ export default function HifzTracker({ repo, onSummary }) {
           <div className="hz-note"><CalendarClock size={18} aria-hidden="true" /><span>Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set.</span></div>
         )}
       </section>
+
+      {children}
 
       <StudentHistory done={done} today={today} onOpen={(id) => openTask(id)} />
 

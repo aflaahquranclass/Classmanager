@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, BookOpen, Layers, CalendarDays, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2 } from "lucide-react";
+import { BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2 } from "lucide-react";
 import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
-import HifzTracker, { HIFZ_CSS, completedCounts, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
+import HifzTracker, { HIFZ_CSS, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
 import { HOME_CSS, NextStepButton, QuickTiles } from "./StudentHome.jsx";
 import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
@@ -25,8 +25,6 @@ import { loadThilawa } from "./thilawa/service.js";
 import { createSupabaseThilawaRepo, createThilawaMemoryStore, createMemoryThilawaRepo } from "./thilawa/repos.js";
 import { hasProgram } from "./thilawa/programs.jsx";
 
-const TOTAL_SURAHS = 114;
-const TOTAL_JUZ = 30;
 
 // Same Islamic pattern assets as the Teacher/Admin portals.
 const PATTERN_MAIN_URL = "/images/tp-pattern-main.png";
@@ -407,13 +405,7 @@ export default function StudentPortal() {
   // Dashboard progress is measured in ayahs (out of 6236), not pages.
   const ayahsMemorized = hasPlan ? summary.stats.ayahs : 0;
   const percent = hasPlan ? summary.stats.percent : 0;
-  const counts = hasPlan ? completedCounts(summary.memorized) : { surahs: 0, juz: 0 };
   const todayHifz = summary?.todayTasks || [];
-  const stats = [
-    { label: "Surahs", Icon: BookOpen, value: <><CountUp value={counts.surahs} /> / {TOTAL_SURAHS}</> },
-    { label: "Juz", Icon: Layers, value: <><CountUp value={counts.juz} /> / {TOTAL_JUZ}</> },
-    { label: "Target year", Icon: CalendarDays, value: summary?.stats.goalYear ?? "—" },
-  ];
   // Hifz dashboard: the "do this next" button and the quick-access buttons.
   // Buttons for parts of the Hifz Tracker open it and scroll to that part
   // (it loads its own data, so wait until it has loaded — "Today's Hifz" is
@@ -475,7 +467,7 @@ export default function StudentPortal() {
         .sp-page-pattern { position: absolute; width: 320px; max-width: 70%; height: auto; opacity: 0.18; pointer-events: none; user-select: none; z-index: 0; }
         .sp-page-pattern-top { top: 0; right: 0; }
         .sp-page-pattern-bottom { bottom: 0; left: 0; transform: rotate(180deg); }
-        .sp-header > *, .sp-stat > * { position: relative; z-index: 1; }
+        .sp-header > * { position: relative; z-index: 1; }
         .sp-wrap { position: relative; z-index: 1; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
         /* Signed in: Teacher/Admin-style shell (sidebar on desktop, drawer on
@@ -487,8 +479,6 @@ export default function StudentPortal() {
         @media (min-width: 1100px) {
           .sp-content .sp-name { font-size: 30px; }
           .sp-content .sp-tracker-foot { font-size: 18px; }
-          .sp-content .sp-stat-label { font-size: 12.5px; }
-          .sp-content .sp-stat-value { font-size: 24px; }
         }
         @media (min-width: 901px) {
           .sp-shell .tp-sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; }
@@ -534,11 +524,6 @@ export default function StudentPortal() {
           font-size: clamp(28px, 7.4vw, 48px); line-height: 1.15;
           background: linear-gradient(90deg, #0F2FA8, ${TP.blue} 50%, #0F2FA8); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
-        .sp-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-        .sp-stat { position: relative; overflow: hidden; padding: 14px 8px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
-        .sp-stat-label { font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #6B819A; }
-        .sp-stat-value { display: flex; align-items: center; justify-content: center; gap: 6px; font-size: clamp(16px, 4.2vw, 22px); font-weight: 700; color: ${TP.navy}; white-space: nowrap; }
-        .sp-stat-value svg { width: 18px; height: 18px; flex-shrink: 0; color: ${TP.blue}; }
 
         .sp-hadith { padding: 18px 20px 18px 34px; }
         .sp-hadith h3 { margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #6B819A; }
@@ -568,13 +553,8 @@ export default function StudentPortal() {
         .sp-wrap > *:nth-child(5) { animation-delay: 0.28s; }
         .sp-wrap > *:nth-child(6) { animation-delay: 0.35s; }
         .sp-wrap > *:nth-child(7) { animation-delay: 0.42s; }
-        .sp-stats { animation: none !important; }
-        .sp-stat { animation: sp-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-        .sp-stat:nth-child(1) { animation-delay: 0.3s; }
-        .sp-stat:nth-child(2) { animation-delay: 0.4s; }
-        .sp-stat:nth-child(3) { animation-delay: 0.5s; }
 
-        .sp-card, .sp-stat { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+        .sp-card { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
         button.sp-card:hover { border-color: #C9DAEC; box-shadow: 0 1px 2px rgba(16,40,70,0.05), 0 8px 24px rgba(16,40,70,0.08); }
 
         .sp-flame { filter: drop-shadow(0 0 6px rgba(255,200,120,0.55)); }
@@ -615,8 +595,6 @@ export default function StudentPortal() {
         }
         @media (max-width: 420px) {
           .sp-streak-box { padding: 6px 10px; }
-          .sp-stats { gap: 8px; }
-          .sp-stat-value { flex-direction: column; gap: 6px; }
           .sp-motivation { padding-left: 44px; }
           .sp-hadith { padding-left: 48px; }
           .sp-accent { left: 16px; width: 7px; }
@@ -698,7 +676,20 @@ export default function StudentPortal() {
           </ol>
         </section>
 
-        {view === "hifz" && doesHifz && <HifzTracker repo={repo} />}
+        {view === "hifz" && doesHifz && (
+          <HifzTracker repo={repo}>
+            <section className="sp-card sp-motivation" aria-label="My motivation">
+              <span className="sp-accent" aria-hidden="true" />
+              <p {...motivationTextProps(quotes.hifz)}>{quotes.hifz.body}</p>
+            </section>
+            <section className="sp-card sp-hadith" aria-label="Hadith">
+              <span className="sp-accent" aria-hidden="true" />
+              <h3>Hadith</h3>
+              <p>{HADITH.text}</p>
+              <p className="sp-hadith-src">{HADITH.source}</p>
+            </section>
+          </HifzTracker>
+        )}
         {view === "thilawa" && doesThilawa && <ThilawaTracker data={thilawa} onGo={setView} />}
         {view === "thilawa-assigned" && doesThilawa && <AssignedReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "thilawa-free" && doesThilawa && <FreeReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
@@ -761,32 +752,6 @@ export default function StudentPortal() {
             <span><CountUp value={percent} />% completed</span>
           </div>
         </button>
-
-        <section className="sp-stats" aria-label="Progress summary">
-          {stats.map(({ label, Icon, value }) => (
-            <div key={label} className="sp-card sp-stat">
-              <div className="sp-stat-label">{label}</div>
-              <div className="sp-stat-value">
-                <Icon strokeWidth={1.9} aria-hidden="true" />
-                <span>{value}</span>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section className="sp-card sp-motivation" aria-label="My motivation">
-          <span className="sp-accent" aria-hidden="true" />
-          <p {...motivationTextProps(quotes.hifz)}>{quotes.hifz.body}</p>
-        </section>
-
-        {!DEMO && <StudentExams />}
-
-        <section className="sp-card sp-hadith" aria-label="Hadith">
-          <span className="sp-accent" aria-hidden="true" />
-          <h3>Hadith</h3>
-          <p>{HADITH.text}</p>
-          <p className="sp-hadith-src">{HADITH.source}</p>
-        </section>
         </div>
         )}
       </main>
