@@ -14,6 +14,7 @@ import { maldivesToday } from "./dates.js";
 import { hideSplash } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
 import { StudentExams } from "./exams/ExamUI.jsx";
+import { useBackNav } from "./useBackNav.js";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
 import ThilawaHome from "./thilawa/ThilawaHome.jsx";
@@ -309,6 +310,7 @@ export default function StudentPortal() {
   const [loginError, setLoginError] = useState("");
   useEffect(() => { if (auth.status !== "loading") hideSplash(); }, [auth.status]);
   const [view, setView] = useState("dashboard");
+  useBackNav(view, setView, "aqcStudentView"); // phone Back goes to the previous page
   const [thilawa, setThilawa] = useState(null);
   const [dashPick, setDashPick] = useState(readDash);
   const [navOpen, setNavOpen] = useState(false);

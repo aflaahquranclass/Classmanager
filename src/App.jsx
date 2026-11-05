@@ -22,6 +22,7 @@ import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
 import { ProgramPicker, inProgramSection, classProgram } from "./thilawa/programs.jsx";
 import { hideSplash, LogoLoader } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
+import { useBackNav } from "./useBackNav.js";
 import TeacherDashboard from "./teacher/TeacherDashboard.jsx";
 import TeacherStudents from "./teacher/TeacherStudents.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
@@ -852,6 +853,7 @@ export default function App() {
   const [saveError, setSaveError] = useState(null);
 
   const [section, setSection] = useState("dashboard"); // dashboard | students | teachers | classes | timetable | finance | data
+  useBackNav(section, setSection, "aqcSection"); // phone Back goes to the previous page
   const [dataMonths, setDataMonths] = useState([]);
   const [dataOverviewLoading, setDataOverviewLoading] = useState(false);
   const [dataOverviewLoaded, setDataOverviewLoaded] = useState(false);
