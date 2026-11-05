@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Mic, Square, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronsLeft, Download, BookOpen, RotateCcw, Check } from "lucide-react";
+import { Mic, Square, Eye, EyeOff, ChevronLeft, ChevronRight, ChevronsLeft, BookOpen, RotateCcw, Check } from "lucide-react";
 import MushafPage from "../thilawa/MushafPage.jsx";
 import { splitWords, alignRecitation } from "../readingTest/match.js";
-import { loadModel, modelReady, modelDownloadedBefore, useRecitation, mistakeSignal } from "./listener.js";
+import { useRecitation, mistakeSignal } from "./listener.js";
 import { passageWords } from "./passage.js";
 import { LEVEL_COLOURS, loadLevels, saveLevels, sessionLevels, hintKeys } from "./levels.js";
 import { pageToUnit, unitToPage } from "../hifz/quran.js";
 
 // Check my Reading (student portal): the student picks one of their tasks (or
-// any page) and recites; Tarteel's Quran speech model listens on the phone and
-// each word is checked on the quran.com Mushaf page. A wrong or skipped word
+// any page) and recites; the app listens (speech-to-text on its server) and
+// each word is checked on the quran.com Mushaf page as the student goes. A wrong or skipped word
 // buzzes and turns light red, then steps down each time it's later recited
 // right (orange → blue → green → gone). Hide covers the words not yet
 // recited (ayah numbers stay); Next word / Next ayah show them in red letters.
@@ -36,8 +36,6 @@ const CSS = `
   .cmr-btn:disabled { opacity: .55; cursor: default; }
   .cmr-btn-main { background: linear-gradient(135deg, #0D4F85, #176FD1 55%, #0A94B1); color: #fff; border: none; }
   .cmr-page-in { width: 84px; min-height: 42px; border: 1px solid #D5E3F2; border-radius: 12px; padding: 0 10px; font: inherit; font-size: 15px; color: #123B67; }
-  .cmr-bar { height: 8px; border-radius: 99px; background: #E8EFF6; overflow: hidden; margin-top: 10px; }
-  .cmr-bar div { height: 100%; background: linear-gradient(90deg, #0D4F85, #176FD1); transition: width .2s; }
   .cmr-err { background: #FDECEC; color: #B42318; border-radius: 12px; padding: 10px 12px; font-size: 14px; }
 
   .cmr-top { display: flex; align-items: center; gap: 8px; }
@@ -79,39 +77,6 @@ const CSS = `
   @keyframes cmr-pulse { 0%, 100% { box-shadow: 0 0 0 6px rgba(23,111,209,.12), 0 8px 18px rgba(13,79,133,.3); } 50% { box-shadow: 0 0 0 12px rgba(23,111,209,.08), 0 8px 18px rgba(13,79,133,.3); } }
   @media (prefers-reduced-motion: reduce) { .cmr-mic.live > span { animation: none; } }
 `;
-
-// The one-time download of the listening model, then ready.
-function ModelSetup({ onReady }) {
-  const [state, setState] = useState(modelReady() ? "ready" : modelDownloadedBefore() ? "loading" : "ask");
-  const [progress, setProgress] = useState(null);
-  const [error, setError] = useState("");
-  const start = () => {
-    setError("");
-    setState("loading");
-    loadModel(setProgress).then(() => { setState("ready"); onReady(); }).catch((e) => { setError(e.message); setState("ask"); });
-  };
-  useEffect(() => {
-    if (state === "ready") onReady();
-    else if (state === "loading") start();
-  }, []);
-  if (state === "ready") return null;
-  return (
-    <div className="cmr-card">
-      {state === "ask" ? (
-        <>
-          <p className="cmr-sub" style={{ marginBottom: 10 }}>Check my Reading listens on your phone. The first time, it downloads the listener (about 160 MB) and keeps it, so use Wi‑Fi. Your recitation never leaves your phone.</p>
-          <button type="button" className="cmr-btn cmr-btn-main" onClick={start}><Download size={17} aria-hidden="true" />Set up Check my Reading</button>
-        </>
-      ) : (
-        <>
-          <p className="cmr-sub">{progress && progress.total > 1e6 ? `Downloading ${Math.round(progress.loaded / 1e6)} of ${Math.round(progress.total / 1e6)} MB… (only the first time)` : "Getting the listener ready…"}</p>
-          <div className="cmr-bar"><div style={{ width: progress ? `${Math.round((progress.loaded / progress.total) * 100)}%` : "6%" }} /></div>
-        </>
-      )}
-      {error && <div className="cmr-err" style={{ marginTop: 10 }}>Couldn't set it up: {error}</div>}
-    </div>
-  );
-}
 
 // Listening to one task.
 function Session({ task, studentId, demo, onBack }) {
@@ -245,7 +210,6 @@ function Session({ task, studentId, demo, onBack }) {
 }
 
 export default function CheckMyReading({ tasks, studentId, demo = false }) {
-  const [ready, setReady] = useState(modelReady());
   const [task, setTask] = useState(null);
   const [anyPage, setAnyPage] = useState(1);
 
@@ -260,8 +224,7 @@ export default function CheckMyReading({ tasks, studentId, demo = false }) {
             <h2 className="cmr-title"><Mic size={22} color="#176FD1" aria-hidden="true" />Check my Reading</h2>
             <p className="cmr-sub">Choose what to recite. The app listens and marks any word you get wrong.</p>
           </div>
-          <ModelSetup onReady={() => setReady(true)} />
-          {ready && (
+          {(
             <>
               {tasks.length > 0 && <h3 className="cmr-label">Your tasks</h3>}
               {tasks.map((t) => (

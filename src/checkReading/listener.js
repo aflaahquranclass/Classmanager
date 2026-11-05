@@ -1,45 +1,40 @@
 import { useEffect, useRef, useState } from "react";
+import { supabase } from "../supabaseClient.js";
 
-// Check my Reading: the listening engine. One copy of Tarteel's Quran speech
-// model (see readingTest/asrWorker.js) runs in a background worker for the
-// whole portal; it is downloaded once (~100–180 MB, kept by the browser) and
-// loaded again in seconds after that. The microphone is read at 16 kHz and
-// re-checked every couple of seconds; long recitations are split at pauses.
+// Check my Reading: the listening engine. While the student recites, the
+// microphone is read at 16 kHz and every couple of seconds the recitation so
+// far is sent to the app's server (/api/recitation, Whisper on Cloudflare),
+// which sends back the words it heard. Nothing to download on the phone.
+// Long recitations are sent in parts, split at pauses.
 
 const RATE = 16000;
 const EVERY_MS = 2000;
-const SEGMENT_S = 22; // the model hears up to 30 s at once
-const READY_KEY = "aqc_reading_model_ready"; // the model was downloaded on this device before
+const SEGMENT_S = 22; // Whisper hears up to 30 s at once
 
-const model = { worker: null, backend: "", loading: null, onProgress: null, onResult: null };
+// 16 kHz mono samples → a WAV file (16-bit PCM).
+function toWav(samples) {
+  const buf = new ArrayBuffer(44 + samples.length * 2);
+  const v = new DataView(buf);
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + samples.length * 2, true); str(8, "WAVE");
+  str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, RATE, true); v.setUint32(28, RATE * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, "data"); v.setUint32(40, samples.length * 2, true);
+  for (let i = 0; i < samples.length; i++) v.setInt16(44 + i * 2, Math.max(-1, Math.min(1, samples[i])) * 0x7fff, true);
+  return buf;
+}
 
-export const modelDownloadedBefore = () => { try { return localStorage.getItem(READY_KEY) === "1"; } catch { return false; } };
-export const modelReady = () => !!model.backend;
-
-// Loads the model (once). onProgress({ loaded, total }) while downloading.
-export function loadModel(onProgress) {
-  model.onProgress = onProgress || null;
-  if (model.backend) return Promise.resolve(model.backend);
-  if (model.loading) return model.loading;
-  model.loading = new Promise((resolve, reject) => {
-    const w = new Worker(new URL("../readingTest/asrWorker.js", import.meta.url), { type: "module" });
-    model.worker = w;
-    w.onmessage = (e) => {
-      const m = e.data;
-      if (m.type === "progress") model.onProgress?.(m);
-      else if (m.type === "ready") {
-        model.backend = m.backend;
-        try { localStorage.setItem(READY_KEY, "1"); } catch { /* private mode */ }
-        resolve(m.backend);
-      } else if (m.type === "result") model.onResult?.(m);
-      else if (m.type === "error") {
-        if (!model.backend) { model.loading = null; w.terminate(); model.worker = null; reject(new Error(m.message)); }
-        else model.onResult?.({ error: m.message });
-      }
-    };
-    w.postMessage({ type: "load", model: "base" });
+async function transcribe(samples) {
+  const { data } = await supabase.auth.getSession();
+  const token = data?.session?.access_token;
+  const res = await fetch("/api/recitation", {
+    method: "POST",
+    headers: { "Content-Type": "audio/wav", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: toWav(samples),
   });
-  return model.loading;
+  const out = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(out.error || "Couldn't listen just now.");
+  return out.text || "";
 }
 
 // Linear resampling of mono audio to 16 kHz.
@@ -61,7 +56,7 @@ export function useRecitation() {
   const [error, setError] = useState("");
   const a = useRef(null);
 
-  const fresh = () => ({ chunks: [], length: 0, segStart: 0, committed: "", busy: false, pending: null, ctx: null, stop: null, timer: null });
+  const fresh = () => ({ chunks: [], length: 0, segStart: 0, committed: "", busy: false, ctx: null, stop: null, timer: null });
   if (!a.current) a.current = fresh();
 
   const audioFrom = (start) => {
@@ -78,7 +73,7 @@ export function useRecitation() {
 
   const tick = (final) => {
     const s = a.current;
-    if (s.busy || !model.worker) return;
+    if (s.busy) return;
     const len = s.length - s.segStart;
     if (len < RATE * 0.5) return;
     const closing = final || len > RATE * SEGMENT_S;
@@ -95,21 +90,20 @@ export function useRecitation() {
       }
     }
     s.busy = true;
-    s.pending = { closing, end: s.segStart + cut };
-    model.worker.postMessage({ type: "transcribe", id: Date.now(), audio: all.slice(0, cut) });
+    const end = s.segStart + cut;
+    transcribe(all.slice(0, cut))
+      .then((text) => {
+        const cur = a.current;
+        if (cur !== s) return; // a new recitation started meanwhile
+        if (closing) { s.committed = `${s.committed} ${text}`.trim(); s.segStart = end; setHeard(s.committed); }
+        else setHeard(`${s.committed} ${text}`.trim());
+        setError("");
+      })
+      .catch((e) => { if (a.current === s) setError(e.message); })
+      .finally(() => { s.busy = false; });
   };
 
-  useEffect(() => {
-    model.onResult = (m) => {
-      const s = a.current;
-      s.busy = false;
-      if (m.error) return;
-      const { closing, end } = s.pending || {};
-      if (closing) { s.committed = `${s.committed} ${m.text}`.trim(); s.segStart = end; setHeard(s.committed); }
-      else setHeard(`${s.committed} ${m.text}`.trim());
-    };
-    return () => { model.onResult = null; release(); };
-  }, []);
+  useEffect(() => () => release(), []);
 
   function release() {
     const s = a.current;

@@ -3,6 +3,8 @@
 //
 // POST /api/dhivehi — exam remarks in correct Dhivehi (see dhivehi.js).
 //
+// POST /api/recitation — Check my Reading: recited audio → text (see recitation.js).
+//
 // POST /api/push-out — from the database: phone notifications for new in-app
 //                     notifications and admin alerts (see push.js)
 //
@@ -16,6 +18,7 @@
 
 import { handleDhivehi } from "./dhivehi.js";
 import { handlePushOut } from "./push.js";
+import { handleRecitation } from "./recitation.js";
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -116,6 +119,7 @@ export default {
     if (pathname === "/api/email") return asAdmin(request, env, handleEmail);
     if (pathname === "/api/push-out") return handlePushOut(request, env, json);
     if (pathname === "/api/dhivehi") return handleDhivehi(request, env);
+    if (pathname === "/api/recitation") return handleRecitation(request, env);
     if (pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
     return env.ASSETS.fetch(request);
   },

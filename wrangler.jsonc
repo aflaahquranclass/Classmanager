@@ -16,6 +16,8 @@
   // Admin → Notifications emails, via Cloudflare Email Service. The sender
   // domain must be onboarded under Email Service → Email Sending.
   "send_email": [{ "name": "EMAIL" }],
+  // Check my Reading: Whisper speech-to-text (see worker/recitation.js).
+  "ai": { "binding": "AI" },
   "vars": {
     "EMAIL_FROM": "noreply@aflaahqc.com",
     "EMAIL_FROM_NAME": "Aflaah Quran Class",

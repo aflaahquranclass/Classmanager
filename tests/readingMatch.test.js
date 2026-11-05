@@ -48,3 +48,10 @@ test("a word the model split in two still counts as right", () => {
   assert.deepEqual(status, ["ok", "ok", "ok"]);
   assert.equal(extra, 0);
 });
+
+test("opening letters recited by their names count as right", () => {
+  const expected = splitWords("الم الله لا إله إلا هو");
+  const { status, extra } = alignRecitation(splitWords("ألف لام ميم الله لا إله إلا هو"), expected);
+  assert.deepEqual(status, ["ok", "ok", "ok", "ok", "ok", "ok"]);
+  assert.equal(extra, 0);
+});

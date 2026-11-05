@@ -40,6 +40,14 @@ export function similarity(a, b) {
   return 1 - prev[n] / Math.max(m, n);
 }
 
+// The disjoint letters that open some surahs are recited by their names
+// (الم → "ألف لام ميم"); in plain spelling, without hamza.
+const SPELLED = {
+  "الم": "الف لام ميم", "المص": "الف لام ميم صاد", "الر": "الف لام را", "المر": "الف لام ميم را",
+  "كهيعص": "كاف ها يا عين صاد", "طه": "طا ها", "طسم": "طا سين ميم", "طس": "طا سين", "يس": "يا سين",
+  "ص": "صاد", "حم": "حا ميم", "عسق": "عين سين قاف", "ق": "قاف", "ن": "نون",
+};
+
 // Short words must match closely; longer ones may differ by a letter or two.
 const isSame = (heard, expected) => similarity(heard, expected) >= (expected.length <= 3 ? 0.67 : 0.75);
 
@@ -65,6 +73,12 @@ export function alignRecitation(heard, expected) {
         [cost[i - 1][j] + 1, "extra"],
       ];
       // The model sometimes splits one word in two (لابثين → لا بسين).
+      // Opening letters said by their names: as many heard words as letters.
+      const spelled = SPELLED[expected[j - 1]];
+      if (spelled) {
+        const k = spelled.split(" ").length;
+        if (i >= k && similarity(heard.slice(i - k, i).join(""), spelled.replace(/ /g, "")) >= 0.8) options.push([cost[i - k][j - 1], `ok${k}`]);
+      }
       // Only when the two parts together are about the word's length.
       if (i >= 2) {
         const joined = heard[i - 2] + heard[i - 1];
@@ -77,7 +91,7 @@ export function alignRecitation(heard, expected) {
   // Where the student has reached: the cheapest end point for all heard words
   // (ties go to the furthest point that ends on a matched word).
   let reached = 0;
-  for (let j = 1; j <= m; j++) if (cost[n][j] < cost[n][reached] || (cost[n][j] === cost[n][reached] && (step[n][j] === "ok" || step[n][j] === "ok2"))) reached = j;
+  for (let j = 1; j <= m; j++) if (cost[n][j] < cost[n][reached] || (cost[n][j] === cost[n][reached] && /^ok\d?$/.test(step[n][j]))) reached = j;
 
   const status = new Array(m).fill("pending");
   let extra = 0;
@@ -85,7 +99,7 @@ export function alignRecitation(heard, expected) {
   while (i > 0 || j > 0) {
     const s = step[i][j];
     if (s === "ok" || s === "wrong") { status[j - 1] = s; i -= 1; j -= 1; }
-    else if (s === "ok2") { status[j - 1] = "ok"; i -= 2; j -= 1; }
+    else if (/^ok\d$/.test(s)) { status[j - 1] = "ok"; i -= +s.slice(2); j -= 1; }
     else if (s === "skip") { status[j - 1] = "skipped"; j -= 1; }
     else { extra += 1; i -= 1; }
   }
