@@ -14,7 +14,7 @@ import { maldivesToday } from "./dates.js";
 import { hideSplash } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
 import { StudentExams } from "./exams/ExamUI.jsx";
-import { useBackNav } from "./useBackNav.js";
+import { useBackNav, useBackLayer } from "./useBackNav.js";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
 import ThilawaHome from "./thilawa/ThilawaHome.jsx";
@@ -314,6 +314,7 @@ export default function StudentPortal() {
   const [thilawa, setThilawa] = useState(null);
   const [dashPick, setDashPick] = useState(readDash);
   const [navOpen, setNavOpen] = useState(false);
+  useBackLayer(navOpen, () => setNavOpen(false), "student-menu");
 
   useEffect(() => {
     if (!navOpen) return undefined;

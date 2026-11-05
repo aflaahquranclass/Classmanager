@@ -7,6 +7,7 @@
 // HIFZ_CSS and PositionPicker are shared with the teacher's screens.
 
 import { useState, useEffect, useCallback } from "react";
+import { useBackLayer } from "./useBackNav.js";
 import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2 } from "lucide-react";
 import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
@@ -553,6 +554,7 @@ export default function HifzTracker({ repo, onSummary }) {
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState(null); // task shown in the Mushaf
   const [focusPage, setFocusPage] = useState(null); // page to open on (a mistake's page)
+  useBackLayer(!!openId, () => { setOpenId(null); setFocusPage(null); }, "hifz-mushaf");
   const [editingGoal, setEditingGoal] = useState(false);
 
   if (error && !state) return <div className="hz"><div className="hz-error" role="alert">{error}</div></div>;

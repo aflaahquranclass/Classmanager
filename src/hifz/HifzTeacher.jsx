@@ -5,6 +5,7 @@
 // The student's portal updates live and they get a phone notification.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useBackLayer } from "../useBackNav.js";
 import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2, Download } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
@@ -470,6 +471,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const [drafts, setDrafts] = useState({}); // activity → the teacher's confirmed next task
   const [nextOpen, setNextOpen] = useState(null); // task whose next task is being looked at
   const [markStep, setMarkStep] = useState("mark"); // full screen: "mark" the Mushaf, then "next" to confirm
+  useBackLayer(!!markingId, () => closeMarking(), "teacher-hifz-mushaf");
   const generating = useRef(false);
 
   const run = async (fn) => {
@@ -755,6 +757,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 // app marks the student present for today's class).
 export function TeacherHifz({ students, teacherId, onMarked }) {
   const [openId, setOpenId] = useState(null);
+  useBackLayer(!!openId, () => { setOpenId(null); loadOverview(); }, "teacher-hifz-student");
   const [saving, setSaving] = useState(false); // making the class's task list image
   const [query, setQuery] = useState("");
   const [openClass, setOpenClass] = useState(null); // class whose students are shown

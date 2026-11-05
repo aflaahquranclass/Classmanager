@@ -5,6 +5,7 @@
 // lesson opens one portion for the whole class (see ClassLesson.jsx).
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useBackLayer } from "../useBackNav.js";
 import { BookOpenCheck, Trophy, ListChecks, StickyNote, ChevronLeft, Trash2, Eye, EyeOff, Flame, History, Plus, Highlighter, BookOpen, CheckCircle2 } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
@@ -102,6 +103,7 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
 
   // Listen & mark: the reading or lesson open full screen, and today's lesson form.
   const [listenId, setListenId] = useState(null);
+  useBackLayer(!!listenId, () => setListenId(null), "teacher-thilawa-listen");
   const [lessonFrom, setLessonFrom] = useState("");
   const [lessonTo, setLessonTo] = useState("");
   const [lessonAyahs, setLessonAyahs] = useState(null);
@@ -366,6 +368,8 @@ export function TeacherThilawa({ students, teacherId }) {
   const [overview, setOverview] = useState(null); // studentId → summary
   const [lessonClass, setLessonClass] = useState(null); // class choosing its portion for a class lesson
   const [classLesson, setClassLesson] = useState(null); // { className, students, portion, startPage } open in the Mushaf
+  useBackLayer(!!openId, () => setOpenId(null), "teacher-thilawa-student");
+  useBackLayer(!!classLesson, () => { setClassLesson(null); setLessonClass(null); loadOverview(); }, "teacher-class-lesson");
   const [lessonsOf, setLessonsOf] = useState({}); // studentId → their lessons, for the class's last part
   const [error, setError] = useState("");
   const ids = useMemo(() => students.map((s) => s.id), [students]);

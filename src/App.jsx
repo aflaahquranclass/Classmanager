@@ -22,7 +22,7 @@ import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
 import { ProgramPicker, inProgramSection, classProgram } from "./thilawa/programs.jsx";
 import { hideSplash, LogoLoader } from "./splash.jsx";
 import AuthShell from "./AuthShell.jsx";
-import { useBackNav } from "./useBackNav.js";
+import { useBackNav, useBackLayer } from "./useBackNav.js";
 import TeacherDashboard from "./teacher/TeacherDashboard.jsx";
 import TeacherStudents from "./teacher/TeacherStudents.jsx";
 // Loaded when opened: it uses HifzTracker.jsx, which needs TP from this file.
@@ -666,6 +666,7 @@ function LoginScreen({
 // owns navigation chrome, not page-specific layout.
 function TeacherPortalLayout({ activeSection, navItems, teacherDisplayName, onLogout, children }) {
   const [navOpen, setNavOpen] = useState(false);
+  useBackLayer(navOpen, () => setNavOpen(false), "portal-menu");
 
   useEffect(() => {
     if (!navOpen) return;
@@ -746,6 +747,7 @@ function TeacherPortalLayout({ activeSection, navItems, teacherDisplayName, onLo
 // avatar and an optional "Teacher login" shortcut alongside Log out.
 function AdminPortalLayout({ activeSection, navItems, portalLabel, displayName, roleLabel, onTeacherLogin, onLogout, children }) {
   const [navOpen, setNavOpen] = useState(false);
+  useBackLayer(navOpen, () => setNavOpen(false), "portal-menu");
 
   useEffect(() => {
     if (!navOpen) return;
@@ -1138,6 +1140,7 @@ export default function App() {
   const [recordDate, setRecordDate] = useState(maldivesToday);
   const [openClassName, setOpenClassName] = useState(null); // which class is open in Day view; null = class list
   const [attDraft, setAttDraft] = useState({}); // unsaved present/absent picks for the open class
+  useBackLayer(role === "teacher" && section === "attendance" && !!openClassName, () => { setOpenClassName(null); setAttDraft({}); }, "attendance-class");
   const [attReschedule, setAttReschedule] = useState(null); // null | { type: "day" } | { type: "class", className }
   const [attRescheduleDate, setAttRescheduleDate] = useState("");
   const [attRescheduleStart, setAttRescheduleStart] = useState("");

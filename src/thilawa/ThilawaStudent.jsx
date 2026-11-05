@@ -5,6 +5,7 @@
 // Uses the .hz-* styles from HifzTracker.jsx plus the .th-* styles below.
 
 import { useState, useEffect } from "react";
+import { useBackLayer } from "../useBackNav.js";
 import { AudioLines, Gauge, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
@@ -274,6 +275,7 @@ export function AssignedReading({ repo, data, refresh }) {
   const { busy, error, run } = useAction(refresh);
   const [open, setOpen] = useState(null); // assignment being read
   const [page, setPage] = useState(1);
+  useBackLayer(!!open, () => setOpen(null), "thilawa-reading");
   if (!data) return <div className="hz"><div className="hz-card hz-muted">Loading…</div></div>;
   const { assignments, today, reading } = data;
   const toggle = (a) => run(() => (a.completedAt ? reopenAssignment(repo, a, reading) : completeAssignment(repo, a, today)));
