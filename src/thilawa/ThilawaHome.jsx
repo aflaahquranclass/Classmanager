@@ -1,4 +1,4 @@
-import { ListChecks, BookMarked, LineChart, CalendarCheck, FileText, Wallet, Play, PenLine, CheckCircle2, ChevronRight } from "lucide-react";
+import { ListChecks, BookMarked, LineChart, Mic, FileText, Wallet, Play, PenLine, CheckCircle2, ChevronRight } from "lucide-react";
 import { describePages } from "./engine.js";
 import { HOME_CSS, NextStepButton, QuickTiles } from "../StudentHome.jsx";
 
@@ -52,7 +52,7 @@ export default function ThilawaHome({ data, onGo, children }) {
     { view: "thilawa-assigned", label: "Teacher's reading", Icon: ListChecks, dot: data?.openAssignments || 0 },
     { view: "thilawa-free", label: "Free reading", Icon: BookMarked },
     { view: "thilawa", label: "My progress", Icon: LineChart },
-    { view: "attendance", label: "Attendance", Icon: CalendarCheck },
+    { view: "check-reading", label: "Check my Reading", Icon: Mic },
     { view: "exams", label: "Exams", Icon: FileText },
     { view: "finance", label: "Fees", Icon: Wallet },
   ];

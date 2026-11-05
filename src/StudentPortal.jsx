@@ -1,12 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2, LineChart } from "lucide-react";
+import { BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2, LineChart, Mic } from "lucide-react";
 import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
-import HifzTracker, { HifzProgress, HIFZ_CSS, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
+import CheckMyReading, { hifzReadingTasks } from "./checkReading/CheckMyReading.jsx";
+import { describePages } from "./thilawa/engine.js";
+import HifzTracker, { HifzProgress, ACTIVITY_INFO, HIFZ_CSS, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
 import { HOME_CSS, NextStepButton, QuickTiles } from "./StudentHome.jsx";
 import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
-import { pageToUnit } from "./hifz/quran.js";
+import { pageToUnit, describeRange } from "./hifz/quran.js";
 import { addDays } from "./hifz/engine.js";
 import { useMotivation, motivationTextProps, MOTIVATION_FONT_CSS } from "./MotivationAdmin.jsx";
 import { TOTAL_AYAHS } from "./hifz/ayahs.js";
@@ -282,6 +284,7 @@ const NAV = [
   { key: "thilawa", label: "Thilawa progress", Icon: BookOpenCheck, program: "thilawa" },
   { key: "thilawa-assigned", label: "Teacher's Reading", Icon: ListChecks, program: "thilawa" },
   { key: "thilawa-free", label: "Free Reading", Icon: BookMarked, program: "thilawa" },
+  { key: "check-reading", label: "Check my Reading", Icon: Mic },
   { key: "attendance", label: "Attendance", Icon: CalendarCheck },
   { key: "exams", label: "Exams", Icon: FileText },
   { key: "finance", label: "Finance", Icon: Wallet },
@@ -438,7 +441,7 @@ export default function StudentPortal() {
     { key: "today", label: "Today's Hifz", Icon: ListChecks, dot: hifzDue.length, onClick: () => goHifz("hz-today") },
     { key: "mistakes", label: "Mistakes", Icon: PenLine, dot: hifzMistakes, onClick: () => goHifz("hz-mistakes") },
     { key: "revision", label: "Revision", Icon: RotateCw, onClick: () => goHifz("hz-revision") },
-    { key: "attendance", label: "Attendance", Icon: CalendarCheck, onClick: () => setView("attendance") },
+    { key: "check-reading", label: "Check my Reading", Icon: Mic, onClick: () => setView("check-reading") },
     { key: "exams", label: "Exams", Icon: FileText, onClick: () => setView("exams") },
     { key: "finance", label: "Fees", Icon: Wallet, onClick: () => setView("finance") },
   ];
@@ -705,6 +708,14 @@ export default function StudentPortal() {
         )}
         {view === "attendance" && <StudentAttendance records={records} />}
         {view === "finance" && <StudentFinance student={student} records={records} demo={DEMO} />}
+        {view === "check-reading" && (
+          <CheckMyReading studentId={student.id} demo={DEMO} tasks={[
+            ...(doesHifz && summary ? hifzReadingTasks([...summary.overdue, ...summary.todayTasks].filter((t) => !t.completedAt), ACTIVITY_INFO, describeRange) : []),
+            ...(doesThilawa && th ? th.assignments.filter((a) => !a.completedAt).map((a) => ({
+              id: a.id, title: "Teacher's reading", sub: describePages(a.fromPage, a.toPage).split(" · ")[0], Icon: ListChecks, first: a.fromPage, last: a.toPage,
+            })) : []),
+          ]} />
+        )}
         {view === "exams" && (DEMO
           ? <section className="sp-card hz-muted" style={{ padding: 18 }}>Exams aren't shown in demo mode.</section>
           : <StudentExams emptyText="No exams scheduled for you yet." />)}
