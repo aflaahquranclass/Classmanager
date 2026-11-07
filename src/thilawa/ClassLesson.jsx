@@ -19,7 +19,7 @@ import ListenScreen from "./ListenScreen.jsx";
 // students: the class (app shape), in the order the dropdown shows them.
 // portion: { fromPage, toPage, instructions }. makeRepo(studentId): a
 // student's Thilawa repo (Supabase unless given, e.g. the in-memory one).
-export default function ClassLesson({ students, teacherId, portion, onClose, makeRepo = null, startPage = null, onPage = null, portions = [] }) {
+export default function ClassLesson({ students, teacherId, portion, onClose, makeRepo = null, startPage = null, onPage = null }) {
   const repos = useMemo(() => new Map(students.map((s) => [s.id, makeRepo ? makeRepo(s.id) : createSupabaseThilawaRepo(supabase, s.id, teacherId)])), [students, teacherId, makeRepo]);
   const [studentId, setStudentId] = useState(students[0]?.id);
   const [data, setData] = useState({}); // student id → { assignments, mistakes }
@@ -78,7 +78,7 @@ export default function ClassLesson({ students, teacherId, portion, onClose, mak
   return (
     <ListenScreen student={student} repo={lessonRepo} mistakes={data[studentId].mistakes}
       assignment={lesson || { id: null, kind: "lesson", ...portion, letters: [], checkedAt: null }}
-      refresh={() => load([studentId])} onClose={onClose} startPage={page} onPage={turn} portions={portions}
+      refresh={() => load([studentId])} onClose={onClose} startPage={page} onPage={turn}
       classmates={classmates} onStudent={setStudentId} onFinished={next} />
   );
 }

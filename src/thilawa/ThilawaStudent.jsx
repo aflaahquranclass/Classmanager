@@ -9,7 +9,7 @@ import { useBackLayer } from "../useBackNav.js";
 import { AudioLines, Gauge, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
-import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, pagesWithMarks, mistakeCategory, mistakeColors, ayahsOnPages, CLASS_READING_COLOR } from "./engine.js";
+import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, pagesWithMarks, mistakeCategory, mistakeColors } from "./engine.js";
 import { LetterChips } from "./LettersPanel.jsx";
 import { markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "./service.js";
 
@@ -234,10 +234,9 @@ export function ThilawaTracker({ data, onGo }) {
 
 // The Madinah Mushaf one page at a time. It opens on `page` and turns freely
 // through the whole Mushaf; `from`–`to` is the part being read (counted in the
-// title, with a way back when the reader goes past it). `portions` colour the
-// part's ayah numbers (see MushafPage). With onTick/onUntick each page can be
+// title, with a way back when the reader goes past it). With onTick/onUntick each page can be
 // ticked as read today. `header` goes above the page.
-export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [], letters = [], portions = [], header = null }) {
+export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [], letters = [], header = null }) {
   const read = readToday?.has(page);
   // Like a printed Mushaf: the next page is to the left.
   const next = () => { if (page < TOTAL_PAGES) onPage(page + 1); };
@@ -258,7 +257,7 @@ export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, bu
         </div>
         <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
-      <div {...swipe}><MushafPage page={page} marks={marks} letters={letters} portions={portions} /></div>
+      <div {...swipe}><MushafPage page={page} marks={marks} letters={letters} /></div>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
         : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => onTick(page)}><Circle size={18} aria-hidden="true" />I've read this page</button>)}
@@ -310,7 +309,7 @@ export function AssignedReading({ repo, data, refresh }) {
           <LetterChips letters={a.letters} style={{ marginBottom: 12 }} inMushaf />
           {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
           {a.checkedAt && <div className="hz-muted" style={{ marginBottom: 10 }}><Highlighter size={14} aria-hidden="true" /> {listenedLabel(a)}. Marked words are highlighted.</div>}
-          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage} marks={marksOf(a)} letters={a.letters} portions={[{ ...ayahsOnPages(a.fromPage, a.toPage), ...CLASS_READING_COLOR }]}
+          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage} marks={marksOf(a)} letters={a.letters}
             footer={lesson ? null : a.completedAt
               ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />Done · tap to undo</button>
               : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />I've finished this reading</button>} />

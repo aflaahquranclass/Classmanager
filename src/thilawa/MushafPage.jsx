@@ -18,13 +18,6 @@ import { Maximize2, X } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
-import { SURAH_FIRST_AYAH } from "../hifz/ayahs.js";
-
-// "67:15" → its ayah number in the whole Quran (1–6236).
-export const ayahNumber = (verseKey) => {
-  const [s, a] = String(verseKey).split(":").map(Number);
-  return SURAH_FIRST_AYAH[s - 1] + a - 1;
-};
 
 export { buildLines };
 
@@ -73,6 +66,8 @@ export function MushafPresent({ children, tools = null }) {
     const el = ref.current;
     const before = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // The page's own bars (e.g. the phone tab bar) are hidden while the Mushaf fills the screen.
+    document.body.classList.add("mf-is-full");
     // Caught first, so Esc leaves full screen without also closing a screen behind it.
     const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); exit(); } };
     // Leaving the browser's full screen (its own Esc or gesture) leaves ours too.
@@ -82,6 +77,7 @@ export function MushafPresent({ children, tools = null }) {
     document.addEventListener("webkitfullscreenchange", onChange);
     return () => {
       document.body.style.overflow = before;
+      document.body.classList.remove("mf-is-full");
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("fullscreenchange", onChange);
       document.removeEventListener("webkitfullscreenchange", onChange);
@@ -112,6 +108,7 @@ const presentCss = `
   .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
   .mf-full .mf-bar { position: sticky; top: 0; z-index: 6; }
   .mf-full .mp-page { max-width: none; }
+  .mf-is-full .mtb { display: none !important; }
 `;
 
 // The endpoint quran.com's own site uses. (The older /api/v4/verses/by_page
@@ -194,18 +191,12 @@ ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyf
   .mp-basmala { display: flex; justify-content: center; align-items: center; height: 1.95em; font-family: "QCF2_P1", serif; }
   .mp-foot { margin-top: 0.6em; text-align: center; font-family: Inter, system-ui, sans-serif; font-size: 13px; color: #7A8496; }
   .mp-first .mp-body { padding: 0 9%; }
-  /* The ayah number of an ayah in the chosen part, in that part's colour. */
-  .mp-ayah-on { color: var(--mp-ayah); }
-  .mp-ayah-on::before { background: var(--mp-ayah-bg); box-shadow: 0 0 0 0.05em var(--mp-ayah); border-radius: 999px; inset: -0.02em -0.04em; }
   .mp-status { text-align: center; color: #7A8496; font-family: Inter, system-ui, sans-serif; font-size: 14px; padding: 40px 0; }
 `;
 
 // `wordStyles` ({ "78:1:2": { background, opacity, … } }) styles single words,
 // e.g. Check my Reading colouring each word as it is recited.
-// `portions` ([{ first, last, color, bg }], ayah numbers 1–6236) colour the
-// ayah numbers of the ayahs in each part: where the Hifz task or the class
-// reading is, on any page the reader turns to.
-export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null, portions = [] }) {
+export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null }) {
   const [state, setState] = useState({ status: "loading", page, lines: [] });
   const [attempt, setAttempt] = useState(0);
   const bodyRef = useRef(null);
@@ -323,12 +314,11 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
                   // Until the Hafs font is here (or without the text), the whole word is orange.
                   const lettered = !w.end && wordHasLetter(w.text, letters);
                   const parts = lettered && hafsReady && w.hafs ? letterParts(w.hafs, letters) : null;
-                  const part = w.end && portions.length ? portions.find((p) => { const n = ayahNumber(w.verseKey); return n >= p.first && n <= p.last; }) : null;
-                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""} ${parts ? "mp-lettered" : lettered ? "mp-letter" : ""} ${w.end ? "mp-end" : ""} ${part ? "mp-ayah-on" : ""}`;
+                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""} ${parts ? "mp-lettered" : lettered ? "mp-letter" : ""} ${w.end ? "mp-end" : ""}`;
                   const glyph = parts
                     ? <><span className="mp-glyph">{w.code}</span><span className="mp-hafs" aria-hidden="true">{parts.map((p, j) => (p.on ? <b key={j}>{p.text}</b> : p.text))}</span></>
                     : w.code;
-                  const style = part ? { ...wordStyles?.[w.key], "--mp-ayah": part.color, "--mp-ayah-bg": part.bg || "#FFFFFF" } : wordStyles?.[w.key];
+                  const style = wordStyles?.[w.key];
                   if (!onWordTap || w.end) return <span key={k} className={cls} style={style}>{glyph}</span>;
                   // el: the word on screen, for a pop-up next to it.
                   const tap = (e) => onWordTap({ ...w, page, line: line.line, el: e.currentTarget });

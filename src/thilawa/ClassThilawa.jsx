@@ -12,7 +12,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { BookOpen, ArrowRight, RefreshCw, X, Plus, Trash2, GraduationCap, CalendarDays, Navigation, Highlighter, BookMarked } from "lucide-react";
 import { confirmDialog } from "../ConfirmDialog.jsx";
-import { TOTAL_PAGES, describePages, readingAyahs, readingTitle, CLASS_READING_COLOR } from "./engine.js";
+import { TOTAL_PAGES, describePages, readingTitle } from "./engine.js";
 import { browserTimezone } from "./service.js";
 import { localDate } from "../hifz/engine.js";
 import SurahAyahPicker from "./SurahAyahPicker.jsx";
@@ -20,7 +20,6 @@ import ClassLesson from "./ClassLesson.jsx";
 import { Reader, fmtDate } from "./ThilawaStudent.jsx";
 
 const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
-const portionsOf = (r) => (r ? [{ ...readingAyahs(r), ...CLASS_READING_COLOR }] : []);
 
 export const CLASS_CSS = `
   .ct { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
@@ -53,14 +52,12 @@ export const CLASS_CSS = `
   .ct-add .hz-field { margin-top: 0; }
   .ct-follow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: #EEF6FE; border: 1px solid #BFDDF6; color: #123B67; font-size: 14px; }
   .ct-follow .hz-btn { min-height: 38px; margin-left: auto; }
-  .ct-key { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #567493; }
-  .ct-key i { display: inline-block; width: 14px; height: 14px; border-radius: 999px; vertical-align: -2px; margin-right: 5px; }
   @media (max-width: 560px) {
     .ct-form, .ct-add { grid-template-columns: 1fr; }
     .ct-head { padding: 16px; }
     .ct-body { padding: 12px 12px 14px; }
     .ct-reader-card { padding: 12px 6px !important; }
-    .ct-reader-card > .ct-follow, .ct-reader-card > .ct-key, .ct-reader-card > .hz-h2 { margin-left: 8px; margin-right: 8px; }
+    .ct-reader-card > .ct-follow, .ct-reader-card > .hz-h2 { margin-left: 8px; margin-right: 8px; }
   }
 `;
 
@@ -233,7 +230,7 @@ export function TeacherClassPanel({ className, students, classRepo, teacherId, m
       {lesson && reading && (
         <ClassLesson students={students} teacherId={teacherId} makeRepo={makeStudentRepo}
           portion={{ fromPage: reading.fromPage, toPage: reading.toPage, instructions: readingTitle(reading) }}
-          startPage={reading.page} onPage={onPage} portions={portionsOf(reading)} onClose={close} />
+          startPage={reading.page} onPage={onPage} onClose={close} />
       )}
 
       <section className="hz-card ct-reading" aria-label={`Class reading for ${className}`}>
@@ -330,11 +327,12 @@ export function StudentClassReading({ classRepo, data, onGo }) {
               : <span>Your class is on <b>page {teacherPage}</b>.</span>}
             {(shown !== teacherPage || !follow) && <button className="hz-btn hz-btn-primary" onClick={() => setFollow(true)}>Go to page {teacherPage}</button>}
           </div>
-          <div className="ct-key" style={{ marginBottom: 10 }}>
-            <span><i style={{ background: CLASS_READING_COLOR.bg, boxShadow: `0 0 0 1.5px ${CLASS_READING_COLOR.color}` }} />Ayahs of the class reading</span>
-            {marks.length > 0 && <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595", borderRadius: 4 }} /><Highlighter size={12} aria-hidden="true" style={{ verticalAlign: "-2px" }} /> Your words to correct ({marks.length})</span>}
-          </div>
-          <Reader from={reading.fromPage} to={reading.toPage} page={shown} onPage={turn} marks={marks} portions={portionsOf(reading)} />
+          {marks.length > 0 && (
+            <div className="hz-legend" style={{ marginBottom: 10 }}>
+              <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} /><Highlighter size={12} aria-hidden="true" style={{ verticalAlign: "-2px" }} /> Your words to correct ({marks.length})</span>
+            </div>
+          )}
+          <Reader from={reading.fromPage} to={reading.toPage} page={shown} onPage={turn} marks={marks} />
         </section>
       )}
 

@@ -13,7 +13,7 @@ import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { unitsOf, intersect } from "./hifz/engine.js";
 import { nearestAyahs } from "./hifz/ayahs.js";
-import { ACTIVITIES, ACTIVITY_TITLES, portionAyahs, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs } from "./hifz/tasks.js";
+import { ACTIVITIES, ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs } from "./hifz/tasks.js";
 import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./thilawa/MushafPage.jsx";
@@ -24,12 +24,6 @@ export const ACTIVITY_INFO = {
   short: { title: ACTIVITY_TITLES.short, Icon: RotateCw },
   new: { title: ACTIVITY_TITLES.new, Icon: BookOpenText },
   long: { title: ACTIVITY_TITLES.long, Icon: History },
-};
-// Each activity's colour: its ayah numbers in the Mushaf and its tab.
-export const ACTIVITY_COLORS = {
-  short: { color: "#0A7F96", bg: "#DDF3F6" },
-  new: { color: "#176FD1", bg: "#E1EEFC" },
-  long: { color: "#5B4BB7", bg: "#ECE9FA" },
 };
 
 export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -138,7 +132,7 @@ export const HIFZ_CSS = `
   @keyframes hz-glow { 0%, 100% { box-shadow: 0 0 0 0 rgba(23,111,209,0.35); } 50% { box-shadow: 0 0 0 5px rgba(23,111,209,0); } }
   @keyframes hz-slide { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
 
-  .hz > * { animation: hz-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .hz > * { animation: hz-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
   .hz > *:nth-child(2) { animation-delay: 0.08s; }
   .hz > *:nth-child(3) { animation-delay: 0.16s; }
   .hz > *:nth-child(4) { animation-delay: 0.24s; }
@@ -147,7 +141,7 @@ export const HIFZ_CSS = `
   .hz-card { transition: transform 0.25s ease, box-shadow 0.25s ease; }
   .hz > .hz-card:hover { transform: translateY(-3px); box-shadow: 0 16px 36px rgba(18,59,103,0.13); }
 
-  .hz-task { animation: hz-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.3s, background 0.3s; }
+  .hz-task { animation: hz-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.3s, background 0.3s; }
   .hz-task:nth-child(1) { animation-delay: 0.2s; }
   .hz-task:nth-child(2) { animation-delay: 0.3s; }
   .hz-task:nth-child(3) { animation-delay: 0.4s; }
@@ -173,8 +167,8 @@ export const HIFZ_CSS = `
   .hz-streak div, .hz-kv div, .hz-rev > div { transition: transform 0.2s ease; }
   .hz-streak div:hover, .hz-kv div:hover, .hz-rev > div:hover { transform: translateY(-2px); }
   .hz-wiz-body { animation: hz-slide 0.35s ease both; }
-  .hz-note { animation: hz-rise 0.4s ease both; }
-  .hz-modal { animation: hz-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .hz-note { animation: hz-rise 0.4s ease backwards; }
+  .hz-modal { animation: hz-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 
   @media (prefers-reduced-motion: reduce) {
     .hz *, .hz *::before, .hz *::after { animation: none !important; transition: none !important; }
@@ -338,13 +332,11 @@ export function PortionText({ task }) {
 // The task in the Mushaf. It opens on the task's first page (or `page`, e.g.
 // where a mistake is) and turns freely through the whole Mushaf, like a
 // printed one; "Back to the portion" returns. On the task's own pages the
-// portion is bright and the rest faded. The ayah numbers of the task's ayahs
-// are coloured in its activity's colour, and so are those of `others` (the
-// day's other tasks), wherever the reader turns to.
+// portion is bright and the rest faded.
 // Teacher mode: onWordTap / selectedKey / showCorrected (see MushafPage).
 // `header` goes above the page (e.g. the day's tasks to switch between) and
 // `children` under it; both stay with it in full screen.
-export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, others = [], header = null, children }) {
+export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, header = null, children }) {
   const pages = task ? taskPages(task) : [focus ?? 1];
   const first = pages[0];
   const last = pages[pages.length - 1];
@@ -367,7 +359,6 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
   const next = () => setPage(Math.min(TOTAL_PAGES, shown + 1));
   const prev = () => setPage(Math.max(1, shown - 1));
   const swipe = useMushafSwipe(next, prev);
-  const portions = [task, ...others].filter(Boolean).map((t) => ({ ...portionAyahs([t.start, t.end]), ...ACTIVITY_COLORS[t.activity] }));
   return (
     <MushafPresent><div className="hz-reader" ref={topRef}>
       {header}
@@ -381,7 +372,7 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
         </div>
         <button className="hz-btn hz-btn-outline" disabled={shown <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
-      <div {...swipe}><MushafPage page={shown} range={task && inTask ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} portions={portions} /></div>
+      <div {...swipe}><MushafPage page={shown} range={task && inTask ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} /></div>
       {children}
     </div></MushafPresent>
   );
@@ -407,12 +398,6 @@ export function TaskTabs({ tasks, current, onPick, done = () => false }) {
       })}
     </div>
   );
-}
-
-// The ayah-number key for the tasks shown (their colours in the Mushaf).
-export function AyahKey({ tasks }) {
-  const acts = ACTIVITIES.filter((a) => tasks.some((t) => t?.activity === a));
-  return acts.map((a) => <span key={a}><i style={{ background: ACTIVITY_COLORS[a].bg, boxShadow: `0 0 0 1.5px ${ACTIVITY_COLORS[a].color}`, borderRadius: 999 }} />{ACTIVITY_INFO[a].title} ayahs</span>);
 }
 
 // submitted: the student has finished; it's done once the teacher approves.
@@ -711,7 +696,6 @@ export default function HifzTracker({ repo, onSummary }) {
   const readerFor = (inline) => {
     if (!opened) return null;
     const after = openedInMain ? nextUnfinished(opened) : null;
-    const others = openedInMain ? main.filter((t) => t.id !== opened.id) : [];
     const finished = !!(opened.completedAt || opened.studentDoneAt);
     return (
       <section className={`hz-card hz-reader-card ${inline ? "hzs-inline-reader" : ""}`} aria-label={`Mushaf: ${ACTIVITY_INFO[opened.activity].title}`} id="hz-reader">
@@ -724,10 +708,9 @@ export default function HifzTracker({ repo, onSummary }) {
         {!inline && opened.notes && <div className="hz-task-notes" style={{ marginBottom: 10 }}>{opened.notes}</div>}
         <div className="hz-legend" style={{ marginBottom: 10 }}>
           <span><i style={{ background: "#1A1F36" }} />Your portion (other lines are faded)</span>
-          <AyahKey tasks={[opened, ...others]} />
           <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />Mistake your teacher marked</span>
         </div>
-        <TaskReader task={opened} page={focusPage} mistakes={mistakes} others={others}
+        <TaskReader task={opened} page={focusPage} mistakes={mistakes}
           header={openedInMain && <TaskTabs tasks={main} current={opened} onPick={(t) => openTask(t.id)} done={(t) => !!(t.studentDoneAt || t.completedAt)} />}>
           {!finished ? (
             <button className="hz-btn hz-btn-primary hzs-finish" disabled={busy} onClick={() => finishFromReader(opened)}>

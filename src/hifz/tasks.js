@@ -45,12 +45,6 @@ export function ayahAtLine(u, edge = "start") {
   for (let n = TOTAL_AYAHS; n >= 1; n--) if (AYAH_START_LINE[n - 1] <= line) return ayahRef(n);
   return ayahRef(1);
 }
-// The ayahs of a [start, end) portion as numbers 1–6236 → { first, last }.
-const ayahNo = (r) => SURAH_FIRST_AYAH[r.surah - 1] + r.ayah - 1;
-export function portionAyahs([s, e]) {
-  const first = ayahNo(ayahAtLine(s, "start"));
-  return { first, last: Math.max(first, ayahNo(ayahAtLine(e - 1, "end"))) };
-}
 export const ayahName = (r) => `${SURAHS[r.surah - 1].name} ${r.ayah}`;
 
 // The position of an ayah: the start of the line it starts on ("start"), or

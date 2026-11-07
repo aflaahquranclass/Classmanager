@@ -10,7 +10,7 @@ import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCir
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
-import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, AyahKey, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
+import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract, localDate } from "./engine.js";
 import { downloadClassTasks } from "./taskImage.js";
@@ -609,11 +609,9 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
                   <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
                   <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
                   <MistakeLegend />
-                  <AyahKey tasks={dayOf(marking)} />
                 </div>
                 {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
                 <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
-                  others={dayOf(marking).filter((x) => x.id !== marking.id)}
                   header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
                 {selected && (
                   <MistakePopup key={selected.id} anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}

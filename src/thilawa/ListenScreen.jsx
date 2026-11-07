@@ -6,7 +6,7 @@
 // listened, and the student is notified with how many words to correct.
 // Pages turn freely past the portion (the class often reads on); the portion's
 // pages are only where it opens. startPage opens it elsewhere, and onPage(page)
-// hears every turn. `portions` colour the part's ayah numbers (see MushafPage).
+// hears every turn.
 //
 // A class lesson (see ClassLesson.jsx) adds `classmates`: [{ id, name, done }]
 // for a dropdown of the class in place of the name, `onStudent(id)` to switch
@@ -56,7 +56,7 @@ const CSS = `
   }
 `;
 
-export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose, classmates = null, onStudent = null, onFinished = null, startPage = null, onPage: onPageTurn = null, portions = [] }) {
+export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose, classmates = null, onStudent = null, onFinished = null, startPage = null, onPage: onPageTurn = null }) {
   const [page, setPage] = useState(startPage ?? a.fromPage);
   const [goto, setGoto] = useState(null); // the page number being typed
   const [selectedKey, setSelectedKey] = useState(null);
@@ -154,7 +154,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
             </div>
             <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
           </div>
-          <div {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected letters={a.letters} portions={portions} /></div>
+          <div {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected letters={a.letters} /></div>
           {selected && (
             <MistakePopup key={selected.id} anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
               onCategory={(c) => run(() => repo.setMistakeCategory(selected.id, c)).then(() => setSelectedKey(null))}

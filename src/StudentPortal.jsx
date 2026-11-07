@@ -567,7 +567,7 @@ export default function StudentPortal() {
         @keyframes sp-accent { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
         /* The profile header stays still: no animations on it. */
-        .sp-wrap > *:not(.sp-header) { animation: sp-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+        .sp-wrap > *:not(.sp-header) { animation: sp-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
         .sp-wrap > *:nth-child(2) { animation-delay: 0.07s; }
         .sp-wrap > *:nth-child(3) { animation-delay: 0.14s; }
         .sp-wrap > *:nth-child(4) { animation-delay: 0.21s; }

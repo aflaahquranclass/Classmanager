@@ -1,9 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createClassMemoryStore, createMemoryClassRepo } from "../src/thilawa/repos.js";
-import { readingAyahs, readingTitle, ayahPages } from "../src/thilawa/engine.js";
-import { portionAyahs } from "../src/hifz/tasks.js";
-import { pageToUnit } from "../src/hifz/quran.js";
+import { readingTitle, ayahPages } from "../src/thilawa/engine.js";
 
 test("a class has one reading open until the teacher changes it; the page where it stopped is kept", async () => {
   const store = createClassMemoryStore();
@@ -44,16 +42,4 @@ test("Tajweed topics: the teacher adds and removes them, the class sees them new
   const [first] = await teacher.listTopics();
   await teacher.deleteTopic(first.id);
   assert.deepEqual((await student.listTopics()).map((t) => t.topic), ["Ikhfa"]);
-});
-
-test("ayahs of a class reading and of a Hifz portion, for colouring their ayah numbers", () => {
-  const mulk = ayahPages(67, 1, 15);
-  assert.deepEqual(readingAyahs({ fromPage: 562, toPage: 563, firstAyah: mulk.first, lastAyah: mulk.last }), { first: mulk.first, last: mulk.last });
-  assert.equal(mulk.last - mulk.first, 14);
-  // Pages only: every ayah starting on them (page 1 = Al-Fatihah 1–7).
-  assert.deepEqual(readingAyahs({ fromPage: 1, toPage: 1 }), { first: 1, last: 7 });
-  // A whole page of Hifz: page 2 starts at Al-Baqarah 1 (ayah 8).
-  const p2 = portionAyahs([pageToUnit(2), pageToUnit(3)]);
-  assert.equal(p2.first, 8);
-  assert.ok(p2.last >= p2.first);
 });
