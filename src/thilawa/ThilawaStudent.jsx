@@ -246,7 +246,7 @@ export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, bu
   const whole = from <= 1 && to >= TOTAL_PAGES;
   const inPart = page >= from && page <= to;
   return (
-    <MushafPresent><div className="th-reader">
+    <MushafPresent onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}><div className="th-reader">
       {header}
       <div className="th-reader-nav">
         <button className="hz-btn hz-btn-outline" disabled={page >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>

@@ -204,8 +204,8 @@ export const HIFZ_CSS = `
   .hz-tab-on.hz-tab-short { color: #0A7F96; }
   .hz-tab-on.hz-tab-new { color: #176FD1; }
   .hz-tab-on.hz-tab-long { color: #5B4BB7; }
-  .hz-tab-short { display: none; }
-  @media (max-width: 520px) { .hz-tab > svg, .hz-tab-label { display: none; } .hz-tab-short { display: inline; } .hz-tab { font-size: 14px; padding: 0 4px; } }
+  .hz-tab-abbr { display: none; }
+  @media (max-width: 520px) { .hz-tab > svg, .hz-tab-label { display: none; } .hz-tab-abbr { display: inline; } .hz-tab { font-size: 14px; padding: 0 4px; } }
   .hz-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: ${TP.secondaryText}; }
   .hz-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
   .hz-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
@@ -361,7 +361,7 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
   const prev = () => setPage(Math.max(1, shown - 1));
   const swipe = useMushafSwipe(next, prev);
   return (
-    <MushafPresent><div className="hz-reader" ref={topRef}>
+    <MushafPresent onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}><div className="hz-reader" ref={topRef}>
       {header}
       <div className="hz-reader-nav">
         <button className="hz-btn hz-btn-outline" disabled={shown >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
@@ -394,7 +394,7 @@ export function TaskTabs({ tasks, current, onPick, done = () => false }) {
         return (
           <button key={t.id} type="button" role="tab" aria-selected={on} aria-label={`${title}${ok ? ", finished" : ""}`} className={`hz-tab hz-tab-${t.activity} ${on ? "hz-tab-on" : ""} ${ok ? "hz-tab-done" : ""}`} onClick={() => !on && onPick(t)}>
             <span className="hz-tab-n" aria-hidden="true">{ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
-            <Icon size={16} aria-hidden="true" /><span className="hz-tab-label">{title}</span><span className="hz-tab-short">{TAB_SHORT[t.activity]}</span>
+            <Icon size={16} aria-hidden="true" /><span className="hz-tab-label">{title}</span><span className="hz-tab-abbr">{TAB_SHORT[t.activity]}</span>
           </button>
         );
       })}

@@ -14,7 +14,7 @@
 // with just those letters in orange.
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
-import { Maximize2, X } from "lucide-react";
+import { Maximize2, X, Menu, ChevronLeft, ChevronRight } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
@@ -43,20 +43,26 @@ export function useMushafSwipe(onNext, onPrev) {
 }
 
 // Full screen for presenting: `children` (the page with its Next / Previous)
-// fill the screen's width, with an Exit button along the top. Uses the
-// browser's own full screen where there is one (not on iPhone); otherwise it
-// covers the window. Esc exits too. `tools`: more buttons beside Full screen /
-// Exit, there in both.
-export function MushafPresent({ children, tools = null }) {
+// fill the screen. Uses the browser's own full screen where there is one (not
+// on iPhone); otherwise it covers the window. Esc exits too. `tools`: more
+// buttons beside Full screen / Exit, there in both.
+// In full screen the controls over the page (Exit, tools, the task tabs, the
+// page title and its arrows) fold into a ☰ button, and see-through Next /
+// Previous buttons sit on the page's edges (onNext / onPrev; null hides one).
+// Swiping turns the page as before.
+export function MushafPresent({ children, tools = null, onNext = null, onPrev = null }) {
   const ref = useRef(null);
   const [full, setFull] = useState(false);
+  const [menu, setMenu] = useState(false);
   const exit = () => {
     setFull(false);
+    setMenu(false);
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
   };
   const enter = () => {
     setFull(true);
+    setMenu(false);
     const el = ref.current;
     const request = el && (el.requestFullscreen || el.webkitRequestFullscreen);
     try { request?.call(el)?.catch?.(() => {}); } catch { /* it covers the window instead */ }
@@ -71,7 +77,7 @@ export function MushafPresent({ children, tools = null }) {
     // Caught first, so Esc leaves full screen without also closing a screen behind it.
     const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); exit(); } };
     // Leaving the browser's full screen (its own Esc or gesture) leaves ours too.
-    const onChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) setFull(false); };
+    const onChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) { setFull(false); setMenu(false); } };
     window.addEventListener("keydown", onKey, true);
     document.addEventListener("fullscreenchange", onChange);
     document.addEventListener("webkitfullscreenchange", onChange);
@@ -85,8 +91,13 @@ export function MushafPresent({ children, tools = null }) {
     };
   }, [full]);
   return (
-    <div ref={ref} className={`mf ${full ? "mf-full" : ""}`} role={full ? "dialog" : undefined} aria-modal={full || undefined} aria-label={full ? "Mushaf, full screen" : undefined}>
+    <div ref={ref} className={`mf ${full ? "mf-full" : ""} ${full && menu ? "mf-menu" : ""}`} role={full ? "dialog" : undefined} aria-modal={full || undefined} aria-label={full ? "Mushaf, full screen" : undefined}>
       <style>{presentCss}</style>
+      {full && (
+        <button type="button" className="mf-burger" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the controls" : "Show the controls"}>
+          {menu ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
+        </button>
+      )}
       <div className="mf-bar">
         {tools}
         {full
@@ -94,6 +105,13 @@ export function MushafPresent({ children, tools = null }) {
           : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter}><Maximize2 size={16} aria-hidden="true" />Full screen</button>}
       </div>
       <div className="mf-content">{children}</div>
+      {full && (
+        <>
+          {/* Like a printed Mushaf: the next page is to the left. */}
+          {onNext && <button type="button" className="mf-side mf-side-next" onClick={onNext} aria-label="Next page"><ChevronLeft size={30} aria-hidden="true" /></button>}
+          {onPrev && <button type="button" className="mf-side mf-side-prev" onClick={onPrev} aria-label="Previous page"><ChevronRight size={30} aria-hidden="true" /></button>}
+        </>
+      )}
     </div>
   );
 }
@@ -106,9 +124,23 @@ const presentCss = `
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
   .mf-full { position: fixed; inset: 0; z-index: 2000; overflow: auto; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box; }
   .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
-  .mf-full .mf-bar { position: sticky; top: -10px; z-index: 6; margin-top: -10px; padding: 10px 0 8px; background: #EEF3F8; }
-  /* Scrolling to the top of the page (e.g. the next task) stops below the bar. */
-  .mf-full .mf-content > * { scroll-margin-top: 68px; }
+  .mf-full { padding-top: 56px; }
+  .mf-full .mf-bar { box-sizing: border-box; padding-right: 56px; margin-top: -48px; min-height: 44px; align-items: center; }
+  /* Full screen: the controls over the page fold into the ☰ button. */
+  .mf-full:not(.mf-menu) :is(.mf-bar, .hz-tabs, .hz-reader-nav, .th-reader-nav, .lm-nav) { display: none !important; }
+  .mf-full .mf-content > * { scroll-margin-top: 56px; }
+  .mf-burger { position: fixed; top: max(8px, env(safe-area-inset-top)); right: 10px; z-index: 8; width: 44px; height: 44px; border-radius: 12px; border: 1px solid #C7DDF4;
+    background: rgba(255,255,255,0.92); color: #123B67; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 14px rgba(18,59,103,0.12); }
+  .mf-burger:focus-visible, .mf-side:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
+  /* See-through Next / Previous on the page's edges. */
+  .mf-side { position: fixed; top: 50%; transform: translateY(-50%); z-index: 7; width: 44px; height: min(42vh, 320px); border: none; padding: 0; cursor: pointer;
+    background: transparent; color: rgba(18,59,103,0.38); display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+  .mf-side:hover, .mf-side:active { background: rgba(23,111,209,0.08); color: rgba(18,59,103,0.7); }
+  .mf-side-next { left: 0; border-radius: 0 16px 16px 0; }
+  .mf-side-prev { right: 0; border-radius: 16px 0 0 16px; }
+  /* The page sits between them, so a word at the edge is never under a button. */
+  .mf-full .mf-content { padding: 0 40px; box-sizing: border-box; }
+  @media (max-width: 640px) { .mf-side { width: 26px; } .mf-full { padding-left: 4px; padding-right: 4px; } .mf-full .mf-content { padding: 0 24px; } }
   .mf-full .mp-page { max-width: none; }
   .mf-is-full .mtb { display: none !important; }
   /* A parent with a transform, filter or containment (a card's hover lift or

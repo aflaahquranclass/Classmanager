@@ -135,7 +135,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
           <LetterChips letters={a.letters} inMushaf />
           {error && <div className="hz-error" role="alert">{error}</div>}
           {/* The letters table goes inside, so it shows in full screen too. */}
-          <MushafPresent tools={
+          <MushafPresent onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null} tools={
             <button type="button" className="hz-btn hz-btn-outline lm-letters" onClick={() => { setSelectedKey(null); setLettersOpen((o) => !o); }} aria-expanded={lettersOpen}
               aria-label={`Letters to improve${a.letters.length ? ` (${a.letters.length} chosen)` : ""}`}>
               <i className="lm-abc" lang="ar" aria-hidden="true">أ ب</i>Letters{a.letters.length > 0 && <b className="lm-count" aria-hidden="true">{a.letters.length}</b>}
