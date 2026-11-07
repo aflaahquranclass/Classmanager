@@ -204,7 +204,8 @@ export const HIFZ_CSS = `
   .hz-tab-on.hz-tab-short { color: #0A7F96; }
   .hz-tab-on.hz-tab-new { color: #176FD1; }
   .hz-tab-on.hz-tab-long { color: #5B4BB7; }
-  @media (max-width: 520px) { .hz-tab > svg { display: none; } .hz-tab { font-size: 12.5px; padding: 0 4px; } }
+  .hz-tab-short { display: none; }
+  @media (max-width: 520px) { .hz-tab > svg, .hz-tab-label { display: none; } .hz-tab-short { display: inline; } .hz-tab { font-size: 14px; padding: 0 4px; } }
   .hz-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: ${TP.secondaryText}; }
   .hz-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
   .hz-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
@@ -381,6 +382,7 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
 // The day's tasks in class order (Short Muraja'ah, New Hifz, Long
 // Muraja'ah) as tabs over the Mushaf: one tap goes to the next task without
 // leaving the Mushaf. done(task) → shows a tick.
+const TAB_SHORT = { short: "Short", new: "Hifz", long: "Long" };
 export function TaskTabs({ tasks, current, onPick, done = () => false }) {
   if (tasks.length < 2) return null;
   return (
@@ -390,9 +392,9 @@ export function TaskTabs({ tasks, current, onPick, done = () => false }) {
         const on = t.id === current?.id;
         const ok = done(t);
         return (
-          <button key={t.id} type="button" role="tab" aria-selected={on} className={`hz-tab hz-tab-${t.activity} ${on ? "hz-tab-on" : ""} ${ok ? "hz-tab-done" : ""}`} onClick={() => !on && onPick(t)}>
+          <button key={t.id} type="button" role="tab" aria-selected={on} aria-label={`${title}${ok ? ", finished" : ""}`} className={`hz-tab hz-tab-${t.activity} ${on ? "hz-tab-on" : ""} ${ok ? "hz-tab-done" : ""}`} onClick={() => !on && onPick(t)}>
             <span className="hz-tab-n" aria-hidden="true">{ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
-            <Icon size={16} aria-hidden="true" /><span className="hz-tab-label">{title}</span>
+            <Icon size={16} aria-hidden="true" /><span className="hz-tab-label">{title}</span><span className="hz-tab-short">{TAB_SHORT[t.activity]}</span>
           </button>
         );
       })}

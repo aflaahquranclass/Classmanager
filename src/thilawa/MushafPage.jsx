@@ -106,9 +106,15 @@ const presentCss = `
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
   .mf-full { position: fixed; inset: 0; z-index: 2000; overflow: auto; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box; }
   .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
-  .mf-full .mf-bar { position: sticky; top: 0; z-index: 6; }
+  .mf-full .mf-bar { position: sticky; top: -10px; z-index: 6; margin-top: -10px; padding: 10px 0 8px; background: #EEF3F8; }
+  /* Scrolling to the top of the page (e.g. the next task) stops below the bar. */
+  .mf-full .mf-content > * { scroll-margin-top: 68px; }
   .mf-full .mp-page { max-width: none; }
   .mf-is-full .mtb { display: none !important; }
+  /* A parent with a transform, filter or containment (a card's hover lift or
+     entry animation) would trap the fixed full screen inside it: switched off
+     on every parent while the Mushaf is full screen. */
+  .mf-is-full :has(.mf-full) { transform: none !important; animation: none !important; filter: none !important; backdrop-filter: none !important; contain: none !important; will-change: auto !important; }
 `;
 
 // The endpoint quran.com's own site uses. (The older /api/v4/verses/by_page
