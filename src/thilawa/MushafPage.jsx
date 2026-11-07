@@ -6,8 +6,8 @@
 //
 // Optional: `range` ([start, end) in half-line units, see hifz/quran.js)
 // fades the lines outside a portion; `marks` highlights mistakes (open in
-// red, or their category's colour; corrected in green when `showCorrected`); `onWordTap(word)` lets the
-// teacher tap words, with `selectedKey` outlining the chosen one; `letters`
+// red, or their category's colour, with no outline; corrected in green when `showCorrected`); `onWordTap(word)` lets the
+// teacher tap words (`selectedKey`: the word the pop-up is for); `letters`
 // (Arabic letters) shows those letters in orange. A word is one glyph in these
 // fonts, so a word with any of them is drawn from its text in the King Fahd
 // Complex's Uthmanic Hafs font instead, fitted to the printed word's width,
@@ -165,21 +165,20 @@ export const mushafCss = `
   .mp-hafs { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-family: "UthmanicHafs", serif; line-height: 1; white-space: nowrap; pointer-events: none; }
   .mp-hafs b { font-weight: inherit; color: #E8650A; }
   .mp-mistake { color: #9B1C0A; }
-  .mp-mistake::before { background: #FBD5CC; box-shadow: 0 0 0 0.06em #F2A595; animation: mp-mark-plain 340ms ease-out; }
+  .mp-mistake::before { background: #FBD5CC; animation: mp-mark-plain 340ms ease-out; }
   .mp-fixed { color: #156B45; }
   .mp-fixed::before { background: #DDF5E9; animation: mp-mark-fixed 340ms ease-out; }
   .mp-tap { cursor: pointer; }
   .mp-tap:hover::before { background: #FFF1C2; }
   .mp-tap.mp-mistake:hover::before { background: #F7BCAE; }
 ${MISTAKE_CATEGORIES.map((c) => `  .mp-mistake.mp-cat-${c.id} { color: ${c.fg}; }
-  .mp-mistake.mp-cat-${c.id}::before { background: ${c.bg}; box-shadow: 0 0 0 0.06em ${c.ring}; animation-name: mp-mark-${c.id}; }
+  .mp-mistake.mp-cat-${c.id}::before { background: ${c.bg}; animation-name: mp-mark-${c.id}; }
   .mp-tap.mp-mistake.mp-cat-${c.id}:hover::before { background: ${c.bg}; filter: brightness(0.94); }`).join("\n")}
   /* The highlight pops in when a word is marked or gets its kind of mistake:
      one name per colour, so changing colour plays it again. */
 ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyframes mp-mark-${n} { from { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.1); } to { transform: none; } }`).join("\n")}
   @media (prefers-reduced-motion: reduce) { .mp-word::before { animation: none !important; } }
   .mp-tap:focus-visible { outline: 2px solid #176FD1; outline-offset: 1px; }
-  .mp-selected { outline: 0.08em solid #176FD1; outline-offset: 0.04em; }
   .mp-surah { display: flex; align-items: center; justify-content: center; height: 1.95em; }
   .mp-frame { position: relative; width: 100%; height: 1.55em; display: flex; align-items: center; justify-content: center; border-radius: 0.3em;
     background: linear-gradient(90deg, #DCEBFB, #F3F8FE 30%, #F3F8FE 70%, #DCEBFB); border: 0.06em solid #176FD1; box-shadow: inset 0 0 0 0.08em #FFFFFF, inset 0 0 0 0.11em #8DBBEA; }
