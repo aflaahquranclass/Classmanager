@@ -164,7 +164,7 @@ test("a lesson is done when made, isn't set reading, and its marks replace the l
 });
 
 test("ayah ranges map to the pages they're on", () => {
-  assert.deepEqual(ayahPages(1, 1, 7), { fromAyah: 1, toAyah: 7, whole: true, fromPage: 1, toPage: 1, label: "Al-Fatihah" });
+  assert.deepEqual(ayahPages(1, 1, 7), { surah: 1, fromAyah: 1, toAyah: 7, first: 1, last: 7, whole: true, fromPage: 1, toPage: 1, label: "Al-Fatihah" });
   const mulk = ayahPages(67, 1, 30);
   assert.equal(mulk.whole, true);
   assert.equal(mulk.fromPage, 562);

@@ -9,7 +9,7 @@ import { useBackLayer } from "../useBackNav.js";
 import { AudioLines, Gauge, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
-import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, pagesWithMarks, mistakeCategory, mistakeColors } from "./engine.js";
+import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, pagesWithMarks, mistakeCategory, mistakeColors, ayahsOnPages, CLASS_READING_COLOR } from "./engine.js";
 import { LetterChips } from "./LettersPanel.jsx";
 import { markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "./service.js";
 
@@ -54,6 +54,8 @@ export const thilawaCss = () => `
   .th-reader-title { text-align: center; font-weight: 700; color: #123B67; font-size: 15px; flex: 1; min-width: 0; }
   .th-reader-title small { display: block; font-weight: 400; color: #567493; font-size: 13px; }
   .th-read-btn { width: 100%; }
+  .th-out { color: #8A5A00; font-weight: 600; }
+  .hz-btn.th-back { min-height: 0; padding: 0 4px; font-size: 13px; }
   .th-read-done { background: #1E8A5A !important; box-shadow: 0 8px 18px rgba(30,138,90,0.25) !important; }
   .th-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
   .th-today { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -230,25 +232,33 @@ export function ThilawaTracker({ data, onGo }) {
 
 // ---------- page reader ----------
 
-// Shows the Madinah Mushaf one page at a time between `from` and `to`.
-// With onTick/onUntick each page can be ticked as read today.
-function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [], letters = [] }) {
+// The Madinah Mushaf one page at a time. It opens on `page` and turns freely
+// through the whole Mushaf; `from`–`to` is the part being read (counted in the
+// title, with a way back when the reader goes past it). `portions` colour the
+// part's ayah numbers (see MushafPage). With onTick/onUntick each page can be
+// ticked as read today. `header` goes above the page.
+export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [], letters = [], portions = [], header = null }) {
   const read = readToday?.has(page);
   // Like a printed Mushaf: the next page is to the left.
-  const next = () => { if (page < to) onPage(page + 1); };
-  const prev = () => { if (page > from) onPage(page - 1); };
+  const next = () => { if (page < TOTAL_PAGES) onPage(page + 1); };
+  const prev = () => { if (page > 1) onPage(page - 1); };
   const swipe = useMushafSwipe(next, prev);
   useEffect(() => { window.scrollTo?.({ top: 0, behavior: "smooth" }); }, [page]);
+  const whole = from <= 1 && to >= TOTAL_PAGES;
+  const inPart = page >= from && page <= to;
   return (
     <MushafPresent><div className="th-reader">
-      {to > from ? (
-        <div className="th-reader-nav">
-          <button className="hz-btn hz-btn-outline" disabled={page >= to} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
-          <div className="th-reader-title">{pageLabel(page)}<small>Page {page - from + 1} of {to - from + 1}</small></div>
-          <button className="hz-btn hz-btn-outline" disabled={page <= from} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
+      {header}
+      <div className="th-reader-nav">
+        <button className="hz-btn hz-btn-outline" disabled={page >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
+        <div className="th-reader-title">{pageLabel(page)}
+          {!whole && <small>{inPart
+            ? (to > from ? `Page ${page - from + 1} of ${to - from + 1} of the reading` : "The reading's page")
+            : <span className="th-out">Past the reading · <button type="button" className="hz-btn hz-btn-ghost th-back" onClick={() => onPage(from)}>back to page {from}</button></span>}</small>}
         </div>
-      ) : <div className="th-reader-title">{pageLabel(page)}</div>}
-      <div {...swipe}><MushafPage page={page} marks={marks} letters={letters} /></div>
+        <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
+      </div>
+      <div {...swipe}><MushafPage page={page} marks={marks} letters={letters} portions={portions} /></div>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
         : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => onTick(page)}><Circle size={18} aria-hidden="true" />I've read this page</button>)}
@@ -289,7 +299,6 @@ export function AssignedReading({ repo, data, refresh }) {
     const a = [...assignments, ...data.lessons].find((x) => x.id === open) || null;
     if (!a) { setOpen(null); return null; }
     const lesson = a.kind === "lesson";
-    const span = pagesWithMarks(a, marksOf(a)); // marked pages show too
     return (
       <div className="hz">
         <section className="hz-card th-reader-card" aria-label="Reading from your teacher">
@@ -301,7 +310,7 @@ export function AssignedReading({ repo, data, refresh }) {
           <LetterChips letters={a.letters} style={{ marginBottom: 12 }} inMushaf />
           {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
           {a.checkedAt && <div className="hz-muted" style={{ marginBottom: 10 }}><Highlighter size={14} aria-hidden="true" /> {listenedLabel(a)}. Marked words are highlighted.</div>}
-          <Reader from={span.fromPage} to={span.toPage} page={page} onPage={setPage} marks={marksOf(a)} letters={a.letters}
+          <Reader from={a.fromPage} to={a.toPage} page={page} onPage={setPage} marks={marksOf(a)} letters={a.letters} portions={[{ ...ayahsOnPages(a.fromPage, a.toPage), ...CLASS_READING_COLOR }]}
             footer={lesson ? null : a.completedAt
               ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />Done · tap to undo</button>
               : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => toggle(a)}><CheckCircle2 size={18} aria-hidden="true" />I've finished this reading</button>} />

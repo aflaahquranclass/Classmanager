@@ -22,13 +22,13 @@ test("memorised = teacher's starting point + completed New Hifz", () => {
   assert.equal(s.streak.current, 1);
 });
 
-test("overdue, today and upcoming are split by date; today is ordered New, Short, Long", () => {
+test("overdue, today and upcoming are split by date; today is ordered Short, New, Long", () => {
   const tasks = [
     task(TODAY, "long", pages(1, 2)), task(TODAY, "new", pages(10, 10)), task(TODAY, "short", pages(9, 9)),
     task("2026-10-29", "new", pages(8, 8)), task("2026-11-01", "new", pages(11, 11)),
   ];
   const s = summarizeHifz({ profile: null, tasks }, TODAY);
-  assert.deepEqual(s.todayTasks.map((t) => t.activity), ["new", "short", "long"]);
+  assert.deepEqual(s.todayTasks.map((t) => t.activity), ["short", "new", "long"]);
   assert.equal(s.overdue.length, 1);
   assert.equal(s.upcoming.length, 1);
   assert.equal(s.hasProfile, false);
@@ -165,22 +165,22 @@ test("tasks are generated from the plan for class days; done creates the next", 
   // Plan just saved on Sunday 1 Nov (a class day): today's three tasks.
   const first = nextTasksToSet({ tasks: [], memorized, profile: plan, today: "2026-11-01", schedule: sched });
   assert.deepEqual(first.map((r) => [r.activity, r.taskDate, r.start, r.end]), [
-    ["new", "2026-11-01", pageToUnit(158), pageToUnit(159)],
     ["short", "2026-11-01", pageToUnit(154), pageToUnit(158)],
+    ["new", "2026-11-01", pageToUnit(158), pageToUnit(159)],
     ["long", "2026-11-01", pageToUnit(2), pageToUnit(4)],
   ]);
   // Nothing more while each activity has a task waiting.
   const set = first.map((r, i) => ({ ...r, id: `t${i}`, completedAt: null, createdAt: `2026-11-01T0${i}` }));
   assert.equal(nextTasksToSet({ tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched }).length, 0);
   // While listening on Sunday: the next tasks are Tuesday's.
-  const nNew = previewNext(set[0], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
-  const nShort = previewNext(set[1], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
+  const nNew = previewNext(set[1], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
+  const nShort = previewNext(set[0], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
   const nLong = previewNext(set[2], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
   assert.deepEqual([nNew.taskDate, nNew.start], ["2026-11-03", pageToUnit(159)]);
   assert.deepEqual([nShort.start, nShort.end], [pageToUnit(155), pageToUnit(159)]); // 4 pages before Tuesday's New Hifz
   assert.deepEqual([nLong.start, nLong.end], [pageToUnit(4), pageToUnit(6)]);
   // A task the student ticked done at home: the teacher's page fills in the next one.
-  const doneNew = set.map((t, i) => (i === 0 ? { ...t, completedAt: "2026-11-01T10:00:00Z" } : t));
+  const doneNew = set.map((t, i) => (i === 1 ? { ...t, completedAt: "2026-11-01T10:00:00Z" } : t));
   const after = nextTasksToSet({ tasks: doneNew, memorized: [pages(2, 158)], profile: plan, today: "2026-11-01", schedule: sched });
   assert.deepEqual(after.map((r) => [r.activity, r.taskDate, r.start]), [["new", "2026-11-03", pageToUnit(159)]]);
   // The teacher's confirmed change is used instead.
@@ -216,22 +216,22 @@ test("the way New Hifz goes follows from where the student starts", () => {
   assert.deepEqual(shortBefore(pageToUnit(545), [wholeJuz("last", 2), pages(542, 544)], j28), { start: pageToUnit(544), end: pageToUnit(545) });
 });
 
-test("teacher's list: not done yet, New, Short, Long in that order", () => {
+test("teacher's list: not done yet, Short, New, Long in that order", () => {
   const SUN = "2026-11-01", MON = "2026-11-02";
   // Made in the order Short, Long, New (as they were approved), all for Sunday.
   const short = task(SUN, "short", pages(153, 156));
   const long = task(SUN, "long", pages(188, 191));
   const nw = task(SUN, "new", pages(157, 157));
-  assert.deepEqual(teacherTaskList([short, long, nw]).map((t) => t.activity), ["new", "short", "long"]);
-  // Across days too: New for Monday still comes before Short for Sunday; a late one first in its activity.
+  assert.deepEqual(teacherTaskList([short, long, nw]).map((t) => t.activity), ["short", "new", "long"]);
+  // Across days too: Short for Sunday still comes before New for Monday; a late one first in its activity.
   const late = task("2026-10-30", "short", pages(150, 153));
-  assert.deepEqual(teacherTaskList([short, task(MON, "new", pages(158, 158)), late]).map((t) => [t.activity, t.taskDate]), [["new", MON], ["short", "2026-10-30"], ["short", SUN]]);
+  assert.deepEqual(teacherTaskList([short, task(MON, "new", pages(158, 158)), late]).map((t) => [t.activity, t.taskDate]), [["short", "2026-10-30"], ["short", SUN], ["new", MON]]);
   // Approved New Hifz goes to History; Monday's takes its place at the top.
   const approved = { ...nw, completedAt: "2026-10-31T10:00:00Z" };
-  assert.deepEqual(teacherTaskList([short, long, approved, task(MON, "new", pages(158, 158))]).map((t) => [t.activity, t.taskDate]), [["new", MON], ["short", SUN], ["long", SUN]]);
+  assert.deepEqual(teacherTaskList([short, long, approved, task(MON, "new", pages(158, 158))]).map((t) => [t.activity, t.taskDate]), [["short", SUN], ["new", MON], ["long", SUN]]);
 });
 
-test("class task sheet: each student's next New, Short and Long, A–Z, with the class's day", () => {
+test("class task sheet: each student's next Short, New and Long, A–Z, with the class's day", () => {
   const ahmed = [
     task("2026-11-01", "new", pages(10, 10), "2026-11-01T10:00:00Z"), // done: not shown
     task("2026-11-02", "new", pages(11, 11)),
@@ -243,9 +243,9 @@ test("class task sheet: each student's next New, Short and Long, A–Z, with the
   assert.equal(sheet.date, "2026-11-02");
   assert.deepEqual(sheet.rows.map((r) => r.name), ["ahmed", "Mohamed"]);
   const [a, m] = sheet.rows;
-  assert.deepEqual(a.items.map((i) => i.label), ["Hifz", "Short Muraja'ah", "Long Muraja'ah"]);
-  assert.equal(a.items[0].text, describeAyahs(pages(11, 11)));
-  assert.equal(a.items[0].date, null);
-  assert.equal(m.items[0].date, "2026-11-03"); // a different day keeps its own date
+  assert.deepEqual(a.items.map((i) => i.label), ["Short Muraja'ah", "Hifz", "Long Muraja'ah"]);
+  assert.equal(a.items[1].text, describeAyahs(pages(11, 11)));
+  assert.equal(a.items[1].date, null);
+  assert.equal(m.items[1].date, "2026-11-03"); // a different day keeps its own date
   assert.equal(m.items[2].text, null); // nothing set
 });

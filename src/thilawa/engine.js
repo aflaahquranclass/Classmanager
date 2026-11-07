@@ -63,7 +63,7 @@ export function ayahPages(surah, fromAyah, toAyah = fromAyah) {
   const page = (line) => Math.floor(line / 15) + 1;
   const name = SURAHS[surah - 1].name;
   const whole = a === 1 && b === count;
-  return { fromAyah: a, toAyah: b, whole, fromPage: page(AYAH_START_LINE[first + a - 2]), toPage: page(AYAH_END_LINE[first + b - 2]), label: whole ? name : `${name} ${a}${a === b ? "" : `–${b}`}` };
+  return { surah, fromAyah: a, toAyah: b, first: first + a - 1, last: first + b - 1, whole, fromPage: page(AYAH_START_LINE[first + a - 2]), toPage: page(AYAH_END_LINE[first + b - 2]), label: whole ? name : `${name} ${a}${a === b ? "" : `–${b}`}` };
 }
 
 // Surahs matching a search: by number prefix, or by name ignoring spaces,
@@ -242,3 +242,16 @@ export function pagesOn(reading, day) {
   for (const r of reading) if (r.readOn === day) for (const p of pagesIn(r.fromPage, r.toPage)) pages.add(p);
   return pages;
 }
+
+// The ayahs of a class reading (ayah numbers 1–6236): the ones the teacher
+// picked, or every ayah starting on its pages. → { first, last }
+export function readingAyahs(r) {
+  if (r.firstAyah && r.lastAyah) return { first: r.firstAyah, last: r.lastAyah };
+  return ayahsOnPages(r.fromPage, r.toPage);
+}
+
+// A class reading's name: "Al-Mulk 1–15", or its pages.
+export const readingTitle = (r) => r.label || describePages(r.fromPage, r.toPage).split(" · ")[0];
+
+// Colour of the class reading's ayah numbers in the Mushaf.
+export const CLASS_READING_COLOR = { color: "#0A7F96", bg: "#DDF3F6" };

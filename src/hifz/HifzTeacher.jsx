@@ -10,11 +10,11 @@ import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCir
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
-import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
+import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, AyahKey, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract, localDate } from "./engine.js";
 import { downloadClassTasks } from "./taskImage.js";
-import { classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE } from "./tasks.js";
+import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
@@ -514,11 +514,20 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const needsProfile = !data.hasProfile || data.profile?.fromLegacy;
 
   const ctx = { tasks, memorized, profile: data.profile, today, schedule: student.schedule };
+  // The tasks of the day being listened to, in class order (Short Muraja'ah,
+  // New Hifz, Long Muraja'ah): tabs over the Mushaf, and what comes next.
+  const dayOf = (t) => (t ? tasks.filter((x) => x.taskDate === t.taskDate).sort((a, b) => ACTIVITIES.indexOf(a.activity) - ACTIVITIES.indexOf(b.activity)) : []);
+  const followingOf = (t) => {
+    const day = dayOf(t);
+    const at = day.findIndex((x) => x.id === t.id);
+    return [...day.slice(at + 1), ...day.slice(0, Math.max(0, at))].find((x) => x.id !== t.id && !x.completedAt) || null;
+  };
   const nextOf = (t) => drafts[t.activity] || previewNext(t, ctx);
   // Done: the next class day's task for the same activity is set (with the
   // teacher's confirmed changes, if any) and the student is notified.
   const markDone = (t, chosen = null) => {
     const next = chosen || nextOf(t);
+    const following = followingOf(t);
     const stillOpen = tasks.some((x) => x.activity === t.activity && !x.completedAt && x.id !== t.id);
     generating.current = true;
     return run(async () => {
@@ -526,7 +535,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
       if (next && !stillOpen) await repo.addTasks([{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "" }]);
       setDrafts((d) => { const n = { ...d }; delete n[t.activity]; return n; });
       setNextOpen(null);
-      if (markingId === t.id) closeMarking();
+      // Listening: straight on to the day's next task (still full screen).
+      if (markingId === t.id) { if (following) openMarking(following); else closeMarking(); }
     }).then((ok) => { if (ok) onMarked?.(); return ok; }).finally(() => { generating.current = false; });
   };
   // Undo an approval: the task is open again and the next one that approving
@@ -599,9 +609,12 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
                   <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
                   <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
                   <MistakeLegend />
+                  <AyahKey tasks={dayOf(marking)} />
                 </div>
                 {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
-                <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected>
+                <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
+                  others={dayOf(marking).filter((x) => x.id !== marking.id)}
+                  header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
                 {selected && (
                   <MistakePopup key={selected.id} anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
                     onCategory={(c) => run(() => repo.setMistakeCategory(selected.id, c)).then(() => setSelectedKey(null))}
@@ -634,10 +647,12 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
           <div className="ht-full-foot">
             <span className="hz-muted">{count} mistake{count === 1 ? "" : "s"} marked on these pages</span>
             {marking.completedAt
-              ? <button className="hz-btn hz-btn-primary" onClick={closeMarking}>Close</button>
+              ? (followingOf(marking)
+                ? <button className="hz-btn hz-btn-primary" onClick={() => openMarking(followingOf(marking))}>Go to {ACTIVITY_INFO[followingOf(marking).activity].title}<ArrowRight size={18} aria-hidden="true" /></button>
+                : <button className="hz-btn hz-btn-primary" onClick={closeMarking}>Close</button>)
               : onNext
                 ? <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => markDone(marking)}><CheckCircle2 size={18} aria-hidden="true" />Finish</button>
-                : <button className="hz-btn hz-btn-primary" onClick={() => { setSelectedKey(null); setMarkStep("next"); }}>Continue<ArrowRight size={18} aria-hidden="true" /></button>}
+                : <button className="hz-btn hz-btn-primary" onClick={() => { setSelectedKey(null); setMarkStep("next"); }}>Continue{followingOf(marking) ? ` · then ${ACTIVITY_INFO[followingOf(marking).activity].title}` : ""}<ArrowRight size={18} aria-hidden="true" /></button>}
           </div>
         )}
       </div>,
@@ -734,7 +749,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
             ? <>Set from the Hifz plan · {student.schedule?.days?.length === 7 ? "every day" : student.schedule?.days?.length ? student.schedule.days.join(", ") : "class days"}</>
             : "Save the Hifz plan above to start. The tasks are then set automatically for the class days."}
         </p>
-        {/* New Hifz, Short, Long Muraja'ah always in that order; approved ones go to History and the next one takes their place. */}
+        {/* Short Muraja'ah, New Hifz, Long Muraja'ah always in that order; approved ones go to History and the next one takes their place. */}
         {ready > 0 && (
           <div className="ht-ready-note" role="status"><CheckCheck size={18} aria-hidden="true" /><span><b>{ready} task{ready === 1 ? "" : "s"} finished by the student.</b> Listen, then approve.</span></div>
         )}
@@ -805,7 +820,7 @@ export function TeacherHifz({ students, teacherId, onMarked }) {
           <div className="hz-row">
             <div>
               <div style={{ fontSize: "20px", fontWeight: 700, color: "#123B67" }}>Hifz</div>
-              <div className="hz-muted">Set each student's New Hifz, Short and Long Muraja'ah, and mark mistakes on the Mushaf.</div>
+              <div className="hz-muted">Set each student's Short Muraja'ah, New Hifz and Long Muraja'ah, and mark mistakes on the Mushaf.</div>
             </div>
           </div>
           {error && <div className="hz-error" role="alert">{error}</div>}

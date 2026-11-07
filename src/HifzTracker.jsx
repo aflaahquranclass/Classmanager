@@ -6,14 +6,14 @@
 //
 // HIFZ_CSS and PositionPicker are shared with the teacher's screens.
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useBackLayer } from "./useBackNav.js";
-import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2 } from "lucide-react";
+import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2, ArrowRight } from "lucide-react";
 import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { unitsOf, intersect } from "./hifz/engine.js";
 import { nearestAyahs } from "./hifz/ayahs.js";
-import { ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs } from "./hifz/tasks.js";
+import { ACTIVITIES, ACTIVITY_TITLES, portionAyahs, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs } from "./hifz/tasks.js";
 import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./thilawa/MushafPage.jsx";
@@ -21,9 +21,15 @@ import { MistakeTag } from "./thilawa/MistakeCategories.jsx";
 import { mistakeColors } from "./thilawa/engine.js";
 
 export const ACTIVITY_INFO = {
-  new: { title: ACTIVITY_TITLES.new, Icon: BookOpenText },
   short: { title: ACTIVITY_TITLES.short, Icon: RotateCw },
+  new: { title: ACTIVITY_TITLES.new, Icon: BookOpenText },
   long: { title: ACTIVITY_TITLES.long, Icon: History },
+};
+// Each activity's colour: its ayah numbers in the Mushaf and its tab.
+export const ACTIVITY_COLORS = {
+  short: { color: "#0A7F96", bg: "#DDF3F6" },
+  new: { color: "#176FD1", bg: "#E1EEFC" },
+  long: { color: "#5B4BB7", bg: "#ECE9FA" },
 };
 
 export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
@@ -188,10 +194,23 @@ export const HIFZ_CSS = `
   .hz-task-actions .hz-btn { flex: 1 1 auto; }
   .hz-mistake-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: #9B1C0A; background: #FBEAE6; border-radius: 999px; padding: 3px 10px; }
   .hz-task-open { box-shadow: 0 0 0 2px ${TP.blue}; }
-  .hz-reader { display: flex; flex-direction: column; gap: 12px; }
+  .hz-reader { scroll-margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
   .hz-reader-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .hz-reader-title { flex: 1; min-width: 0; text-align: center; font-weight: 700; color: ${TP.navy}; font-size: 15px; }
   .hz-reader-title small { display: block; font-weight: 400; color: ${TP.secondaryText}; font-size: 13px; }
+  .hz-out { color: #8A5A00; font-weight: 600; }
+  .hz-btn.hz-back-portion { min-height: 0; padding: 0 4px; font-size: 13px; }
+  .hz-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; padding: 4px; border-radius: 14px; background: #EEF3F8; }
+  .hz-tab { min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; border: none; border-radius: 11px; background: transparent; color: #4A6480; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; min-width: 0; }
+  .hz-tab:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 1px; }
+  .hz-tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hz-tab-n { flex-shrink: 0; width: 20px; height: 20px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; font-size: 11.5px; background: #FFFFFF; color: #4A6480; }
+  .hz-tab-done .hz-tab-n { background: #1E8A5A; color: #FFFFFF; }
+  .hz-tab-on { background: #FFFFFF; box-shadow: 0 2px 8px rgba(18,59,103,0.12); }
+  .hz-tab-on.hz-tab-short { color: #0A7F96; }
+  .hz-tab-on.hz-tab-new { color: #176FD1; }
+  .hz-tab-on.hz-tab-long { color: #5B4BB7; }
+  @media (max-width: 520px) { .hz-tab > svg { display: none; } .hz-tab { font-size: 12.5px; padding: 0 4px; } }
   .hz-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: ${TP.secondaryText}; }
   .hz-legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: -2px; margin-right: 5px; }
   .hz-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
@@ -316,42 +335,84 @@ export function PortionText({ task }) {
   );
 }
 
-// The task's pages in the Mushaf, its portion bright and the rest faded.
-// Only the task's own pages can be turned to; without a task, only `page`.
-// `page` also picks the page to open on (e.g. where a mistake is).
+// The task in the Mushaf. It opens on the task's first page (or `page`, e.g.
+// where a mistake is) and turns freely through the whole Mushaf, like a
+// printed one; "Back to the portion" returns. On the task's own pages the
+// portion is bright and the rest faded. The ayah numbers of the task's ayahs
+// are coloured in its activity's colour, and so are those of `others` (the
+// day's other tasks), wherever the reader turns to.
 // Teacher mode: onWordTap / selectedKey / showCorrected (see MushafPage).
-// `children` go under the page and stay with it in full screen.
-export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, children }) {
+// `header` goes above the page (e.g. the day's tasks to switch between) and
+// `children` under it; both stay with it in full screen.
+export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, others = [], header = null, children }) {
   const pages = task ? taskPages(task) : [focus ?? 1];
   const first = pages[0];
   const last = pages[pages.length - 1];
-  const clamp = (p) => Math.min(last, Math.max(first, p ?? first));
-  const [page, setPage] = useState(() => clamp(focus));
-  useEffect(() => { setPage(clamp(focus)); }, [task?.id, task?.start, task?.end, focus]);
-  const shown = clamp(page);
+  const startAt = () => Math.min(TOTAL_PAGES, Math.max(1, focus ?? first));
+  const [page, setPage] = useState(startAt);
+  useEffect(() => { setPage(startAt()); }, [task?.id, task?.start, task?.end, focus]);
+  // Going on to another task (the tabs, or finishing one): back to the top of the Mushaf.
+  const topRef = useRef(null);
+  const shownTask = useRef(task?.id);
+  useEffect(() => {
+    if (shownTask.current === task?.id) return undefined;
+    shownTask.current = task?.id;
+    const t = setTimeout(() => topRef.current?.scrollIntoView({ block: "start" }), 80);
+    return () => clearTimeout(t);
+  }, [task?.id]);
+  const shown = Math.min(TOTAL_PAGES, Math.max(1, page));
+  const inTask = shown >= first && shown <= last;
   const open = mistakes.filter((m) => !m.correctedAt && m.page === shown).length;
   // Like a printed Mushaf: the next page is to the left.
-  const next = () => setPage(Math.min(last, shown + 1));
-  const prev = () => setPage(Math.max(first, shown - 1));
+  const next = () => setPage(Math.min(TOTAL_PAGES, shown + 1));
+  const prev = () => setPage(Math.max(1, shown - 1));
   const swipe = useMushafSwipe(next, prev);
-  const title = (
-    <div className="hz-reader-title">Page {shown} · {surahsOnPages(shown, shown).map((s) => s.name).join(", ")}
-      <small>{pages.length > 1 ? `Page ${shown - first + 1} of ${pages.length}` : `Juz ${JUZ_START_PAGES.filter((p) => p <= shown).length}`}{open ? ` · ${open} mistake${open === 1 ? "" : "s"} here` : ""}</small>
-    </div>
-  );
+  const portions = [task, ...others].filter(Boolean).map((t) => ({ ...portionAyahs([t.start, t.end]), ...ACTIVITY_COLORS[t.activity] }));
   return (
-    <MushafPresent><div className="hz-reader">
-      {pages.length > 1 ? (
-        <div className="hz-reader-nav">
-          <button className="hz-btn hz-btn-outline" disabled={shown >= last} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
-          {title}
-          <button className="hz-btn hz-btn-outline" disabled={shown <= first} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
+    <MushafPresent><div className="hz-reader" ref={topRef}>
+      {header}
+      <div className="hz-reader-nav">
+        <button className="hz-btn hz-btn-outline" disabled={shown >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
+        <div className="hz-reader-title">Page {shown} · {surahsOnPages(shown, shown).map((s) => s.name).join(", ")}
+          <small>{inTask
+            ? (pages.length > 1 ? `Page ${shown - first + 1} of ${pages.length} of the portion` : `Juz ${JUZ_START_PAGES.filter((p) => p <= shown).length} · the portion's page`)
+            : <span className="hz-out">Outside the portion · <button type="button" className="hz-btn hz-btn-ghost hz-back-portion" onClick={() => setPage(first)}>back to page {first}</button></span>}
+            {open ? ` · ${open} mistake${open === 1 ? "" : "s"} here` : ""}</small>
         </div>
-      ) : <div className="hz-reader-nav">{title}</div>}
-      <div {...(pages.length > 1 ? swipe : {})}><MushafPage page={shown} range={task ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} /></div>
+        <button className="hz-btn hz-btn-outline" disabled={shown <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
+      </div>
+      <div {...swipe}><MushafPage page={shown} range={task && inTask ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected} portions={portions} /></div>
       {children}
     </div></MushafPresent>
   );
+}
+
+// The day's tasks in class order (Short Muraja'ah, New Hifz, Long
+// Muraja'ah) as tabs over the Mushaf: one tap goes to the next task without
+// leaving the Mushaf. done(task) → shows a tick.
+export function TaskTabs({ tasks, current, onPick, done = () => false }) {
+  if (tasks.length < 2) return null;
+  return (
+    <div className="hz-tabs" role="tablist" aria-label="The day's tasks">
+      {tasks.map((t, i) => {
+        const { title, Icon } = ACTIVITY_INFO[t.activity];
+        const on = t.id === current?.id;
+        const ok = done(t);
+        return (
+          <button key={t.id} type="button" role="tab" aria-selected={on} className={`hz-tab hz-tab-${t.activity} ${on ? "hz-tab-on" : ""} ${ok ? "hz-tab-done" : ""}`} onClick={() => !on && onPick(t)}>
+            <span className="hz-tab-n" aria-hidden="true">{ok ? <Check size={14} strokeWidth={3} /> : i + 1}</span>
+            <Icon size={16} aria-hidden="true" /><span className="hz-tab-label">{title}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// The ayah-number key for the tasks shown (their colours in the Mushaf).
+export function AyahKey({ tasks }) {
+  const acts = ACTIVITIES.filter((a) => tasks.some((t) => t?.activity === a));
+  return acts.map((a) => <span key={a}><i style={{ background: ACTIVITY_COLORS[a].bg, boxShadow: `0 0 0 1.5px ${ACTIVITY_COLORS[a].color}`, borderRadius: 999 }} />{ACTIVITY_INFO[a].title} ayahs</span>);
 }
 
 // submitted: the student has finished; it's done once the teacher approves.
@@ -428,6 +489,8 @@ const STUDENT_CSS = `
   .hzs-wait { color: #1D5FA8; font-weight: 600; }
   .hzs-note { font-size: 13px; color: #1F3A5A; background: #F3F8FD; border-radius: 8px; padding: 5px 9px; white-space: pre-wrap; }
   .hzs-inline-reader { margin-top: -2px; box-shadow: none; }
+  .hzs-finish { width: 100%; min-height: 52px; flex-wrap: wrap; font-size: 15px; }
+  .hzs-finish-next { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,0.22); font-size: 13px; }
   @media (max-width: 640px) {
     .hzs-inline-reader { padding: 10px 2px; }
     #hz-today.hz-card { padding-left: 12px; padding-right: 12px; }
@@ -605,7 +668,7 @@ export default function HifzTracker({ repo, onSummary }) {
   // The main card: what's waiting for today (and anything not finished from
   // before) or, when today is all done, the next class day's tasks — named by
   // that day until it comes. Done tasks move to History.
-  const actOrder = (t) => ["new", "short", "long"].indexOf(t.activity);
+  const actOrder = (t) => ACTIVITIES.indexOf(t.activity);
   const waiting = tasks.filter((t) => !t.completedAt);
   const due = waiting.filter((t) => t.taskDate <= today).sort((a, b) => (a.taskDate < b.taskDate ? -1 : a.taskDate > b.taskDate ? 1 : actOrder(a) - actOrder(b)));
   const future = waiting.filter((t) => t.taskDate > today).sort((a, b) => (a.taskDate < b.taskDate ? -1 : a.taskDate > b.taskDate ? 1 : actOrder(a) - actOrder(b)));
@@ -628,39 +691,58 @@ export default function HifzTracker({ repo, onSummary }) {
   const dayList = mainDate === today ? [...main, ...state.todayTasks.filter((t) => t.completedAt)] : main;
   const finishedCount = dayList.filter((t) => t.completedAt || t.studentDoneAt).length;
   const allFinished = dayList.length > 0 && finishedCount === dayList.length;
-  // Finishing from the Mushaf closes it and goes on to the next task.
+  // The task after `t` in class order that isn't finished yet (wrapping round).
+  const nextUnfinished = (t) => {
+    const at = main.findIndex((x) => x.id === t.id);
+    return [...main.slice(at + 1), ...main.slice(0, Math.max(0, at))].find((x) => x.id !== t.id && !x.studentDoneAt && !x.completedAt) || null;
+  };
+  // Finishing in the Mushaf goes straight on to the next task, still in the
+  // Mushaf (Short Muraja'ah → New Hifz → Long Muraja'ah); after the last one it closes.
   const finishFromReader = async (t) => {
+    const next = nextUnfinished(t);
     await toggle(t, true);
-    setOpenId(null);
-    setFocusPage(null);
-    const next = main.find((x) => x.id !== t.id && !x.studentDoneAt && !x.completedAt);
-    if (next) setTimeout(() => document.getElementById(`hzs-task-${next.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+    if (next) openTask(next.id);
+    else { setOpenId(null); setFocusPage(null); }
   };
   const openedInMain = opened && main.some((t) => t.id === opened.id);
   const nextTask = main.find((t) => !t.studentDoneAt);
   // Under its task card (inline) the Mushaf needs no title, notes or close
   // button of its own — the card above shows them.
-  const readerFor = (inline) => opened && (
-    <section className={`hz-card hz-reader-card ${inline ? "hzs-inline-reader" : ""}`} aria-label={`Mushaf: ${ACTIVITY_INFO[opened.activity].title}`} id="hz-reader">
-      {!inline && (
-        <div className="hz-row" style={{ marginBottom: 8 }}>
-          <h2 className="hz-h2" style={{ margin: 0 }}><BookOpen size={22} aria-hidden="true" />{ACTIVITY_INFO[opened.activity].title} <span className="hz-muted" style={{ fontWeight: 400 }}>· {describeRange([opened.start, opened.end])}</span></h2>
-          <button className="hz-btn hz-btn-ghost" onClick={() => { setOpenId(null); setFocusPage(null); }} aria-label="Close Mushaf"><X size={18} aria-hidden="true" /></button>
+  const readerFor = (inline) => {
+    if (!opened) return null;
+    const after = openedInMain ? nextUnfinished(opened) : null;
+    const others = openedInMain ? main.filter((t) => t.id !== opened.id) : [];
+    const finished = !!(opened.completedAt || opened.studentDoneAt);
+    return (
+      <section className={`hz-card hz-reader-card ${inline ? "hzs-inline-reader" : ""}`} aria-label={`Mushaf: ${ACTIVITY_INFO[opened.activity].title}`} id="hz-reader">
+        {!inline && (
+          <div className="hz-row" style={{ marginBottom: 8 }}>
+            <h2 className="hz-h2" style={{ margin: 0 }}><BookOpen size={22} aria-hidden="true" />{ACTIVITY_INFO[opened.activity].title} <span className="hz-muted" style={{ fontWeight: 400 }}>· {describeRange([opened.start, opened.end])}</span></h2>
+            <button className="hz-btn hz-btn-ghost" onClick={() => { setOpenId(null); setFocusPage(null); }} aria-label="Close Mushaf"><X size={18} aria-hidden="true" /></button>
+          </div>
+        )}
+        {!inline && opened.notes && <div className="hz-task-notes" style={{ marginBottom: 10 }}>{opened.notes}</div>}
+        <div className="hz-legend" style={{ marginBottom: 10 }}>
+          <span><i style={{ background: "#1A1F36" }} />Your portion (other lines are faded)</span>
+          <AyahKey tasks={[opened, ...others]} />
+          <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />Mistake your teacher marked</span>
         </div>
-      )}
-      {!inline && opened.notes && <div className="hz-task-notes" style={{ marginBottom: 10 }}>{opened.notes}</div>}
-      <div className="hz-legend" style={{ marginBottom: 10 }}>
-        <span><i style={{ background: "#1A1F36" }} />Your portion (other lines are faded)</span>
-        <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />Mistake your teacher marked</span>
-      </div>
-      <TaskReader task={opened} page={focusPage} mistakes={mistakes} />
-      {!opened.completedAt && !opened.studentDoneAt && (
-        <button className="hz-btn hz-btn-primary" style={{ width: "100%", marginTop: 12 }} disabled={busy} onClick={() => finishFromReader(opened)}>
-          <CheckCircle2 size={18} aria-hidden="true" />I've finished {ACTIVITY_INFO[opened.activity].title}
-        </button>
-      )}
-    </section>
-  );
+        <TaskReader task={opened} page={focusPage} mistakes={mistakes} others={others}
+          header={openedInMain && <TaskTabs tasks={main} current={opened} onPick={(t) => openTask(t.id)} done={(t) => !!(t.studentDoneAt || t.completedAt)} />}>
+          {!finished ? (
+            <button className="hz-btn hz-btn-primary hzs-finish" disabled={busy} onClick={() => finishFromReader(opened)}>
+              <CheckCircle2 size={18} aria-hidden="true" />I've finished {ACTIVITY_INFO[opened.activity].title}
+              {after && <span className="hzs-finish-next">Next: {ACTIVITY_INFO[after.activity].title}<ArrowRight size={16} aria-hidden="true" /></span>}
+            </button>
+          ) : after ? (
+            <button className="hz-btn hz-btn-outline hzs-finish" onClick={() => openTask(after.id)}>
+              <CheckCircle2 size={18} color="#1E8A5A" aria-hidden="true" />Finished · go to {ACTIVITY_INFO[after.activity].title}<ArrowRight size={16} aria-hidden="true" />
+            </button>
+          ) : null}
+        </TaskReader>
+      </section>
+    );
+  };
 
   return (
     <div className="hz">
@@ -679,7 +761,9 @@ export default function HifzTracker({ repo, onSummary }) {
         {allFinished && main.length > 0 && <div className="hzs-done-note"><CheckCircle2 size={18} aria-hidden="true" />All finished. Your teacher will listen and approve.</div>}
         {main.length === 0
           ? <p className="hz-muted" style={{ margin: 0 }}>{done.length ? "All done. Your next tasks show here as soon as your teacher sets them." : "Your teacher plans your Hifz. Your daily New Hifz, Short and Long Muraja'ah will show here as soon as they are set."}</p>
-          : <div className="hzs-tasks">{main.map((t, i) => [card(t, i + 1), openId === t.id && <div key={`r-${t.id}`}>{readerFor(true)}</div>])}</div>}
+          : <div className="hzs-tasks">{main.map((t, i) => card(t, i + 1))}</div>}
+        {/* One Mushaf under the day's tasks: its tabs switch task in place (it stays in full screen). */}
+        {openedInMain && <div style={{ marginTop: 10 }}>{readerFor(true)}</div>}
       </section>
 
       {!openedInMain && readerFor(false)}

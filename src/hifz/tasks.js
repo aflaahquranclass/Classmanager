@@ -26,7 +26,8 @@ import { countAyahs, TOTAL_AYAHS, ayahRef, SURAH_AYAH_COUNTS } from "./ayahs.js"
 import { AYAH_START_LINE, AYAH_END_LINE } from "./ayahLines.js";
 import { SURAHS } from "./quran.js";
 
-export const ACTIVITIES = ["new", "short", "long"];
+// In class order: Short Muraja'ah first, then New Hifz, then Long Muraja'ah.
+export const ACTIVITIES = ["short", "new", "long"];
 export const ACTIVITY_TITLES = { new: "New Hifz", short: "Short Muraja'ah", long: "Long Muraja'ah" };
 export const TIMEZONE = "Indian/Maldives";
 
@@ -43,6 +44,12 @@ export function ayahAtLine(u, edge = "start") {
   }
   for (let n = TOTAL_AYAHS; n >= 1; n--) if (AYAH_START_LINE[n - 1] <= line) return ayahRef(n);
   return ayahRef(1);
+}
+// The ayahs of a [start, end) portion as numbers 1–6236 → { first, last }.
+const ayahNo = (r) => SURAH_FIRST_AYAH[r.surah - 1] + r.ayah - 1;
+export function portionAyahs([s, e]) {
+  const first = ayahNo(ayahAtLine(s, "start"));
+  return { first, last: Math.max(first, ayahNo(ayahAtLine(e - 1, "end"))) };
 }
 export const ayahName = (r) => `${SURAHS[r.surah - 1].name} ${r.ayah}`;
 

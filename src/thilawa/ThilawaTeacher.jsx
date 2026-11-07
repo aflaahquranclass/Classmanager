@@ -2,7 +2,8 @@
 // finish (or holds a lesson straight in the Mushaf) and marks the words to
 // correct, sets Tajweed and fluency levels, sets reading for the students to
 // tick off, and keeps notes (shared with the student or kept private). A class
-// lesson opens one portion for the whole class (see ClassLesson.jsx).
+// class has one reading open for every student until the teacher changes it,
+// and its Tajweed topics (see ClassThilawa.jsx).
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useBackLayer } from "../useBackNav.js";
@@ -10,16 +11,15 @@ import { BookOpenCheck, Trophy, ListChecks, StickyNote, ChevronLeft, Trash2, Eye
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS } from "../HifzTracker.jsx";
-import { TOTAL_PAGES, describePages, levelLabel, lastClassPortion } from "./engine.js";
+import { TOTAL_PAGES, describePages, levelLabel } from "./engine.js";
 import { summarizeThilawa, loadThilawa } from "./service.js";
-import { createSupabaseThilawaRepo, selectAll, THILAWA_MAPS } from "./repos.js";
+import { createSupabaseThilawaRepo, createSupabaseClassRepo, selectAll, THILAWA_MAPS } from "./repos.js";
 import { LevelMeter, thilawaCss, fmtDate } from "./ThilawaStudent.jsx";
 import ClassBrowser from "./ClassBrowser.jsx";
 import ListenScreen from "./ListenScreen.jsx";
 import SurahAyahPicker from "./SurahAyahPicker.jsx";
 import { LetterChips } from "./LettersPanel.jsx";
-import ClassLesson, { ClassLessonForm, classStopPage, saveClassStop } from "./ClassLesson.jsx";
-import { groupByClass } from "./programRules.js";
+import { TeacherClassPanel } from "./ClassThilawa.jsx";
 
 const fmtWhen = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
@@ -366,11 +366,7 @@ export function TeacherThilawa({ students, teacherId }) {
   const [query, setQuery] = useState("");
   const [openClass, setOpenClass] = useState(null); // class whose students are shown
   const [overview, setOverview] = useState(null); // studentId → summary
-  const [lessonClass, setLessonClass] = useState(null); // class choosing its portion for a class lesson
-  const [classLesson, setClassLesson] = useState(null); // { className, students, portion, startPage } open in the Mushaf
   useBackLayer(!!openId, () => setOpenId(null), "teacher-thilawa-student");
-  useBackLayer(!!classLesson, () => { setClassLesson(null); setLessonClass(null); loadOverview(); }, "teacher-class-lesson");
-  const [lessonsOf, setLessonsOf] = useState({}); // studentId → their lessons, for the class's last part
   const [error, setError] = useState("");
   const ids = useMemo(() => students.map((s) => s.id), [students]);
 
@@ -383,9 +379,7 @@ export function TeacherThilawa({ students, teacherId }) {
       const [settings, reading, assignments, assessments] = await Promise.all(["thilawa_settings", "thilawa_reading", "thilawa_assignments", "thilawa_assessments"].map(fetch));
       const of = (rows, id, map) => rows.filter((r) => r.student_id === id).map(map);
       const out = {};
-      const lessons = {};
       for (const id of ids) {
-        lessons[id] = of(assignments, id, THILAWA_MAPS.assignmentFromDb).filter((a) => a.kind === "lesson");
         const st = settings.find((r) => r.student_id === id);
         out[id] = summarizeThilawa({
           settings: st ? { timezone: st.timezone, goalDate: st.goal_date } : null,
@@ -396,7 +390,6 @@ export function TeacherThilawa({ students, teacherId }) {
         });
       }
       setOverview(out);
-      setLessonsOf(lessons);
       setError("");
     } catch (e) { setError(e.message); }
   }, [ids]);
@@ -404,8 +397,14 @@ export function TeacherThilawa({ students, teacherId }) {
 
   const opened = students.find((s) => s.id === openId);
   const repo = useMemo(() => (opened ? createSupabaseThilawaRepo(supabase, opened.id, teacherId) : null), [opened, teacherId]);
-  const lessonStudents = lessonClass ? groupByClass(students).find((c) => c.name === lessonClass)?.students || [] : [];
-  const lastPortion = lastClassPortion(lessonStudents.flatMap((s) => lessonsOf[s.id] || []));
+  // One class repo per class (by the students' class), kept while the page is open.
+  const classRepos = useMemo(() => new Map(), [teacherId]);
+  const classRepoOf = (c) => {
+    const classId = c.students.find((s) => s.classId)?.classId;
+    if (!classId) return null;
+    if (!classRepos.has(classId)) classRepos.set(classId, createSupabaseClassRepo(supabase, classId, teacherId));
+    return classRepos.get(classId);
+  };
 
   return (
     <div>
@@ -417,23 +416,15 @@ export function TeacherThilawa({ students, teacherId }) {
           <div className="hz-row">
             <div>
               <div style={{ fontSize: "20px", fontWeight: 700, color: "#123B67" }}>Thilawa</div>
-              <div className="hz-muted">Students reading by looking. Open a student to listen and mark, set their levels and reading, and keep notes.</div>
+              <div className="hz-muted">Students reading by looking. Open a class to open its reading and write the Tajweed topics taken; open a student for their levels, own reading and notes.</div>
             </div>
           </div>
           {error && <div className="hz-error" role="alert">{error}</div>}
-          {lessonClass && openClass === lessonClass && !query && lessonStudents.length > 0 && (
-            <ClassLessonForm key={`${lessonClass}:${lastPortion?.createdAt}`} className={lessonClass} count={lessonStudents.length} onCancel={() => setLessonClass(null)}
-              last={lastPortion} stopPage={lastPortion && classStopPage(lessonClass, lastPortion)}
-              onOpen={(portion, startPage) => { saveClassStop(lessonClass, portion, startPage); setClassLesson({ className: lessonClass, students: lessonStudents, portion, startPage }); }} />
-          )}
-          {classLesson && <ClassLesson students={classLesson.students} teacherId={teacherId} portion={classLesson.portion} startPage={classLesson.startPage}
-            onPage={(page) => saveClassStop(classLesson.className, classLesson.portion, page)}
-            onClose={() => { setClassLesson(null); setLessonClass(null); loadOverview(); }} />}
           {students.length === 0 ? (
             <div className="hz-card hz-muted">None of your students are enrolled in Thilawa yet. The admin chooses Hifz, Thilawa or both when adding a student.</div>
           ) : (
-            <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={(c) => { setOpenClass(c); setLessonClass(null); }} gridClass="tt-grid"
-              classActions={(c) => <button type="button" className="hz-btn hz-btn-primary" onClick={() => setLessonClass(c.name)}><BookOpen size={17} aria-hidden="true" />Class lesson</button>}
+            <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={setOpenClass} gridClass="tt-grid"
+              classPanel={(c) => <TeacherClassPanel key={c.name} className={c.name} students={c.students} classRepo={classRepoOf(c)} teacherId={teacherId} onClosed={loadOverview} />}
               summary={(list) => {
                 const os = list.map((s) => overview?.[s.id]).filter(Boolean);
                 const listen = os.reduce((n, o) => n + o.toListen.length, 0);

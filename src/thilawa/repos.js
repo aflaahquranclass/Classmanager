@@ -216,3 +216,109 @@ export function createMemoryThilawaRepo(store, studentId, { asStudent = false, t
     async deleteNote(id) { teacherOnly(); remove("notes", id); },
   };
 }
+
+// ---------- A class's Thilawa: its open reading and Tajweed topics ----------
+// See supabase/migrations/20261119_thilawa_class_reading.sql.
+//   getReading() → the open reading | null          listReadings() → every reading, newest first
+//   openReading({ fromPage, toPage, firstAyah, lastAyah, label, page }) → row (teacher; ends the open one)
+//   setReadingPage(id, page) (teacher: where the class stopped)
+//   listTopics() → topics, newest first             addTopic({ topic, note, taughtOn }) (teacher)
+//   deleteTopic(id) (teacher)                       subscribe(onChange) → stop
+
+const classReadingFromDb = (r) => ({
+  id: r.id, classId: r.class_id, teacherId: r.teacher_id, fromPage: r.from_page, toPage: r.to_page,
+  firstAyah: r.first_ayah ?? null, lastAyah: r.last_ayah ?? null, label: r.label || "", page: r.page,
+  endedAt: r.ended_at || null, createdAt: r.created_at, updatedAt: r.updated_at,
+});
+const classTopicFromDb = (r) => ({ id: r.id, classId: r.class_id, teacherId: r.teacher_id, topic: r.topic, note: r.note || "", taughtOn: r.taught_on, createdAt: r.created_at });
+export const CLASS_MAPS = { classReadingFromDb, classTopicFromDb };
+
+const byNewest = (a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
+const topicOrder = (a, b) => (a.taughtOn < b.taughtOn ? 1 : a.taughtOn > b.taughtOn ? -1 : byNewest(a, b));
+
+export function createSupabaseClassRepo(supabase, classId, teacherId = null) {
+  const check = ({ data, error }) => {
+    if (error) throw new Error(error.message);
+    return data;
+  };
+  return {
+    classId,
+    async getReading() {
+      const r = check(await supabase.from("thilawa_class_readings").select("*").eq("class_id", classId).is("ended_at", null).maybeSingle());
+      return r ? classReadingFromDb(r) : null;
+    },
+    async listReadings() {
+      return check(await supabase.from("thilawa_class_readings").select("*").eq("class_id", classId).order("created_at", { ascending: false }).limit(50)).map(classReadingFromDb);
+    },
+    async openReading(r) {
+      const now = new Date().toISOString();
+      check(await supabase.from("thilawa_class_readings").update({ ended_at: now, updated_at: now }).eq("class_id", classId).is("ended_at", null));
+      return classReadingFromDb(check(await supabase.from("thilawa_class_readings").insert({
+        class_id: classId, teacher_id: teacherId, from_page: r.fromPage, to_page: r.toPage,
+        first_ayah: r.firstAyah ?? null, last_ayah: r.lastAyah ?? null, label: r.label?.trim() || null, page: r.page ?? r.fromPage,
+      }).select("*").single()));
+    },
+    async setReadingPage(id, page) {
+      check(await supabase.from("thilawa_class_readings").update({ page, updated_at: new Date().toISOString() }).eq("id", id).eq("class_id", classId));
+    },
+    async listTopics() {
+      return check(await supabase.from("thilawa_class_topics").select("*").eq("class_id", classId).order("taught_on", { ascending: false }).order("created_at", { ascending: false })).map(classTopicFromDb);
+    },
+    async addTopic(t) {
+      check(await supabase.from("thilawa_class_topics").insert({
+        class_id: classId, teacher_id: teacherId, topic: t.topic.trim(), note: t.note?.trim() || null, ...(t.taughtOn ? { taught_on: t.taughtOn } : {}),
+      }));
+    },
+    async deleteTopic(id) { check(await supabase.from("thilawa_class_topics").delete().eq("id", id).eq("class_id", classId)); },
+    subscribe(onChange) {
+      const channel = supabase.channel(`thilawa-class-${classId}-${Math.random().toString(36).slice(2)}`);
+      for (const table of ["thilawa_class_readings", "thilawa_class_topics"]) {
+        channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `class_id=eq.${classId}` }, () => onChange());
+      }
+      channel.subscribe();
+      return () => { supabase.removeChannel(channel); };
+    },
+  };
+}
+
+// In memory (tests and the localhost demo). asStudent: read only.
+export function createClassMemoryStore() {
+  return { readings: [], topics: [], nextId: 1, tick: 0, listeners: new Set() };
+}
+export function createMemoryClassRepo(store, classId, { asStudent = false, teacherId = null } = {}) {
+  const clone = (x) => JSON.parse(JSON.stringify(x));
+  const stamp = () => new Date(Date.now() + store.tick++).toISOString();
+  const teacherOnly = () => { if (asStudent) throw new Error("Only the teacher can do this."); };
+  const changed = () => { for (const fn of store.listeners) fn(); };
+  const mine = (r) => r.classId === classId;
+  return {
+    classId,
+    async getReading() { const r = store.readings.find((x) => mine(x) && !x.endedAt); return r ? clone(r) : null; },
+    async listReadings() { return clone(store.readings.filter(mine).sort(byNewest)); },
+    async openReading(r) {
+      teacherOnly();
+      const now = stamp();
+      for (const x of store.readings) if (mine(x) && !x.endedAt) x.endedAt = now;
+      const row = { id: `c${store.nextId++}`, classId, teacherId, fromPage: r.fromPage, toPage: r.toPage, firstAyah: r.firstAyah ?? null, lastAyah: r.lastAyah ?? null,
+        label: r.label?.trim() || "", page: r.page ?? r.fromPage, endedAt: null, createdAt: stamp(), updatedAt: now };
+      store.readings.push(row);
+      changed();
+      return clone(row);
+    },
+    async setReadingPage(id, page) {
+      teacherOnly();
+      const r = store.readings.find((x) => x.id === id && mine(x));
+      if (!r) throw new Error("That reading belongs to another class.");
+      r.page = page; r.updatedAt = stamp();
+      changed();
+    },
+    async listTopics() { return clone(store.topics.filter(mine).sort(topicOrder)); },
+    async addTopic(t) {
+      teacherOnly();
+      store.topics.push({ id: `k${store.nextId++}`, classId, teacherId, topic: t.topic.trim(), note: t.note?.trim() || "", taughtOn: t.taughtOn || stamp().slice(0, 10), createdAt: stamp() });
+      changed();
+    },
+    async deleteTopic(id) { teacherOnly(); store.topics = store.topics.filter((t) => !(t.id === id && mine(t))); changed(); },
+    subscribe(onChange) { store.listeners.add(onChange); return () => store.listeners.delete(onChange); },
+  };
+}

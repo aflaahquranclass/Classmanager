@@ -18,6 +18,13 @@ import { Maximize2, X } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
+import { SURAH_FIRST_AYAH } from "../hifz/ayahs.js";
+
+// "67:15" → its ayah number in the whole Quran (1–6236).
+export const ayahNumber = (verseKey) => {
+  const [s, a] = String(verseKey).split(":").map(Number);
+  return SURAH_FIRST_AYAH[s - 1] + a - 1;
+};
 
 export { buildLines };
 
@@ -187,12 +194,18 @@ ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyf
   .mp-basmala { display: flex; justify-content: center; align-items: center; height: 1.95em; font-family: "QCF2_P1", serif; }
   .mp-foot { margin-top: 0.6em; text-align: center; font-family: Inter, system-ui, sans-serif; font-size: 13px; color: #7A8496; }
   .mp-first .mp-body { padding: 0 9%; }
+  /* The ayah number of an ayah in the chosen part, in that part's colour. */
+  .mp-ayah-on { color: var(--mp-ayah); }
+  .mp-ayah-on::before { background: var(--mp-ayah-bg); box-shadow: 0 0 0 0.05em var(--mp-ayah); border-radius: 999px; inset: -0.02em -0.04em; }
   .mp-status { text-align: center; color: #7A8496; font-family: Inter, system-ui, sans-serif; font-size: 14px; padding: 40px 0; }
 `;
 
 // `wordStyles` ({ "78:1:2": { background, opacity, … } }) styles single words,
 // e.g. Check my Reading colouring each word as it is recited.
-export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null }) {
+// `portions` ([{ first, last, color, bg }], ayah numbers 1–6236) colour the
+// ayah numbers of the ayahs in each part: where the Hifz task or the class
+// reading is, on any page the reader turns to.
+export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null, portions = [] }) {
   const [state, setState] = useState({ status: "loading", page, lines: [] });
   const [attempt, setAttempt] = useState(0);
   const bodyRef = useRef(null);
@@ -310,11 +323,12 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
                   // Until the Hafs font is here (or without the text), the whole word is orange.
                   const lettered = !w.end && wordHasLetter(w.text, letters);
                   const parts = lettered && hafsReady && w.hafs ? letterParts(w.hafs, letters) : null;
-                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""} ${parts ? "mp-lettered" : lettered ? "mp-letter" : ""} ${w.end ? "mp-end" : ""}`;
+                  const part = w.end && portions.length ? portions.find((p) => { const n = ayahNumber(w.verseKey); return n >= p.first && n <= p.last; }) : null;
+                  const cls = `mp-word ${mark === "open" ? "mp-mistake" : mark === "fixed" ? "mp-fixed" : ""} ${mark === "open" && categoryOf.has(w.key) ? `mp-cat-${categoryOf.get(w.key)}` : ""} ${selectedKey === w.key ? "mp-selected" : ""} ${parts ? "mp-lettered" : lettered ? "mp-letter" : ""} ${w.end ? "mp-end" : ""} ${part ? "mp-ayah-on" : ""}`;
                   const glyph = parts
                     ? <><span className="mp-glyph">{w.code}</span><span className="mp-hafs" aria-hidden="true">{parts.map((p, j) => (p.on ? <b key={j}>{p.text}</b> : p.text))}</span></>
                     : w.code;
-                  const style = wordStyles?.[w.key];
+                  const style = part ? { ...wordStyles?.[w.key], "--mp-ayah": part.color, "--mp-ayah-bg": part.bg || "#FFFFFF" } : wordStyles?.[w.key];
                   if (!onWordTap || w.end) return <span key={k} className={cls} style={style}>{glyph}</span>;
                   // el: the word on screen, for a pop-up next to it.
                   const tap = (e) => onWordTap({ ...w, page, line: line.line, el: e.currentTarget });

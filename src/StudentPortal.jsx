@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2, LineChart, Mic } from "lucide-react";
+import { BookOpen, BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2, LineChart, Mic } from "lucide-react";
 import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
 import { supabase } from "./supabaseClient.js";
 import CheckMyReading, { hifzReadingTasks } from "./checkReading/CheckMyReading.jsx";
@@ -24,7 +24,8 @@ import ThilawaHome from "./thilawa/ThilawaHome.jsx";
 import { ThilawaTracker, AssignedReading, FreeReading, THILAWA_HADITH, thilawaCss } from "./thilawa/ThilawaStudent.jsx";
 import { TeacherThilawaStudent } from "./thilawa/ThilawaTeacher.jsx";
 import { loadThilawa } from "./thilawa/service.js";
-import { createSupabaseThilawaRepo, createThilawaMemoryStore, createMemoryThilawaRepo } from "./thilawa/repos.js";
+import { createSupabaseThilawaRepo, createThilawaMemoryStore, createMemoryThilawaRepo, createSupabaseClassRepo, createClassMemoryStore, createMemoryClassRepo } from "./thilawa/repos.js";
+import { StudentClassReading, TeacherClassPanel, useClassThilawa } from "./thilawa/ClassThilawa.jsx";
 import { hasProgram } from "./thilawa/programs.jsx";
 
 
@@ -43,6 +44,7 @@ const HADITH = {
 const DEMO = ["localhost", "127.0.0.1"].includes(window.location.hostname) && new URLSearchParams(window.location.search).get("demo") === "1";
 const hifzDemoStore = createHifzMemoryStore();
 const thilawaDemoStore = createThilawaMemoryStore();
+const classDemoStore = createClassMemoryStore();
 // Sample teacher data for the demo, so every Thilawa screen has something to show.
 if (DEMO) {
   const t = createMemoryThilawaRepo(thilawaDemoStore, "demo", { teacherId: "demo-teacher" });
@@ -58,6 +60,11 @@ if (DEMO) {
     await t.setAssignmentChecked(l.id, true);
   });
   t.addNote({ body: "Practise reading 2 pages every day before class.", visibleToStudent: true });
+  // The class's reading (Al-Mulk 1–15, the class stopped on page 563) and Tajweed topics.
+  const c = createMemoryClassRepo(classDemoStore, "demo-class", { teacherId: "demo-teacher" });
+  c.openReading({ fromPage: 562, toPage: 563, firstAyah: 5242, lastAyah: 5256, label: "Al-Mulk 1–15", page: 563 });
+  c.addTopic({ topic: "Noon sakinah and tanween: Ikhfa", note: "15 letters. Practise with Al-Mulk 1–5.", taughtOn: "2026-11-03" });
+  c.addTopic({ topic: "Madd tabee'i", note: "", taughtOn: "2026-11-05" });
   t.addNote({ body: "Private: needs help with qalqalah.", visibleToStudent: false });
   const h = createMemoryHifzRepo(hifzDemoStore, "demo", { teacherId: "demo-teacher" });
   const today = maldivesToday();
@@ -271,7 +278,7 @@ function SetPassword({ studentName, onDone, onCancel }) {
 
 // Signed-in student → their students row (row-level security only returns their own).
 async function loadStudentForUser(userId) {
-  const { data, error } = await supabase.from("students").select("id, name, student_code, class_name, fee, joined_month, programs").eq("user_id", userId).maybeSingle();
+  const { data, error } = await supabase.from("students").select("id, name, student_code, class_id, class_name, fee, joined_month, programs").eq("user_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
   return data;
 }
@@ -281,6 +288,7 @@ const NAV = [
   { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText, program: "hifz" },
   { key: "hifz-progress", label: "Hifz progress", Icon: LineChart, program: "hifz" },
+  { key: "thilawa-class", label: "Class Reading", Icon: BookOpen, program: "thilawa" },
   { key: "thilawa", label: "Thilawa progress", Icon: BookOpenCheck, program: "thilawa" },
   { key: "thilawa-assigned", label: "Teacher's Reading", Icon: ListChecks, program: "thilawa" },
   { key: "thilawa-free", label: "Free Reading", Icon: BookMarked, program: "thilawa" },
@@ -310,7 +318,7 @@ const readDash = () => { try { return localStorage.getItem(DASH_KEY); } catch { 
 const writeDash = (v) => { try { localStorage.setItem(DASH_KEY, v); } catch { /* private mode */ } };
 
 export default function StudentPortal() {
-  const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode", class_name: "Demo class", fee: 375, joined_month: "2026-08", programs: ["hifz", "thilawa"] } } : { status: "loading" });
+  const [auth, setAuth] = useState(DEMO ? { status: "ready", student: { id: "demo", name: "Demo Student", student_code: "Demo mode", class_id: "demo-class", class_name: "Demo class", fee: 375, joined_month: "2026-08", programs: ["hifz", "thilawa"] } } : { status: "loading" });
   const [loginError, setLoginError] = useState("");
   useEffect(() => { if (auth.status !== "loading") hideSplash(); }, [auth.status]);
   const [view, setView] = useState("dashboard");
@@ -380,6 +388,12 @@ export default function StudentPortal() {
     if (!student || !doesThilawa) return null;
     return DEMO ? createMemoryThilawaRepo(thilawaDemoStore, student.id, { asStudent: true }) : createSupabaseThilawaRepo(supabase, student.id);
   }, [student, doesThilawa]);
+  // The student's class: its open reading and Tajweed topics.
+  const classRepo = useMemo(() => {
+    if (!student?.class_id || !doesThilawa) return null;
+    return DEMO ? createMemoryClassRepo(classDemoStore, student.class_id, { asStudent: true }) : createSupabaseClassRepo(supabase, student.class_id);
+  }, [student, doesThilawa]);
+  const { state: classState } = useClassThilawa(classRepo);
   const refreshThilawa = useCallback(async () => {
     if (!thilawaRepo) return;
     try { setThilawa(await loadThilawa(thilawaRepo)); } catch { setThilawa(null); }
@@ -397,6 +411,8 @@ export default function StudentPortal() {
   const dash = doesHifz && doesThilawa ? (dashPick === "thilawa" ? "thilawa" : "hifz") : doesThilawa ? "thilawa" : "hifz";
   const pickDash = (v) => { setDashPick(v); writeDash(v); };
   const demoTeacherRepo = useMemo(() => (DEMO && student ? createMemoryThilawaRepo(thilawaDemoStore, student.id, { teacherId: "demo-teacher" }) : null), [student]);
+  const demoClassTeacherRepo = useMemo(() => (DEMO && student ? createMemoryClassRepo(classDemoStore, student.class_id, { teacherId: "demo-teacher" }) : null), [student]);
+  const demoMakeStudentRepo = useCallback((id) => createMemoryThilawaRepo(thilawaDemoStore, id, { teacherId: "demo-teacher" }), []);
   const demoHifzTeacherRepo = useMemo(() => (DEMO && student ? createMemoryHifzRepo(hifzDemoStore, student.id, { teacherId: "demo-teacher" }) : null), [student]);
   const nav = NAV.filter((n) => !n.program || hasProgram(student, n.program));
   if (DEMO) {
@@ -450,8 +466,8 @@ export default function StudentPortal() {
   const studentTabs = [
     { key: "dashboard", label: "Home", Icon: LayoutDashboard },
     ...(doesHifz ? [{ key: "hifz", label: "Hifz", Icon: BookOpenText, dot: hifzDue.length }] : []),
-    ...(doesThilawa ? [{ key: "thilawa-assigned", label: "Reading", Icon: ListChecks, dot: thilawa?.openAssignments || 0 }] : []),
-    { key: "finance", label: "Fees", Icon: Wallet },
+    ...(doesThilawa ? [{ key: "thilawa-class", label: "Class", Icon: BookOpen }, { key: "thilawa-assigned", label: "Reading", Icon: ListChecks, dot: thilawa?.openAssignments || 0 }] : []),
+    ...(doesHifz && doesThilawa ? [] : [{ key: "finance", label: "Fees", Icon: Wallet }]),
   ].map((t) => ({ ...t, active: view === t.key, onClick: () => setView(t.key) }));
   const th = thilawa;
   const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
@@ -696,6 +712,7 @@ export default function StudentPortal() {
             </section>
           </HifzProgress>
         )}
+        {view === "thilawa-class" && doesThilawa && <StudentClassReading classRepo={classRepo} data={thilawa} onGo={setView} />}
         {view === "thilawa" && doesThilawa && <ThilawaTracker data={thilawa} onGo={setView} />}
         {view === "thilawa-assigned" && doesThilawa && <AssignedReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "thilawa-free" && doesThilawa && <FreeReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
@@ -703,8 +720,12 @@ export default function StudentPortal() {
           <TeacherHifzStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }} repo={demoHifzTeacherRepo} />
         )}
         {view === "demo-teacher" && DEMO && (
-          <TeacherThilawaStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }}
-            repo={demoTeacherRepo} onChanged={refreshThilawa} />
+          <>
+            <TeacherClassPanel className={student.class_name} classRepo={demoClassTeacherRepo} teacherId="demo-teacher"
+              students={[{ id: student.id, name: student.name, studentCode: student.student_code }]} makeStudentRepo={demoMakeStudentRepo} onClosed={refreshThilawa} />
+            <TeacherThilawaStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }}
+              repo={demoTeacherRepo} onChanged={refreshThilawa} />
+          </>
         )}
         {view === "attendance" && <StudentAttendance records={records} />}
         {view === "finance" && <StudentFinance student={student} records={records} demo={DEMO} />}
@@ -729,7 +750,7 @@ export default function StudentPortal() {
         )}
 
         {view === "dashboard" && dash === "thilawa" && (
-          <ThilawaHome data={th} onGo={setView}>
+          <ThilawaHome data={th} classReading={classState ? classState.reading : undefined} topics={classState?.topics} onGo={setView}>
             <section className="sp-card sp-hadith" aria-label="Hadith">
               <span className="sp-accent" aria-hidden="true" />
               <h3>Hadith</h3>
