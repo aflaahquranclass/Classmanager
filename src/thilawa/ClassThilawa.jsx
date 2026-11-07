@@ -142,7 +142,6 @@ export function TopicsCard({ topics, onAdd = null, onDelete = null, busy = false
       <h2 className="hz-h2"><GraduationCap size={22} aria-hidden="true" />Tajweed topics taken{topics.length > 0 && <span className="hz-muted" style={{ fontWeight: 400 }}>· {topics.length}</span>}</h2>
       {onAdd && (
         <>
-          <p className="hz-muted" style={{ marginTop: 0 }}>Write the topic you took today. Every student in the class sees it.</p>
           <div className="ct-add">
             <div className="hz-field">
               <label htmlFor="ct-topic">Topic</label>
@@ -163,7 +162,7 @@ export function TopicsCard({ topics, onAdd = null, onDelete = null, busy = false
         </>
       )}
       {topics.length === 0
-        ? <p className="hz-muted" style={{ margin: onAdd ? "14px 0 0" : 0 }}>{onAdd ? "No topics written yet." : "Your teacher will write the Tajweed topics taken in class here."}</p>
+        ? <p className="hz-muted" style={{ margin: onAdd ? "14px 0 0" : 0 }}>{onAdd ? "No topics yet." : "No topics yet."}</p>
         : (
           <ul className="ct-topics" style={{ marginTop: onAdd ? 14 : 0 }}>
             {topics.map((t) => (
@@ -239,7 +238,7 @@ export function TeacherClassPanel({ className, students, classRepo, teacherId, m
           <div className="ct-head-text">
             <small>Class reading · {className}</small>
             <h2>{reading ? readingTitle(reading) : "No reading open"}</h2>
-            <span>{reading ? `${describePages(reading.fromPage, reading.toPage)} · since ${fmtWhen(reading.createdAt)}` : `Open a part for all ${students.length} students. It stays open until you change it.`}</span>
+            <span>{reading ? `${describePages(reading.fromPage, reading.toPage)} · since ${fmtWhen(reading.createdAt)}` : `${students.length} students`}</span>
           </div>
           {reading && !changing && (
             <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => setLesson(true)}>
@@ -252,7 +251,6 @@ export function TeacherClassPanel({ className, students, classRepo, teacherId, m
             <>
               <div className="ct-stop">
                 <span className="ct-pill"><Navigation size={13} aria-hidden="true" />Stopped at page {reading.page}</span>
-                <span className="hz-muted">Every student of the class sees this reading, and the page you're on, until you change it.</span>
               </div>
               <div className="ct-actions" style={{ justifyContent: "flex-start" }}>
                 <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => setChanging(true)}><RefreshCw size={16} aria-hidden="true" />Change reading</button>

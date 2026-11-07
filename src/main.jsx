@@ -18,10 +18,13 @@ const showLanding = !PORTAL && !oldStaffLogin;
 // Check my Reading test page (any address): loaded only when opened.
 const ReadingTest = lazy(() => import("./readingTest/ReadingTest.jsx"));
 const readingTest = window.location.pathname === "/reading-test";
+// Teachers Portal demo on localhost (?portal=teacher&demo=1): sample data, no sign-in.
+const TeacherDemo = lazy(() => import("./TeacherDemo.jsx"));
+const teacherDemo = LOCAL && PORTAL === "teacher" && new URLSearchParams(window.location.search).get("demo") === "1";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : oldStaffLogin ? null : PORTAL === "student" ? <StudentPortal /> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <App />}
+    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : teacherDemo ? <Suspense fallback={null}><TeacherDemo /></Suspense> : oldStaffLogin ? null : PORTAL === "student" ? <StudentPortal /> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <App />}
     <ConfirmHost />
   </React.StrictMode>
 );

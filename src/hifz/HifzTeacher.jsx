@@ -16,6 +16,7 @@ import { unitsOf, toSet, subtract, localDate } from "./engine.js";
 import { downloadClassTasks } from "./taskImage.js";
 import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE } from "./tasks.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
+import { loadHifz } from "./taskService.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
 import ClassBrowser from "../thilawa/ClassBrowser.jsx";
@@ -559,7 +560,6 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
         <EditTask key={`${t.id}-${next.taskDate}-${next.start}-${next.end}`} task={{ ...next, id: `next-${t.id}`, notes: next.notes || "" }} busy={busy} saveLabel="Confirm"
           onCancel={() => setNextOpen(null)}
           onSave={(d) => { setDrafts((prev) => ({ ...prev, [t.activity]: d })); setNextOpen(null); }} />
-        <p className="hz-muted" style={{ margin: "8px 0 0" }}>It's set when you mark this task done, and the student is notified.</p>
       </div>
     );
   };
@@ -605,7 +605,6 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
             {!onNext ? (
               <>
                 <div className="hz-legend">
-                  <span>Tap a word the student gets wrong to highlight it, then choose the kind of mistake in the pop-up (optional). Tap a highlighted word to open it again.</span>
                   <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
                   <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
                   <MistakeLegend />
@@ -625,15 +624,14 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
               <div className="ht-confirm">
                 <div className="ht-next-head"><Icon size={18} aria-hidden="true" />Next {title}{next && !alreadySet ? ` · ${fmtDay(next.taskDate)}` : ""}</div>
                 {alreadySet ? (
-                  <p className="hz-muted" style={{ margin: 0 }}>The next {title} is already set for {fmtDay(alreadySet.taskDate)}: {portionSummary(alreadySet)}. Finish to mark this one done.</p>
+                  <p className="hz-muted" style={{ margin: 0 }}>Next {title} already set: {fmtDay(alreadySet.taskDate)} · {portionSummary(alreadySet)}.</p>
                 ) : !next ? (
-                  <p className="hz-muted" style={{ margin: 0 }}>Nothing comes next on the plan. Finish to mark this one done.</p>
+                  <p className="hz-muted" style={{ margin: 0 }}>Nothing comes next on the plan.</p>
                 ) : (
                   <>
                     <EditTask key={`${marking.id}-${next.taskDate}-${next.start}-${next.end}`} task={{ ...next, id: `next-${marking.id}`, notes: next.notes || "" }} busy={busy}
                       saveLabel="Confirm & finish" onCancel={() => setMarkStep("mark")} cancelLabel="Back"
                       onSave={(d) => markDone(marking, d)} />
-                    <p className="hz-muted" style={{ margin: "8px 0 0" }}>Confirm marks today's {title} done, sets this one and notifies the student.</p>
                   </>
                 )}
               </div>
@@ -745,7 +743,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
         <p className="hz-muted" style={{ marginTop: 0 }}>
           {planReady
             ? <>Set from the Hifz plan · {student.schedule?.days?.length === 7 ? "every day" : student.schedule?.days?.length ? student.schedule.days.join(", ") : "class days"}</>
-            : "Save the Hifz plan above to start. The tasks are then set automatically for the class days."}
+            : "Save the Hifz plan above to start."}
         </p>
         {/* Short Muraja'ah, New Hifz, Long Muraja'ah always in that order; approved ones go to History and the next one takes their place. */}
         {ready > 0 && (
@@ -767,8 +765,9 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 // ---------- all of the teacher's Hifz students ----------
 
 // onMarked(studentId): the teacher approved a task or marked a mistake (the
-// app marks the student present for today's class).
-export function TeacherHifz({ students, teacherId, onMarked }) {
+// app marks the student present for today's class). makeRepo(studentId): a
+// student's repo other than Supabase (the localhost teacher demo).
+export function TeacherHifz({ students, teacherId, onMarked, makeRepo = null }) {
   const [openId, setOpenId] = useState(null);
   useBackLayer(!!openId, () => { setOpenId(null); loadOverview(); }, "teacher-hifz-student");
   const [saving, setSaving] = useState(false); // making the class's task list image
@@ -781,6 +780,10 @@ export function TeacherHifz({ students, teacherId, onMarked }) {
   // One query per table for all of them (row-level security keeps it to theirs).
   const loadOverview = useCallback(async () => {
     if (!ids.length) { setOverview({}); return; }
+    if (makeRepo) {
+      try { setOverview(Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await loadHifz(makeRepo(id))])))); setError(""); } catch (e) { setError(e.message); }
+      return;
+    }
     try {
       // hifz_profiles is keyed by student_id (no id column).
       const fetch = (table) => selectAll(() => supabase.from(table).select("*").in("student_id", ids).order("created_at").order(table === "hifz_profiles" ? "student_id" : "id"));
@@ -802,11 +805,11 @@ export function TeacherHifz({ students, teacherId, onMarked }) {
       setOverview(out);
       setError("");
     } catch (e) { setError(e.message); }
-  }, [ids]);
+  }, [ids, makeRepo]);
   useEffect(() => { loadOverview(); }, [loadOverview]);
 
   const opened = students.find((s) => s.id === openId);
-  const repo = useMemo(() => (opened ? createSupabaseHifzRepo(supabase, opened.id, teacherId) : null), [opened, teacherId]);
+  const repo = useMemo(() => (opened ? (makeRepo ? makeRepo(opened.id) : createSupabaseHifzRepo(supabase, opened.id, teacherId)) : null), [opened, teacherId, makeRepo]);
 
   return (
     <div>
@@ -818,7 +821,6 @@ export function TeacherHifz({ students, teacherId, onMarked }) {
           <div className="hz-row">
             <div>
               <div style={{ fontSize: "20px", fontWeight: 700, color: "#123B67" }}>Hifz</div>
-              <div className="hz-muted">Set each student's Short Muraja'ah, New Hifz and Long Muraja'ah, and mark mistakes on the Mushaf.</div>
             </div>
           </div>
           {error && <div className="hz-error" role="alert">{error}</div>}

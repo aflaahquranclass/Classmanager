@@ -175,7 +175,7 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
       <section className="hz-card" aria-label="Listen and mark">
         <h2 className="hz-h2"><Highlighter size={22} aria-hidden="true" />Listen & Mark</h2>
         {toListen.length === 0
-          ? <p className="hz-muted" style={{ marginTop: 0 }}>No finished reading waiting. When {student.name} finishes a reading you set, it shows here and you're notified.</p>
+          ? <p className="hz-muted" style={{ marginTop: 0 }}>No finished reading waiting.</p>
           : (
             <ul className="tt-rows" style={{ marginBottom: 14 }}>
               {toListen.map((a) => (
@@ -188,7 +188,6 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
           )}
 
         <h3 className="hz-h2" style={{ fontSize: 15, margin: "6px 0 8px" }}><BookOpen size={18} aria-hidden="true" />Today's lesson</h3>
-        <p className="hz-muted" style={{ marginTop: 0 }}>Open the Mushaf at the pages you're reading in class today and mark as you listen. {student.name} sees the words to correct.</p>
         <div className="tt-form">
           <div className="tt-wide"><SurahAyahPicker key={lessonPicker} id="tt-lesson" onPick={pickLessonAyahs} /></div>
           <div className="hz-field">
@@ -272,7 +271,6 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
 
       <section className="hz-card" aria-label="Set reading">
         <h2 className="hz-h2"><ListChecks size={22} aria-hidden="true" />Set Reading</h2>
-        <p className="hz-muted" style={{ marginTop: 0 }}>The student sees this under Teacher's Reading, reads it and ticks it. You're notified when it's done, to listen and mark.</p>
         <div className="tt-form">
           <div className="tt-wide"><SurahAyahPicker key={readingPicker} id="tt-reading" onPick={pickAyahs} /></div>
           <div className="hz-field">
@@ -361,7 +359,9 @@ export function TeacherThilawaStudent({ student, repo, onBack, onChanged }) {
 // ---------- all of the teacher's Thilawa students ----------
 
 // students: the teacher's students (app shape), already filtered to Thilawa.
-export function TeacherThilawa({ students, teacherId }) {
+// makeRepo(studentId) / makeClassRepo(classId): repos other than Supabase
+// (the localhost teacher demo).
+export function TeacherThilawa({ students, teacherId, makeRepo = null, makeClassRepo = null }) {
   const [openId, setOpenId] = useState(null);
   const [query, setQuery] = useState("");
   const [openClass, setOpenClass] = useState(null); // class whose students are shown
@@ -373,6 +373,10 @@ export function TeacherThilawa({ students, teacherId }) {
   // One query per table for every student (row-level security limits it to theirs).
   const loadOverview = useCallback(async () => {
     if (!ids.length) { setOverview({}); return; }
+    if (makeRepo) {
+      try { setOverview(Object.fromEntries(await Promise.all(ids.map(async (id) => [id, await loadThilawa(makeRepo(id))])))); setError(""); } catch (e) { setError(e.message); }
+      return;
+    }
     try {
       // thilawa_settings is keyed by student_id (no id column).
       const fetch = (table) => selectAll(() => supabase.from(table).select("*").in("student_id", ids).order("created_at").order(table === "thilawa_settings" ? "student_id" : "id"));
@@ -392,17 +396,17 @@ export function TeacherThilawa({ students, teacherId }) {
       setOverview(out);
       setError("");
     } catch (e) { setError(e.message); }
-  }, [ids]);
+  }, [ids, makeRepo]);
   useEffect(() => { loadOverview(); }, [loadOverview]);
 
   const opened = students.find((s) => s.id === openId);
-  const repo = useMemo(() => (opened ? createSupabaseThilawaRepo(supabase, opened.id, teacherId) : null), [opened, teacherId]);
+  const repo = useMemo(() => (opened ? (makeRepo ? makeRepo(opened.id) : createSupabaseThilawaRepo(supabase, opened.id, teacherId)) : null), [opened, teacherId, makeRepo]);
   // One class repo per class (by the students' class), kept while the page is open.
   const classRepos = useMemo(() => new Map(), [teacherId]);
   const classRepoOf = (c) => {
     const classId = c.students.find((s) => s.classId)?.classId;
     if (!classId) return null;
-    if (!classRepos.has(classId)) classRepos.set(classId, createSupabaseClassRepo(supabase, classId, teacherId));
+    if (!classRepos.has(classId)) classRepos.set(classId, makeClassRepo ? makeClassRepo(classId) : createSupabaseClassRepo(supabase, classId, teacherId));
     return classRepos.get(classId);
   };
 
@@ -416,7 +420,6 @@ export function TeacherThilawa({ students, teacherId }) {
           <div className="hz-row">
             <div>
               <div style={{ fontSize: "20px", fontWeight: 700, color: "#123B67" }}>Thilawa</div>
-              <div className="hz-muted">Students reading by looking. Open a class to open its reading and write the Tajweed topics taken; open a student for their levels, own reading and notes.</div>
             </div>
           </div>
           {error && <div className="hz-error" role="alert">{error}</div>}
@@ -424,7 +427,7 @@ export function TeacherThilawa({ students, teacherId }) {
             <div className="hz-card hz-muted">None of your students are enrolled in Thilawa yet. The admin chooses Hifz, Thilawa or both when adding a student.</div>
           ) : (
             <ClassBrowser students={students} query={query} onQuery={setQuery} openClass={openClass} onOpenClass={setOpenClass} gridClass="tt-grid"
-              classPanel={(c) => <TeacherClassPanel key={c.name} className={c.name} students={c.students} classRepo={classRepoOf(c)} teacherId={teacherId} onClosed={loadOverview} />}
+              classPanel={(c) => <TeacherClassPanel key={c.name} className={c.name} students={c.students} classRepo={classRepoOf(c)} teacherId={teacherId} makeStudentRepo={makeRepo} onClosed={loadOverview} />}
               summary={(list) => {
                 const os = list.map((s) => overview?.[s.id]).filter(Boolean);
                 const listen = os.reduce((n, o) => n + o.toListen.length, 0);

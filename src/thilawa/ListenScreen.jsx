@@ -127,7 +127,6 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
       <div className="lm-body">
         <div className="lm-inner">
           <div className="hz-legend">
-            <span>Tap a word the student gets wrong to mark it, then choose the kind of mistake in the pop-up. Tap a marked word to open it again.</span>
             <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To correct</span>
             <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
             <MistakeLegend />
