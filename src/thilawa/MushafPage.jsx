@@ -14,6 +14,7 @@
 // with just those letters in orange.
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Maximize2, X, Menu, ChevronLeft, ChevronRight } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
@@ -43,33 +44,44 @@ export function useMushafSwipe(onNext, onPrev) {
 }
 
 // Full screen for presenting: `children` (the page with its Next / Previous)
-// fill the screen. Uses the browser's own full screen where there is one (not
-// on iPhone); otherwise it covers the window. Esc exits too. `tools`: more
-// buttons beside Full screen / Exit, there in both.
+// fill the screen. Esc exits too. `tools`: more buttons beside Full screen /
+// Exit, there in both.
+// Full screen is its own layer on the page body (a portal), so nothing around
+// the Mushaf — a scrolling screen (the teacher's Listen & mark, which on
+// iPhone traps a fixed layer inside it and swallows the taps), a card's hover
+// lift, a stacking order — can clip it or catch its taps. Where the browser has
+// its own full screen (not on iPhone), the whole page goes full screen with it.
 // In full screen the controls over the page (Exit, tools, the task tabs, the
 // page title and its arrows) fold into a ☰ button, and see-through Next /
 // Previous buttons sit on the page's edges (onNext / onPrev; null hides one).
 // Swiping turns the page as before.
 export function MushafPresent({ children, tools = null, onNext = null, onPrev = null }) {
-  const ref = useRef(null);
   const [full, setFull] = useState(false);
   const [menu, setMenu] = useState(false);
-  const exit = () => {
-    setFull(false);
-    setMenu(false);
+  const native = useRef(false); // the browser's own full screen is on because of us
+  const leaveNative = () => {
+    if (!native.current) return;
+    native.current = false;
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
   };
+  const exit = () => { setFull(false); setMenu(false); leaveNative(); };
   const enter = () => {
     setFull(true);
     setMenu(false);
-    const el = ref.current;
-    const request = el && (el.requestFullscreen || el.webkitRequestFullscreen);
-    try { request?.call(el)?.catch?.(() => {}); } catch { /* it covers the window instead */ }
+    // Asked for in the tap itself (browsers only allow it then), for the whole page.
+    const el = document.documentElement;
+    const request = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (request && !document.fullscreenElement && !document.webkitFullscreenElement) {
+      try {
+        const p = request.call(el);
+        native.current = true;
+        p?.catch?.(() => { native.current = false; });
+      } catch { native.current = false; /* the layer still covers the window */ }
+    }
   };
   useEffect(() => {
     if (!full) return undefined;
-    const el = ref.current;
     const before = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     // The page's own bars (e.g. the phone tab bar) are hidden while the Mushaf fills the screen.
@@ -77,7 +89,9 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
     // Caught first, so Esc leaves full screen without also closing a screen behind it.
     const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); exit(); } };
     // Leaving the browser's full screen (its own Esc or gesture) leaves ours too.
-    const onChange = () => { if (!document.fullscreenElement && !document.webkitFullscreenElement) { setFull(false); setMenu(false); } };
+    const onChange = () => {
+      if (native.current && !document.fullscreenElement && !document.webkitFullscreenElement) { native.current = false; setFull(false); setMenu(false); }
+    };
     window.addEventListener("keydown", onKey, true);
     document.addEventListener("fullscreenchange", onChange);
     document.addEventListener("webkitfullscreenchange", onChange);
@@ -87,32 +101,41 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("fullscreenchange", onChange);
       document.removeEventListener("webkitfullscreenchange", onChange);
-      if (document.fullscreenElement === el) document.exitFullscreen?.().catch(() => {});
     };
   }, [full]);
-  return (
-    <div ref={ref} className={`mf ${full ? "mf-full" : ""} ${full && menu ? "mf-menu" : ""}`} role={full ? "dialog" : undefined} aria-modal={full || undefined} aria-label={full ? "Mushaf, full screen" : undefined}>
-      <style>{presentCss}</style>
-      {full && (
-        <button type="button" className="mf-burger" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the controls" : "Show the controls"}>
-          {menu ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
-        </button>
-      )}
-      <div className="mf-bar">
-        {tools}
-        {full
-          ? <button type="button" className="hz-btn hz-btn-primary" onClick={exit}><X size={18} aria-hidden="true" />Exit full screen</button>
-          : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter}><Maximize2 size={16} aria-hidden="true" />Full screen</button>}
-      </div>
-      <div className="mf-content">{children}</div>
-      {full && (
-        <>
-          {/* Like a printed Mushaf: the next page is to the left. */}
-          {onNext && <button type="button" className="mf-side mf-side-next" onClick={onNext} aria-label="Next page"><ChevronLeft size={30} aria-hidden="true" /></button>}
-          {onPrev && <button type="button" className="mf-side mf-side-prev" onClick={onPrev} aria-label="Previous page"><ChevronRight size={30} aria-hidden="true" /></button>}
-        </>
-      )}
+  // Closing the screen while in full screen leaves the browser's full screen too.
+  useEffect(() => () => leaveNative(), []);
+
+  const bar = (
+    <div className="mf-bar">
+      {tools}
+      {full
+        ? <button type="button" className="hz-btn hz-btn-primary" onClick={exit}><X size={18} aria-hidden="true" />Exit full screen</button>
+        : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter}><Maximize2 size={16} aria-hidden="true" />Full screen</button>}
     </div>
+  );
+  if (!full) {
+    return (
+      <div className="mf">
+        <style>{presentCss}</style>
+        {bar}
+        <div className="mf-content">{children}</div>
+      </div>
+    );
+  }
+  return createPortal(
+    <div className={`mf mf-full ${menu ? "mf-menu" : ""}`} role="dialog" aria-modal="true" aria-label="Mushaf, full screen">
+      <style>{presentCss}</style>
+      <button type="button" className="mf-burger" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the controls" : "Show the controls"}>
+        {menu ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
+      </button>
+      {bar}
+      <div className="mf-content">{children}</div>
+      {/* Like a printed Mushaf: the next page is to the left. */}
+      {onNext && <button type="button" className="mf-side mf-side-next" onClick={onNext} aria-label="Next page"><ChevronLeft size={30} aria-hidden="true" /></button>}
+      {onPrev && <button type="button" className="mf-side mf-side-prev" onClick={onPrev} aria-label="Previous page"><ChevronRight size={30} aria-hidden="true" /></button>}
+    </div>,
+    document.body,
   );
 }
 
@@ -122,7 +145,8 @@ const presentCss = `
   .mf-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
   .mf-content { display: flex; flex-direction: column; gap: 12px; }
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
-  .mf-full { position: fixed; inset: 0; z-index: 2000; overflow: auto; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box; }
+  .mf-full { position: fixed; inset: 0; z-index: 3000; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box;
+    color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
   .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
   .mf-full { padding-top: 56px; }
   .mf-full .mf-bar { box-sizing: border-box; padding-right: 56px; margin-top: -48px; min-height: 44px; align-items: center; }
@@ -142,11 +166,8 @@ const presentCss = `
   .mf-full .mf-content { padding: 0 40px; box-sizing: border-box; }
   @media (max-width: 640px) { .mf-side { width: 26px; } .mf-full { padding-left: 4px; padding-right: 4px; } .mf-full .mf-content { padding: 0 24px; } }
   .mf-full .mp-page { max-width: none; }
+  @media (max-width: 640px) { .mf-full .mp-page { padding: 4% 2.5% 2%; border-radius: 10px; } }
   .mf-is-full .mtb { display: none !important; }
-  /* A parent with a transform, filter or containment (a card's hover lift or
-     entry animation) would trap the fixed full screen inside it: switched off
-     on every parent while the Mushaf is full screen. */
-  .mf-is-full :has(.mf-full) { transform: none !important; animation: none !important; filter: none !important; backdrop-filter: none !important; contain: none !important; will-change: auto !important; }
 `;
 
 // The endpoint quran.com's own site uses. (The older /api/v4/verses/by_page
