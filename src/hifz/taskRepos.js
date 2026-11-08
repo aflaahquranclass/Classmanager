@@ -11,7 +11,7 @@
 //   updateTask(id, patch)                  deleteTask(id)
 //   setTaskDone(id, done)                  (teacher: approved, the task is complete)
 //   setStudentDone(id, done)               (student: "I've finished", waits for the teacher)
-//   listMistakes() → mistakes              addMistake({ page, line, verseKey, position, wordText, taskId })
+//   listMistakes() → mistakes              addMistake({ page, line, verseKey, position, wordText, taskId }) → mistake
 //   setMistakeCorrected(id, corrected)     deleteMistake(id)
 //   setMistakeCategory(id, category)       (an id from MISTAKE_CATEGORIES, or null for a plain mistake)
 //   setMistakeTicked(id, ticked)           (the student's own tick)
@@ -91,10 +91,10 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
     },
     listMistakes: async () => (await selectAll(() => own("hifz_mistakes").order("created_at").order("id"))).map(mistakeFromDb),
     async addMistake(m) {
-      check(await supabase.from("hifz_mistakes").insert({
+      return mistakeFromDb(check(await supabase.from("hifz_mistakes").insert({
         student_id: studentId, teacher_id: teacherId, task_id: m.taskId || null, page: m.page,
         verse_key: m.verseKey, word_position: m.position, word_line: m.line || null, word_text: m.wordText || null, note: m.note || null,
-      }));
+      }).select("*").single()));
     },
     async setMistakeCorrected(id, corrected) {
       check(await supabase.from("hifz_mistakes").update({ corrected_at: corrected ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
@@ -163,8 +163,10 @@ export function createMemoryHifzRepo(store, studentId, { asStudent = false, teac
     async addMistake(m) {
       teacherOnly();
       if (store.mistakes.some((x) => own(x) && !x.correctedAt && x.verseKey === m.verseKey && x.position === m.position)) throw new Error("That word is already marked.");
-      store.mistakes.push({ note: "", wordText: "", taskId: null, category: null, ...clone(m), id: `m${store.nextId++}`, studentId, teacherId, correctedAt: null, createdAt: stamp() });
+      const row = { note: "", wordText: "", taskId: null, category: null, ...clone(m), id: `m${store.nextId++}`, studentId, teacherId, correctedAt: null, createdAt: stamp() };
+      store.mistakes.push(row);
       changed();
+      return clone(row);
     },
     async setMistakeCorrected(id, corrected) { teacherOnly(); find("mistakes", id).correctedAt = corrected ? stamp() : null; changed(); },
     async setMistakeCategory(id, category) { teacherOnly(); find("mistakes", id).category = category || null; changed(); },

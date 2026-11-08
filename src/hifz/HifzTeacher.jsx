@@ -474,6 +474,15 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const [markStep, setMarkStep] = useState("mark"); // full screen: "mark" the Mushaf, then "next" to confirm
   useBackLayer(!!markingId, () => closeMarking(), "teacher-hifz-mushaf");
   const generating = useRef(false);
+  // Marking is instant: a tapped word is highlighted (and its pop-up opens)
+  // at once and saved in the background, one change after another, so a word
+  // is saved before its kind of mistake; when they're all done the student's
+  // data reloads once. Until then `overlay` holds the changes not reloaded yet:
+  // [{ key, seq, add?: mistake, patch?: { category | correctedAt | removed } }].
+  const [overlay, setOverlay] = useState([]);
+  const seq = useRef(0);
+  const queue = useRef({ chain: Promise.resolve(), count: 0 });
+  const savedIds = useRef(new Map()); // word key → Promise<the saved mark's id>
 
   const run = async (fn) => {
     setBusy(true);
@@ -507,7 +516,31 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 
   if (!data) return <div className="ht">{error ? <div className="hz-error" role="alert">{error}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
 
-  const { stats, streak, today, mistakes, openMistakes, memorized, tasks } = data;
+  const { stats, streak, today, memorized, tasks } = data;
+  const wordKey = (m) => `${m.verseKey}:${m.position}`;
+  let mistakes = data.mistakes;
+  for (const o of overlay) {
+    if (o.add && !mistakes.some((m) => !m.correctedAt && wordKey(m) === o.key)) mistakes = [...mistakes, o.add];
+    if (o.patch) mistakes = mistakes.map((m) => (!m.correctedAt && wordKey(m) === o.key ? { ...m, ...o.patch } : m));
+  }
+  mistakes = mistakes.filter((m) => !m.removed);
+  const openMistakes = mistakes.filter((m) => !m.correctedAt);
+  // Runs `op` after the earlier saves; once none are left, reloads and drops
+  // the overlay up to here. Returns op's result.
+  const enqueue = (op) => {
+    const q = queue.current;
+    q.count += 1;
+    const result = q.chain.then(op);
+    result.catch((e) => setError(e.message));
+    q.chain = result.catch(() => {}).then(async () => {
+      q.count -= 1;
+      if (q.count > 0) return;
+      const upto = seq.current;
+      await refresh();
+      setOverlay((o) => o.filter((x) => x.seq > upto));
+    });
+    return result;
+  };
   const marking = tasks.find((t) => t.id === markingId) || null;
   const openMarking = (t) => { setSelectedKey(null); setMarkStep("mark"); setMarkingId(t.id); };
   function closeMarking() { setMarkingId(null); setSelectedKey(null); setMarkStep("mark"); }
@@ -532,6 +565,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     const stillOpen = tasks.some((x) => x.activity === t.activity && !x.completedAt && x.id !== t.id);
     generating.current = true;
     return run(async () => {
+      await queue.current.chain; // every mark saved first
       await repo.setTaskDone(t.id, true);
       if (next && !stillOpen) await repo.addTasks([{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "" }]);
       setDrafts((d) => { const n = { ...d }; delete n[t.activity]; return n; });
@@ -567,10 +601,26 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const tapWord = (w) => {
     setSelectedKey(w.key);
     setAnchor(w.el);
-    const open = openMistakes.find((m) => m.verseKey === w.verseKey && m.position === w.position);
-    if (open || busy) return; // tapping a marked word selects it; ignore taps while saving
-    run(() => repo.addMistake({ page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text, taskId: marking?.id }))
-      .then((ok) => { if (ok) onMarked?.(); });
+    if (openMistakes.some((m) => wordKey(m) === w.key)) return; // tapping a marked word selects it
+    const s = ++seq.current;
+    const row = { page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text, taskId: marking?.id || null };
+    setOverlay((o) => [...o, { key: w.key, seq: s, add: { ...row, id: `new-${s}`, pending: true, category: null, note: "", correctedAt: null, createdAt: new Date().toISOString() } }]);
+    const saved = enqueue(async () => (await repo.addMistake(row))?.id);
+    savedIds.current.set(w.key, saved);
+    saved.then(() => onMarked?.(), () => {});
+  };
+  // Kind of mistake, Corrected or Remove: shown at once, saved after the word itself.
+  const change = (m, patch, write) => {
+    const key = wordKey(m), s = ++seq.current;
+    const id = savedIds.current.get(key) || Promise.resolve(m.pending ? null : m.id);
+    setOverlay((o) => [...o, { key, seq: s, patch }]);
+    setSelectedKey(null);
+    enqueue(async () => {
+      const real = await id;
+      if (!real) throw new Error("That word couldn't be saved. Mark it again.");
+      await write(real);
+    });
+    if (patch.removed || patch.correctedAt) savedIds.current.delete(key);
   };
   const remove = async (what, fn) => {
     if (await confirmDialog({ title: `Delete this ${what}?`, message: "This can't be undone.", confirmLabel: "Delete" })) run(fn);
@@ -613,10 +663,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
                 <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
                   header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
                 {selected && (
-                  <MistakePopup key={selected.id} anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
-                    onCategory={(c) => run(() => repo.setMistakeCategory(selected.id, c)).then(() => setSelectedKey(null))}
-                    onCorrected={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}
-                    onRemove={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))} />
+                  <MistakePopup key={selectedKey} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
+                    onCategory={(c) => change(selected, { category: c || null }, (id) => repo.setMistakeCategory(id, c))}
+                    onCorrected={() => change(selected, { correctedAt: new Date().toISOString() }, (id) => repo.setMistakeCorrected(id, true))}
+                    onRemove={() => change(selected, { removed: true }, (id) => repo.deleteMistake(id))} />
                 )}
                 </TaskReader>
               </>

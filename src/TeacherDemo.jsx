@@ -99,7 +99,7 @@ export default function TeacherDemo() {
   const [tab, setTab] = useState("thilawa");
   const thilawaRepo = useCallback((id) => slowly(createMemoryThilawaRepo(thilawaStore, id, { teacherId: TEACHER })), []);
   const classRepo = useCallback((id) => createMemoryClassRepo(classStore, id, { teacherId: TEACHER }), []);
-  const hifzRepo = useCallback((id) => createMemoryHifzRepo(hifzStore, id, { teacherId: TEACHER }), []);
+  const hifzRepo = useCallback((id) => slowly(createMemoryHifzRepo(hifzStore, id, { teacherId: TEACHER })), []);
   return (
     <div className="td">
       <style>{CSS}</style>
