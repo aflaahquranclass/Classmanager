@@ -7,7 +7,7 @@
 // picks up the lessons already made. Pages turn freely in the Mushaf, and
 // onPage(page) hears every turn (the class reading keeps where it stopped).
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { localDate } from "../hifz/engine.js";
@@ -43,17 +43,26 @@ export default function ClassLesson({ students, teacherId, portion, onClose, mak
   const lesson = lessonOf(studentId);
   const lessonId = lesson?.id ?? null;
   // Until the student has their lesson, Listen & mark gets one with no id; the
-  // first write makes the real one and goes to it.
+  // first write makes the real one and goes to it. It is made once per student
+  // and part (kept outside the render, so marks saved while the screen
+  // redraws all go to the same lesson).
+  const making = useRef(new Map()); // "studentId|part" → Promise<lesson id>
   const lessonRepo = useMemo(() => {
-    let made = null;
-    const ensure = () => (lessonId ? Promise.resolve(lessonId) : (made ??= repo.addAssignment({ ...portion, kind: "lesson" }).then((a) => a.id, (e) => { made = null; throw e; })));
+    const k = `${studentId}|${portion.fromPage}|${portion.toPage}|${portion.instructions || ""}`;
+    const ensure = () => {
+      if (lessonId) return Promise.resolve(lessonId);
+      if (!making.current.has(k)) {
+        making.current.set(k, repo.addAssignment({ ...portion, kind: "lesson" }).then((a) => a.id, (e) => { making.current.delete(k); throw e; }));
+      }
+      return making.current.get(k);
+    };
     return {
       ...repo,
       addMistake: async (m) => repo.addMistake({ ...m, assignmentId: await ensure() }),
       setAssignmentLetters: async (_id, letters) => repo.setAssignmentLetters(await ensure(), letters),
       setAssignmentChecked: async (_id, checked) => repo.setAssignmentChecked(await ensure(), checked),
     };
-  }, [repo, lessonId, portion]);
+  }, [repo, lessonId, portion, studentId]);
 
   // Where the class is: kept as the pages turn, so switching student stays on the page.
   const [page, setPage] = useState(startPage);

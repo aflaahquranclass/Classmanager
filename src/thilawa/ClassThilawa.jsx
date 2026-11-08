@@ -220,6 +220,7 @@ export function TeacherClassPanel({ className, students, classRepo, teacherId, m
   if (!state) return <div className="ct">{error ? <div className="hz-error" role="alert">{error}</div> : <div className="hz-card hz-muted">Loading {className}…</div>}</div>;
 
   const { reading, topics } = state;
+  const portion = reading ? { fromPage: reading.fromPage, toPage: reading.toPage, instructions: readingTitle(reading) } : null;
   const openReading = (r) => run(async () => { await classRepo.openReading({ ...r, page: r.fromPage }); setChanging(false); });
   const close = async () => { setLesson(false); await flush(); await refresh(); onClosed?.(); };
 
@@ -228,7 +229,7 @@ export function TeacherClassPanel({ className, students, classRepo, teacherId, m
       <style>{CLASS_CSS}</style>
       {lesson && reading && (
         <ClassLesson students={students} teacherId={teacherId} makeRepo={makeStudentRepo}
-          portion={{ fromPage: reading.fromPage, toPage: reading.toPage, instructions: readingTitle(reading) }}
+          portion={portion}
           startPage={reading.page} onPage={onPage} onClose={close} />
       )}
 

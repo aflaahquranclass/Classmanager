@@ -14,7 +14,7 @@
 //   setAssignmentChecked(id, checked) (teacher: finished listening)
 //   setAssignmentLetters(id, letters) (teacher: Arabic letters the student needs to work on)
 //   deleteAssignment(id) (teacher)
-//   listMistakes() → rows                               addMistake({ assignmentId, page, line, verseKey, position, wordText }) (teacher)
+//   listMistakes() → rows                               addMistake({ assignmentId, page, line, verseKey, position, wordText }) → row (teacher)
 //   setMistakeCorrected(id, corrected) (teacher)        deleteMistake(id) (teacher)
 //   setMistakeCategory(id, category) (teacher; an id from MISTAKE_CATEGORIES, or null)
 //   setMistakeTicked(id, ticked) (the student's own tick)
@@ -98,10 +98,10 @@ export function createSupabaseThilawaRepo(supabase, studentId, teacherId = null)
     },
     listMistakes: () => list("thilawa_mistakes", mistakeFromDb),
     async addMistake(m) {
-      check(await supabase.from("thilawa_mistakes").insert({
+      return mistakeFromDb(check(await supabase.from("thilawa_mistakes").insert({
         student_id: studentId, teacher_id: teacherId, assignment_id: m.assignmentId, page: m.page,
         verse_key: m.verseKey, word_position: m.position, word_line: m.line || null, word_text: m.wordText || null,
-      }));
+      }).select("*").single()));
     },
     async setMistakeCorrected(id, corrected) {
       check(await supabase.from("thilawa_mistakes").update({ corrected_at: corrected ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
@@ -192,8 +192,9 @@ export function createMemoryThilawaRepo(store, studentId, { asStudent = false, t
     async addMistake(m) {
       teacherOnly();
       if (store.mistakes.some((x) => own(x) && !x.correctedAt && x.assignmentId === m.assignmentId && x.verseKey === m.verseKey && x.position === m.position)) throw new Error("That word is already marked.");
-      add("mistakes", { teacherId, assignmentId: m.assignmentId, page: m.page, line: m.line || null, verseKey: m.verseKey, position: m.position, wordText: m.wordText || "", category: null, note: "", correctedAt: null, tickedAt: null });
+      const row = add("mistakes", { teacherId, assignmentId: m.assignmentId, page: m.page, line: m.line || null, verseKey: m.verseKey, position: m.position, wordText: m.wordText || "", category: null, note: "", correctedAt: null, tickedAt: null });
       changed();
+      return row;
     },
     async setMistakeCorrected(id, corrected) { teacherOnly(); find("mistakes", id).correctedAt = corrected ? stamp() : null; changed(); },
     async setMistakeCategory(id, category) { teacherOnly(); find("mistakes", id).category = category || null; changed(); },

@@ -14,6 +14,10 @@ import { maldivesToday } from "./dates.js";
 import { SplashDone } from "./splash.jsx";
 
 const TEACHER = "demo-teacher";
+// ?slow=1: every save and load waits 1.5 s, like a slow phone connection.
+const SLOW = new URLSearchParams(window.location.search).get("slow") === "1";
+const slowly = (repo) => (SLOW ? Object.fromEntries(Object.entries(repo).map(([k, f]) => [k, typeof f === "function" && k !== "subscribe"
+  ? async (...args) => { await new Promise((r) => setTimeout(r, 1500)); return f(...args); } : f])) : repo);
 const EVERY_DAY = { days: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] };
 const student = (id, name, code, classId, className, program) => ({ id, name, studentCode: code, classId, className, programs: [program], schedule: EVERY_DAY, teacherId: TEACHER });
 
@@ -93,7 +97,7 @@ const CSS = `
 
 export default function TeacherDemo() {
   const [tab, setTab] = useState("thilawa");
-  const thilawaRepo = useCallback((id) => createMemoryThilawaRepo(thilawaStore, id, { teacherId: TEACHER }), []);
+  const thilawaRepo = useCallback((id) => slowly(createMemoryThilawaRepo(thilawaStore, id, { teacherId: TEACHER })), []);
   const classRepo = useCallback((id) => createMemoryClassRepo(classStore, id, { teacherId: TEACHER }), []);
   const hifzRepo = useCallback((id) => createMemoryHifzRepo(hifzStore, id, { teacherId: TEACHER }), []);
   return (

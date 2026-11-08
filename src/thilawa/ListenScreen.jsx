@@ -13,7 +13,7 @@
 // to another student (their own marks show), and `onFinished` to call after
 // Finish instead of closing.
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
@@ -65,9 +65,64 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lesson = a.kind === "lesson";
-  const marks = mistakes.filter((m) => m.assignmentId === a.id);
+
+  // Marking is instant: a tapped word is highlighted (and its pop-up opens)
+  // at once, and the change is saved in the background. Each student's saves
+  // run one after another, so a word is saved before its kind of mistake;
+  // when they're all done the marks are reloaded once. Until then `overlay`
+  // holds the changes not yet reloaded:
+  // [{ sid, key, seq, add?: mistake, patch?: { category | correctedAt | removed } }].
+  const [overlay, setOverlay] = useState([]);
+  const seq = useRef(0);
+  const queues = useRef(new Map()); // student id → { chain, count }
+  const savedIds = useRef(new Map()); // "studentId|word key" → Promise<the saved mark's id>
+  const wordKey = (m) => `${m.verseKey}:${m.position}`;
+  let marks = mistakes.filter((m) => m.assignmentId === a.id);
+  for (const o of overlay.filter((x) => x.sid === student.id)) {
+    if (o.add && !marks.some((m) => !m.correctedAt && wordKey(m) === o.key)) marks = [...marks, o.add];
+    if (o.patch) marks = marks.map((m) => (!m.correctedAt && wordKey(m) === o.key ? { ...m, ...o.patch } : m));
+  }
+  marks = marks.filter((m) => !m.removed);
   const open = marks.filter((m) => !m.correctedAt);
-  const selected = open.find((m) => `${m.verseKey}:${m.position}` === selectedKey) || null;
+  const selected = open.find((m) => wordKey(m) === selectedKey) || null;
+
+  // Runs `op` after the student's earlier saves; once none are left, reloads
+  // and drops the overlay up to here. Returns op's result.
+  const enqueue = (sid, op, reload) => {
+    const q = queues.current.get(sid) || { chain: Promise.resolve(), count: 0 };
+    queues.current.set(sid, q);
+    q.count += 1;
+    const result = q.chain.then(op);
+    result.catch((e) => setError(e.message));
+    q.chain = result.catch(() => {}).then(async () => {
+      q.count -= 1;
+      if (q.count > 0) return;
+      const upto = seq.current;
+      try { await reload(); } catch { /* the next reload catches up */ }
+      setOverlay((o) => o.filter((x) => x.sid !== sid || x.seq > upto));
+    });
+    return result;
+  };
+  const markWord = (w) => {
+    const sid = student.id, r = repo, s = ++seq.current;
+    const temp = { id: `new-${s}`, pending: true, assignmentId: a.id, page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text, category: null, note: "", correctedAt: null };
+    setOverlay((o) => [...o, { sid, key: w.key, seq: s, add: temp }]);
+    const saved = enqueue(sid, async () => (await r.addMistake({ assignmentId: a.id, page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text }))?.id, refresh);
+    savedIds.current.set(`${sid}|${w.key}`, saved);
+  };
+  // Kind of mistake, Corrected or Remove: shown at once, saved after the word itself.
+  const change = (m, patch, write) => {
+    const sid = student.id, r = repo, key = wordKey(m), s = ++seq.current;
+    const id = savedIds.current.get(`${sid}|${key}`) || Promise.resolve(m.pending ? null : m.id);
+    setOverlay((o) => [...o, { sid, key, seq: s, patch }]);
+    setSelectedKey(null);
+    enqueue(sid, async () => {
+      const real = await id;
+      if (!real) throw new Error("That word couldn't be saved. Mark it again.");
+      await write(r, real);
+    }, refresh);
+    if (patch.removed || patch.correctedAt) savedIds.current.delete(`${sid}|${key}`);
+  };
 
   const run = async (fn) => {
     setBusy(true);
@@ -100,10 +155,17 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
   const tapWord = (w) => {
     setSelectedKey(w.key);
     setAnchor(w.el);
-    if (busy || open.some((m) => m.verseKey === w.verseKey && m.position === w.position)) return; // a marked word is only selected
-    run(() => repo.addMistake({ assignmentId: a.id, page: w.page, line: w.line, verseKey: w.verseKey, position: w.position, wordText: w.text }));
+    if (open.some((m) => wordKey(m) === w.key)) return; // a marked word is only selected
+    markWord(w);
   };
-  const finish = () => run(() => repo.setAssignmentChecked(a.id, true)).then((ok) => ok && (onFinished || onClose)());
+  // Finish once every mark is saved.
+  const finish = async () => {
+    setBusy(true);
+    await queues.current.get(student.id)?.chain;
+    setBusy(false);
+    const ok = await run(() => repo.setAssignmentChecked(a.id, true));
+    if (ok) (onFinished || onClose)();
+  };
   const onPage = open.filter((m) => m.page === page).length;
 
   return createPortal(
@@ -155,10 +217,10 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
           </div>
           <div {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected letters={a.letters} /></div>
           {selected && (
-            <MistakePopup key={selected.id} anchor={anchor} mistake={selected} busy={busy} onClose={() => setSelectedKey(null)}
-              onCategory={(c) => run(() => repo.setMistakeCategory(selected.id, c)).then(() => setSelectedKey(null))}
-              onCorrected={() => run(() => repo.setMistakeCorrected(selected.id, true)).then(() => setSelectedKey(null))}
-              onRemove={() => run(() => repo.deleteMistake(selected.id)).then(() => setSelectedKey(null))} />
+            <MistakePopup key={`${student.id}|${selectedKey}`} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
+              onCategory={(c) => change(selected, { category: c || null }, (r, id) => r.setMistakeCategory(id, c))}
+              onCorrected={() => change(selected, { correctedAt: new Date().toISOString() }, (r, id) => r.setMistakeCorrected(id, true))}
+              onRemove={() => change(selected, { removed: true }, (r, id) => r.deleteMistake(id))} />
           )}
           {lettersOpen && <LettersPanel value={a.letters} studentName={student.name} busy={busy} onClose={() => setLettersOpen(false)}
             onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />}
