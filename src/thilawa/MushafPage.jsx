@@ -55,7 +55,11 @@ export function useMushafSwipe(onNext, onPrev) {
 // page title and its arrows) fold into a ☰ button, and see-through Next /
 // Previous buttons sit on the page's edges (onNext / onPrev; null hides one).
 // Swiping turns the page as before.
-export function MushafPresent({ children, tools = null, onNext = null, onPrev = null }) {
+// `quick`: a button to keep at hand (e.g. the whiteboard): in the bar, and in
+// full screen beside the ☰ button. `edge`: things that sit on the screen's
+// edge or slide over it (e.g. the letters tab on a phone), put on the page
+// body too, above full screen while it's on.
+export function MushafPresent({ children, tools = null, onNext = null, onPrev = null, quick = null, edge = null }) {
   const [full, setFull] = useState(false);
   const [menu, setMenu] = useState(false);
   const native = useRef(false); // the browser's own full screen is on because of us
@@ -106,8 +110,10 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
   // Closing the screen while in full screen leaves the browser's full screen too.
   useEffect(() => () => leaveNative(), []);
 
+  const edgeLayer = edge && createPortal(<div className={`mf-edge ${full ? "mf-edge-full" : ""}`}><style>{presentCss}</style>{edge}</div>, document.body);
   const bar = (
     <div className="mf-bar">
+      {!full && quick}
       {tools}
       {full
         ? <button type="button" className="hz-btn hz-btn-primary" onClick={exit}><X size={18} aria-hidden="true" />Exit full screen</button>
@@ -120,15 +126,17 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
         <style>{presentCss}</style>
         {bar}
         <div className="mf-content">{children}</div>
+        {edgeLayer}
       </div>
     );
   }
-  return createPortal(
+  return [createPortal(
     <div className={`mf mf-full ${menu ? "mf-menu" : ""}`} role="dialog" aria-modal="true" aria-label="Mushaf, full screen">
       <style>{presentCss}</style>
       <button type="button" className="mf-burger" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the controls" : "Show the controls"}>
         {menu ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
       </button>
+      {quick && <div className="mf-quick">{quick}</div>}
       {bar}
       <div className="mf-content">{children}</div>
       {/* Like a printed Mushaf: the next page is to the left. */}
@@ -136,7 +144,8 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
       {onPrev && <button type="button" className="mf-side mf-side-prev" onClick={onPrev} aria-label="Previous page"><ChevronRight size={30} aria-hidden="true" /></button>}
     </div>,
     document.body,
-  );
+    "mf-full",
+  ), <span key="mf-edge" style={{ display: "contents" }}>{edgeLayer}</span>];
 }
 
 // Full screen fills the screen's width (a laptop scrolls down the page); very
@@ -149,7 +158,10 @@ const presentCss = `
     color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
   .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
   .mf-full { padding-top: 56px; }
-  .mf-full .mf-bar { box-sizing: border-box; padding-right: 56px; margin-top: -48px; min-height: 44px; align-items: center; }
+  .mf-full .mf-bar { box-sizing: border-box; padding-right: 108px; margin-top: -48px; min-height: 44px; align-items: center; }
+  .mf-quick { position: fixed; top: max(8px, env(safe-area-inset-top)); right: 62px; z-index: 8; display: flex; gap: 8px; }
+  .mf-edge { position: fixed; top: 0; right: 0; width: 0; height: 0; z-index: 1500; }
+  .mf-edge-full { z-index: 3001; }
   /* Full screen: the controls over the page fold into the ☰ button. */
   .mf-full:not(.mf-menu) :is(.mf-bar, .hz-tabs, .hz-reader-nav, .th-reader-nav, .lm-nav) { display: none !important; }
   .mf-full .mf-content > * { scroll-margin-top: 56px; }

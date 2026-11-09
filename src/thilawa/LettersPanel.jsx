@@ -1,8 +1,8 @@
 // The Arabic letters table: in Listen & mark the teacher taps the letters a
-// student needs to work on (a side panel on a laptop, a sheet from the bottom
-// on a phone). The letters are saved with the reading or lesson once the
-// teacher stops tapping (or closes the table), and the student sees them with
-// it (LetterChips).
+// student needs to work on. LettersSide sits beside the Mushaf page (always in
+// view); on a phone LettersPanel is a sheet from the bottom. The letters are
+// saved with the reading or lesson once the teacher stops tapping (or the
+// table closes), and the student sees them with it (LetterChips).
 
 import { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
@@ -21,7 +21,7 @@ const CSS = `
     font: 500 26px/1 "Noto Naskh Arabic", "Geeza Pro", "Arabic Typesetting", serif; }
   .lp-letter:hover { border-color: #176FD1; }
   .lp-letter:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
-  .lp-letter[aria-pressed="true"] { background: #176FD1; border-color: #176FD1; color: #FFFFFF; }
+  .lp-letter[aria-pressed="true"] { background: #E8650A; border-color: #E8650A; color: #FFFFFF; }
   .lp-foot { display: flex; align-items: center; gap: 10px; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom)); border-top: 1px solid #DCEBF8; }
   .lp-foot span { flex: 1; font-size: 14px; color: #567493; }
   .lp-foot .hz-btn { min-height: 44px; }
@@ -30,16 +30,29 @@ const CSS = `
     .lp-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
     .lp-letter { font-size: 22px; min-height: 44px; }
   }
+  .ls { width: 172px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 8px; align-self: flex-start; background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 14px; padding: 10px;
+    color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  .mf-full .ls { top: 56px; }
+  .ls-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
+  .ls-head span { min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: #FDEBD7; color: #9A4A06; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
+  .ls-head span:empty { visibility: hidden; }
+  .ls-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; direction: rtl; }
+  .ls-letter { aspect-ratio: 1; min-height: 34px; padding: 0; border-radius: 9px; border: 1px solid #C7DDF4; background: #F7FAFD; color: #123B67; cursor: pointer;
+    font: 500 21px/1 "Noto Naskh Arabic", "Geeza Pro", "Arabic Typesetting", serif; }
+  .ls-letter:hover { border-color: #176FD1; }
+  .ls-letter:focus-visible, .ls-clear:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
+  .ls-letter[aria-pressed="true"] { background: #E8650A; border-color: #E8650A; color: #FFFFFF; }
+  .ls-clear { width: 100%; margin-top: 8px; min-height: 34px; border-radius: 9px; border: 1px solid #C7DDF4; background: #FFFFFF; color: #567493; font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; }
   .lc { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #567493; }
   .lc b { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 6px; box-sizing: border-box; border-radius: 8px;
     background: #EAF3FD; color: #1452A8; font: 500 20px/1 "Noto Naskh Arabic", "Geeza Pro", serif; }
 `;
 
+// Taps show at once and are saved together a moment after the last one, so
+// quick taps never race each other. The saved letters take over once nothing
+// is waiting to be saved; anything waiting is saved when the table goes away.
 // value: the letters chosen; onChange(letters) saves them.
-export default function LettersPanel({ value, studentName, busy, onChange, onClose }) {
-  // Taps show at once and are saved together a moment after the last one, so
-  // quick taps never race each other. The saved letters take over once nothing
-  // is waiting to be saved.
+function useLetterPicks(value, onChange) {
   const [chosen, setChosen] = useState(value);
   const latest = useRef(value);
   const timer = useRef(0);
@@ -47,11 +60,6 @@ export default function LettersPanel({ value, studentName, busy, onChange, onClo
   save.current = onChange;
   useEffect(() => { if (!timer.current) { latest.current = value; setChosen(value); } }, [value.join("")]);
   useEffect(() => () => { if (timer.current) { clearTimeout(timer.current); save.current(latest.current); } }, []);
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
   const set = (letters) => {
     latest.current = letters;
     setChosen(letters);
@@ -59,6 +67,35 @@ export default function LettersPanel({ value, studentName, busy, onChange, onClo
     timer.current = setTimeout(() => { timer.current = 0; save.current(latest.current); }, 500);
   };
   const toggle = (l) => { const c = latest.current; set(sortLetters(c.includes(l) ? c.filter((x) => x !== l) : [...c, l])); };
+  return { chosen, set, toggle };
+}
+
+// The letters beside the Mushaf page, always in view (it stays put as the
+// page scrolls). Hidden on narrow screens, where LettersPanel opens from a tab.
+export function LettersSide({ value, studentName, busy, onChange }) {
+  const { chosen, set, toggle } = useLetterPicks(value, onChange);
+  return (
+    <aside className="ls" aria-label={`Letters ${studentName} needs to work on`}>
+      <style>{CSS}</style>
+      <div className="ls-head"><b>Letters</b><span aria-live="polite">{busy ? "Saving…" : chosen.length || ""}</span></div>
+      <div className="ls-grid" lang="ar">
+        {ARABIC_LETTERS.map((l) => (
+          <button key={l} type="button" className="ls-letter" aria-pressed={chosen.includes(l)} onClick={() => toggle(l)}>{l}</button>
+        ))}
+      </div>
+      {chosen.length > 0 && <button type="button" className="ls-clear" onClick={() => set([])}>Clear</button>}
+    </aside>
+  );
+}
+
+// value: the letters chosen; onChange(letters) saves them.
+export default function LettersPanel({ value, studentName, busy, onChange, onClose }) {
+  const { chosen, set, toggle } = useLetterPicks(value, onChange);
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
 
   return (
     <aside className="lp" role="dialog" aria-label="Letters to improve">
