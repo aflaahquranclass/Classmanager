@@ -52,14 +52,14 @@ const CSS = `
   .lm-row { display: flex; gap: 12px; align-items: flex-start; }
   .lm-page { flex: 1; min-width: 0; }
   .lm-board { min-height: 38px; padding: 0 12px; font-size: 13px; gap: 6px; }
-  .mf-quick .lm-board { min-height: 44px; width: 44px; padding: 0; border-radius: 12px; background: rgba(255,255,255,0.92); }
-  .mf-quick .lm-board span { display: none; }
   /* Phone: the letters open from a tab on the right edge. */
   .lm-ltab { display: none; position: fixed; right: 0; top: 116px; width: 24px; padding: 8px 0; border-radius: 12px 0 0 12px; border: 1px solid #C7DDF4; border-right: none;
     background: #FFFFFF; color: #123B67; box-shadow: -4px 4px 14px rgba(18,59,103,0.14); cursor: pointer; flex-direction: column; align-items: center; gap: 6px; }
   .lm-ltab i { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 500 15px/1 "Noto Naskh Arabic", "Geeza Pro", serif; font-style: normal; }
   .lm-ltab b { min-width: 18px; height: 18px; line-height: 18px !important; border-radius: 999px; background: #E8650A; color: #FFFFFF; font: 700 11px/20px Inter, system-ui, sans-serif; text-align: center; }
   .lm-ltab:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
+  /* In full screen it goes under the ☰ and whiteboard tabs. */
+  .mf-edge-full .lm-ltab { top: calc(max(12px, env(safe-area-inset-top)) + 104px); }
   @media (max-width: 760px) { .lm-row .ls { display: none; } .lm-ltab { display: flex; } }
   .lm-count { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #176FD1; color: #FFFFFF; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
   @media (max-width: 640px) {

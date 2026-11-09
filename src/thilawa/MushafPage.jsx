@@ -133,10 +133,13 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
   return [createPortal(
     <div className={`mf mf-full ${menu ? "mf-menu" : ""}`} role="dialog" aria-modal="true" aria-label="Mushaf, full screen">
       <style>{presentCss}</style>
-      <button type="button" className="mf-burger" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the controls" : "Show the controls"}>
-        {menu ? <X size={22} aria-hidden="true" /> : <Menu size={22} aria-hidden="true" />}
-      </button>
-      {quick && <div className="mf-quick">{quick}</div>}
+      {/* Slim tabs on the right edge, beside the page (never over the text). */}
+      <div className="mf-rail">
+        <button type="button" className="mf-burger" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the controls" : "Show the controls"}>
+          {menu ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
+        </button>
+        {quick && <div className="mf-quick">{quick}</div>}
+      </div>
       {bar}
       <div className="mf-content">{children}</div>
       {/* Like a printed Mushaf: the next page is to the left. */}
@@ -157,16 +160,19 @@ const presentCss = `
   .mf-full { position: fixed; inset: 0; z-index: 3000; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box;
     color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
   .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
-  .mf-full { padding-top: 56px; }
-  .mf-full .mf-bar { box-sizing: border-box; padding-right: 108px; margin-top: -48px; min-height: 44px; align-items: center; }
-  .mf-quick { position: fixed; top: max(8px, env(safe-area-inset-top)); right: 62px; z-index: 8; display: flex; gap: 8px; }
+  .mf-full { padding-top: max(12px, env(safe-area-inset-top)); }
+  .mf-full .mf-bar { box-sizing: border-box; min-height: 44px; align-items: center; padding-right: 40px; }
+  /* The ☰ and quick buttons: slim tabs on the right edge, in the gap beside the page. */
+  .mf-rail { position: fixed; right: 0; top: max(12px, env(safe-area-inset-top)); z-index: 8; display: flex; flex-direction: column; gap: 6px; }
+  .mf-quick { display: flex; flex-direction: column; gap: 6px; }
+  .mf-rail .mf-burger, .mf-quick > button { position: static; width: 36px; height: 44px; min-height: 0; padding: 0; border-radius: 12px 0 0 12px; border: 1px solid #C7DDF4; border-right: none;
+    background: #FFFFFF; color: #123B67; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: -4px 4px 14px rgba(18,59,103,0.12); }
+  .mf-quick > button span { display: none; }
   .mf-edge { position: fixed; top: 0; right: 0; width: 0; height: 0; z-index: 1500; }
   .mf-edge-full { z-index: 3001; }
   /* Full screen: the controls over the page fold into the ☰ button. */
   .mf-full:not(.mf-menu) :is(.mf-bar, .hz-tabs, .hz-reader-nav, .th-reader-nav, .lm-nav) { display: none !important; }
-  .mf-full .mf-content > * { scroll-margin-top: 56px; }
-  .mf-burger { position: fixed; top: max(8px, env(safe-area-inset-top)); right: 10px; z-index: 8; width: 44px; height: 44px; border-radius: 12px; border: 1px solid #C7DDF4;
-    background: rgba(255,255,255,0.92); color: #123B67; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 14px rgba(18,59,103,0.12); }
+  .mf-full .mf-content > * { scroll-margin-top: 12px; }
   .mf-burger:focus-visible, .mf-side:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
   /* See-through Next / Previous on the page's edges. */
   .mf-side { position: fixed; top: 50%; transform: translateY(-50%); z-index: 7; width: 44px; height: min(42vh, 320px); border: none; padding: 0; cursor: pointer;
@@ -176,7 +182,7 @@ const presentCss = `
   .mf-side-prev { right: 0; border-radius: 16px 0 0 16px; }
   /* The page sits between them, so a word at the edge is never under a button. */
   .mf-full .mf-content { padding: 0 40px; box-sizing: border-box; }
-  @media (max-width: 640px) { .mf-side { width: 26px; } .mf-full { padding-left: 4px; padding-right: 4px; } .mf-full .mf-content { padding: 0 24px; } }
+  @media (max-width: 640px) { .mf-full .mf-bar { padding-right: 24px; } .mf-rail .mf-burger, .mf-quick > button { width: 24px; height: 40px; } .mf-side { width: 26px; } .mf-full { padding-left: 4px; padding-right: 4px; } .mf-full .mf-content { padding: 0 24px; } }
   .mf-full .mp-page { max-width: none; }
   @media (max-width: 640px) { .mf-full .mp-page { padding: 4% 2.5% 2%; border-radius: 10px; } }
   .mf-is-full .mtb { display: none !important; }

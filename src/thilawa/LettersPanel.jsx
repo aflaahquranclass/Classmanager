@@ -32,7 +32,7 @@ const CSS = `
   }
   .ls { width: 172px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 8px; align-self: flex-start; background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 14px; padding: 10px;
     color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-  .mf-full .ls { top: 56px; }
+  .mf-full .ls { top: 12px; }
   .ls-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
   .ls-head span { min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: #FDEBD7; color: #9A4A06; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
   .ls-head span:empty { visibility: hidden; }
