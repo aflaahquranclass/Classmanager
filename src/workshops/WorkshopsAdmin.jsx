@@ -69,7 +69,11 @@ export function AdminWorkshops({ showToast, onCountChange }) {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
   const [sentAt, setSentAt] = useState({}); // sign-up tag → { at, status } of its last message
-  const [compose, setCompose] = useState(null); // { id, text } — the message being written
+  // The message being written: { row, text }. Shown in a pop-up, so it stays
+  // on screen when an accepted sign-up leaves the Waiting list.
+  const [compose, setCompose] = useState(null);
+  const [sending, setSending] = useState(false);
+  const openMessage = (r) => setCompose({ row: r, text: w.acceptedMessage });
 
   const load = useCallback(async () => {
     setError("");
@@ -103,25 +107,27 @@ export function AdminWorkshops({ showToast, onCountChange }) {
     const { error: err } = await supabase.from("workshop_registrations").update({ status, reviewed_at: new Date().toISOString() }).eq("id", r.id);
     setBusyId(null);
     if (err) { showToast(`Couldn’t update: ${err.message}`); return; }
-    showToast(status === "accepted" ? "Sign-up accepted. Send them the message below." : status === "rejected" ? "Sign-up rejected." : "Moved back to waiting.");
-    if (status === "accepted" && w.acceptedMessage && !sentAt[msgTag(r.id)]) setCompose({ id: r.id, text: w.acceptedMessage });
+    showToast(status === "accepted" ? "Sign-up accepted." : status === "rejected" ? "Sign-up rejected." : "Moved back to waiting.");
+    if (status === "accepted" && w.acceptedMessage && !sentAt[msgTag(r.id)]) openMessage({ ...r, status });
     onCountChange?.();
     load();
   };
 
-  const sendMessage = async (r) => {
+  const sendMessage = async () => {
+    const r = compose?.row;
     const text = compose?.text?.trim();
+    if (!r) return;
     if (!text) { showToast("Write the message first."); return; }
     const numbers = numbersOf(r);
     const name = r.students?.[0]?.name || "";
-    setBusyId(r.id);
+    setSending(true);
     const res = await createNotification({
       title: "Workshop", body: text, audience: MSG_AUDIENCE,
       audienceLabel: `Workshop accepted — ${name} ${msgTag(r.id)}`,
       inApp: false, sms: true,
       recipients: numbers.map((phone) => ({ name, phone, body: text })),
     });
-    setBusyId(null);
+    setSending(false);
     if (!res.ok) { showToast(res.message); return; }
     setCompose(null);
     showToast(res.message || "Message sent.");
@@ -227,23 +233,14 @@ export function AdminWorkshops({ showToast, onCountChange }) {
                 ))}
               </ol>
               <div className="wa-sent">Sent {fmtWhen(r.created_at)}{r.reviewed_at ? ` · checked ${fmtWhen(r.reviewed_at)}` : ""}</div>
-              {r.status === "accepted" && w.acceptedMessage && (compose?.id === r.id ? (
-                <div className="wa-msg">
-                  <div className="wa-msg-head"><MessageSquare size={16} aria-hidden="true" /> SMS to {numbersOf(r).join(", ")}</div>
-                  <textarea className="wa-msg-text" dir="rtl" lang="dv" rows={9} value={compose.text} onChange={(e) => setCompose({ id: r.id, text: e.target.value })} />
-                  <div className="wa-msg-actions">
-                    <button type="button" className="tp-btn-gradient" disabled={busy} onClick={() => sendMessage(r)}><Send size={16} aria-hidden="true" /> {busy ? "Sending…" : "Send SMS"}</button>
-                    <button type="button" className="tp-btn-outline" disabled={busy} onClick={() => setCompose(null)}>Cancel</button>
-                  </div>
-                </div>
-              ) : sentAt[msgTag(r.id)] ? (
+              {r.status === "accepted" && w.acceptedMessage && (sentAt[msgTag(r.id)] ? (
                 <div className={`wa-msg-done ${sentAt[msgTag(r.id)].status}`}>
                   {sentAt[msgTag(r.id)].status === "sent" ? <Check size={16} aria-hidden="true" /> : <MessageSquare size={16} aria-hidden="true" />}
                   {sentAt[msgTag(r.id)].status === "sent" ? "SMS sent" : sentAt[msgTag(r.id)].status === "failed" ? "SMS failed" : "SMS waiting to send"} · {fmtWhen(sentAt[msgTag(r.id)].at)}
-                  <button type="button" className="wa-link-btn" onClick={() => setCompose({ id: r.id, text: w.acceptedMessage })}>{sentAt[msgTag(r.id)].status === "sent" ? "Send again" : "Try again"}</button>
+                  <button type="button" className="wa-link-btn" onClick={() => openMessage(r)}>{sentAt[msgTag(r.id)].status === "sent" ? "Send again" : "Try again"}</button>
                 </div>
               ) : (
-                <button type="button" className="tp-btn-gradient wa-msg-btn" onClick={() => setCompose({ id: r.id, text: w.acceptedMessage })}><MessageSquare size={17} aria-hidden="true" /> Send message</button>
+                <button type="button" className="tp-btn-gradient wa-msg-btn" onClick={() => openMessage(r)}><MessageSquare size={17} aria-hidden="true" /> Send message</button>
               ))}
               <div className="wa-actions">
                 <button type="button" className="tp-btn-outline" disabled={busy} onClick={() => openSlip(r)}><FileText size={17} aria-hidden="true" /> View slip</button>
@@ -256,6 +253,20 @@ export function AdminWorkshops({ showToast, onCountChange }) {
           );
         })}
       </div>
+
+      {compose && (
+        <div className="wa-overlay" onClick={() => !sending && setCompose(null)}>
+          <div className="wa-dialog" role="dialog" aria-modal="true" aria-labelledby="wa-dialog-title" onClick={(e) => e.stopPropagation()}>
+            <h2 id="wa-dialog-title"><MessageSquare size={20} aria-hidden="true" /> Send message</h2>
+            <p className="wa-dialog-to">SMS to <b>{numbersOf(compose.row).join(", ")}</b> · <span dir="auto">{compose.row.students?.[0]?.name}</span></p>
+            <textarea className="wa-msg-text" dir="rtl" lang="dv" rows={10} value={compose.text} onChange={(e) => setCompose({ ...compose, text: e.target.value })} autoFocus />
+            <div className="wa-msg-actions">
+              <button type="button" className="tp-btn-outline" disabled={sending} onClick={() => setCompose(null)}>Not now</button>
+              <button type="button" className="tp-btn-gradient" disabled={sending} onClick={sendMessage}><Send size={16} aria-hidden="true" /> {sending ? "Sending…" : "Send SMS"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -294,6 +305,12 @@ const waCss = () => `
   .wa-actions button { flex: 1 1 auto; justify-content: center; }
   .wa-actions .wa-delete { flex: 0 0 auto; color: #A5432C; border-color: #E3C3BA; }
   .wa-reject { color: #A5432C; border-color: #E3C3BA; }
+  .wa-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(18,59,103,.45); }
+  .wa-dialog { width: min(100%, 520px); max-height: calc(100vh - 32px); overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 18px; background: #fff; box-shadow: 0 24px 60px rgba(8,30,60,.35); }
+  .wa-dialog h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 18px; color: ${TP.navy}; }
+  .wa-dialog-to { margin: 0; font-size: 14px; color: ${TP.secondaryText}; }
+  .wa-dialog-to b { color: ${TP.navy}; }
+  .wa-dialog .wa-msg-actions { justify-content: flex-end; }
   .wa-msg { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: #F3F8FC; border: 1px solid ${TP.border}; }
   .wa-msg-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: ${TP.navy}; }
   .wa-msg-text { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid ${TP.border}; border-radius: 10px; font: 16px/1.7 ${THAANA_FONT}; color: ${TP.navy}; background: #fff; resize: vertical; }
