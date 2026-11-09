@@ -1,0 +1,61 @@
+// Workshops with their own sign-up page on the website (/workshop/<slug>),
+// e.g. aflaahqc.com/workshop/namaadhu for the prayer session. A parent adds
+// one or more students, pays the fee × the number of students by bank
+// transfer and attaches the slip. Saved to workshop_registrations through
+// submit_workshop_registration (supabase/migrations/20261120_workshop_registrations.sql),
+// which knows the same workshops, fees and last days — change both together.
+
+import { supabase } from "../supabaseClient.js";
+
+export const WORKSHOPS = {
+  namaadhu: {
+    key: "namaadhu-2026-11",
+    fee: 150, // MVR per student
+    minAge: 10,
+    maxAge: 16,
+    lastDay: "2026-11-19", // sign-up closes after this day (Maldives time)
+    label: "ފުރާވަރު ދަރިވަރުންގެ ޚާއްސަ ނަމާދު ސެޝަން",
+    title: ["ނަމާދަށް އަހުލުވެރި", "ދަރިވަރު"],
+    speaker: {
+      name: "އައްޝައިޚް ސާޖިދު މުޙައްމަދު",
+      photo: "/images/workshops/shaikh-sajid.png",
+      lines: ["މާސްޓާރސް އޮފް ޓީޗިންގ އިސްލާމިކް ސްޓަޑީޒް", "ބެޗްލަރސް އިން ޝަރީޢާ"],
+    },
+    date: ["19", "ނޮވެމްބަރު", "2026"],
+    day: "ބުރާސްފަތި ދުވަހުގެ ރޭ",
+    time: "8:15 - 9:45",
+    viber: "9715441",
+  },
+};
+
+export const workshopSlugOf = (pathname = window.location.pathname) => {
+  const m = pathname.match(/^\/workshop\/([a-z0-9-]+)\/?$/);
+  return m && WORKSHOPS[m[1]] ? m[1] : "";
+};
+
+// Still taking sign-ups (Maldives date).
+export const isWorkshopOpen = (w) =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Indian/Maldives" }) <= w.lastDay;
+
+// Same private bucket and rules as class registration slips.
+const BUCKET = "registration-slips";
+export const SLIP_MAX_BYTES = 5 * 1024 * 1024;
+export const SLIP_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,application/pdf";
+
+// students: [{ name, age, address, viber }]. Uploads the slip under new/, then
+// files the sign-up. The visitor can't read either back; only admins can.
+export async function submitWorkshopRegistration({ workshop, students, file }) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
+  const path = `new/workshop-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  const up = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined });
+  if (up.error) throw new Error("slip");
+  const { error } = await supabase.rpc("submit_workshop_registration", {
+    p_workshop: workshop,
+    p_students: students.map((s) => ({ name: s.name.trim(), age: Number(s.age), address: s.address.trim(), viber: s.viber.trim() })),
+    p_slip_path: path,
+  });
+  if (error) {
+    const m = error.message;
+    throw new Error(m.includes("not open") ? "closed" : m.includes("too many") ? "busy" : m.includes("not valid") ? "invalid" : "save");
+  }
+}
