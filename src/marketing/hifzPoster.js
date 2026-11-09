@@ -212,27 +212,45 @@ function blurCanvas(c, radius) {
   ctx.putImageData(img, 0, 0);
 }
 
-// A word made unreadable: drawn at half size, blurred, and scaled back up.
-function drawBlurredWord(ctx, word, right, y, font, fill, width, size) {
+// One word of the name on its own canvas: drawn in a plain colour, then the
+// gradient laid over it ("source-in"). Safari cuts gradient-filled canvas
+// text off at the font's height, which loses the Thaana marks above and
+// below the letters; plain-colour text is drawn whole. `scale` < 1 draws it
+// smaller (for blurring).
+function wordCanvas(word, right, y, font, fill, width, size, scale = 1) {
   const pad = size;
   const w = width + pad * 2;
   const h = size * 1.6 + pad * 2;
   const left = right - width - pad;
   const top = y - h / 2;
-  const half = canvasOf(w / 2, h / 2);
-  const s = half.getContext("2d");
-  s.scale(0.5, 0.5);
+  const c = canvasOf(w * scale, h * scale);
+  const s = c.getContext("2d");
+  s.scale(scale, scale);
   s.translate(-left, -top); // same coordinates as the poster, so the gradient lines up
   s.font = font;
   s.direction = "rtl";
   s.textAlign = "right";
-  s.fillStyle = fill(s);
+  s.fillStyle = "#000000";
   fillMid(s, word, right, y);
-  blurCanvas(half, Math.round(size / 9));
+  s.globalCompositeOperation = "source-in";
+  s.fillStyle = fill(s);
+  s.fillRect(left, top, w, h);
+  return { canvas: c, left, top, w, h };
+}
+
+function drawWord(ctx, word, right, y, font, fill, width, size) {
+  const { canvas, left, top, w, h } = wordCanvas(word, right, y, font, fill, width, size);
+  ctx.drawImage(canvas, left, top, w, h);
+}
+
+// A word made unreadable: drawn at half size, blurred, and scaled back up.
+function drawBlurredWord(ctx, word, right, y, font, fill, width, size) {
+  const { canvas, left, top, w, h } = wordCanvas(word, right, y, font, fill, width, size, 0.5);
+  blurCanvas(canvas, Math.round(size / 9));
   ctx.save();
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(half, left, top, w, h);
+  ctx.drawImage(canvas, left, top, w, h);
   ctx.restore();
 }
 
@@ -455,10 +473,7 @@ export async function drawHifzPoster({ name, age, juz, blur = [], size = "feed",
       if (words.length && blurred.has(i)) {
         drawBlurredWord(ctx, w, nx, nameY, `${fs}px ${AAMMU}`, nameFill, widths[i], fs);
       } else {
-        ctx.font = `${fs}px ${AAMMU}`;
-        ctx.textAlign = "right";
-        ctx.fillStyle = nameFill(ctx);
-        fillMid(ctx, w, nx, nameY);
+        drawWord(ctx, w, nx, nameY, `${fs}px ${AAMMU}`, nameFill, widths[i], fs);
       }
       nx -= widths[i] + space;
     });
