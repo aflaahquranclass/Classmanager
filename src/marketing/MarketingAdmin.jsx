@@ -6,7 +6,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Megaphone, Download, EyeOff, Eye } from "lucide-react";
 import { TP } from "../App.jsx";
-import { drawHifzPoster, downloadHifzPoster, nameWords, POSTER_SIZES, TOTAL_JUZ } from "./hifzPoster.js";
+import { drawHifzPoster, downloadHifzPoster, nameWords, POSTER_SIZES, START_FROM, TOTAL_JUZ } from "./hifzPoster.js";
 
 const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th"];
 
@@ -15,6 +15,7 @@ export function AdminMarketing({ showToast }) {
   const [age, setAge] = useState("");
   const [juz, setJuz] = useState("");
   const [size, setSize] = useState("feed");
+  const [startFrom, setStartFrom] = useState("first");
   // Word index → blurred or not. Words not set yet: every word after the
   // first is blurred, so a public post keeps only the first name.
   const [blurPick, setBlurPick] = useState({});
@@ -36,7 +37,7 @@ export function AdminMarketing({ showToast }) {
     let cancelled = false;
     const t = setTimeout(async () => {
       try {
-        const canvas = await drawHifzPoster({ name, age: ageOk ? age : "", juz: juzOk ? juzNum : 0, blur, size });
+        const canvas = await drawHifzPoster({ name, age: ageOk ? age : "", juz: juzOk ? juzNum : 0, blur, size, startFrom });
         if (cancelled || !previewRef.current) return;
         canvas.className = "mk-canvas";
         canvas.setAttribute("role", "img");
@@ -50,13 +51,13 @@ export function AdminMarketing({ showToast }) {
     }, 180);
     return () => { cancelled = true; clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, age, juz, size, blurKey]);
+  }, [name, age, juz, size, startFrom, blurKey]);
 
   const download = async (sizes) => {
     if (!ready) return;
     setBusy(sizes.length > 1 ? "both" : "one");
     try {
-      for (const s of sizes) await downloadHifzPoster({ name, age, juz: juzNum, blur, size: s });
+      for (const s of sizes) await downloadHifzPoster({ name, age, juz: juzNum, blur, size: s, startFrom });
       showToast(sizes.length > 1 ? "Both posters downloaded." : "Poster downloaded.");
     } catch (e) {
       console.error("poster", e);
@@ -132,6 +133,16 @@ export function AdminMarketing({ showToast }) {
             </div>
             {!ageOk && <p className="mk-error" role="alert">Enter the age as a whole number.</p>}
             {juz !== "" && !juzOk && <p className="mk-error" role="alert">Juz memorised must be a whole number from 0 to {TOTAL_JUZ}.</p>}
+
+            <div className="mk-field">
+              Started memorising from
+              <div className="mk-sizes" role="group" aria-label="Started memorising from">
+                {START_FROM.map((o) => (
+                  <button key={o.key} type="button" aria-pressed={startFrom === o.key} onClick={() => setStartFrom(o.key)}>{o.label}</button>
+                ))}
+              </div>
+              <span className="mk-hint">Which juz blocks are filled in: from juz 1 (right) or from juz 30 (left).</span>
+            </div>
 
             <div className="mk-field">
               Blur for a public post

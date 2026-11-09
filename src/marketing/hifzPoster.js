@@ -35,8 +35,6 @@ const TEXT = {
   memorised: "ފޮތް ހިފްޡުކޮށްފި",
   juz: "ފޮތް",
   progress: "ހިފްޡުކުރެވުނު މިންވަރު",
-  ofJuz: "ފޮތުން",
-  complete: "ފުރިހަމަ",
   prizeLine: ["ހިފްޡުކުރާ", "ކޮންމެ ފޮތަކަށް", "ޓްރޮފީއެއް، ފައިސާގެ އިނާމެއް އަދި ސެޓްފިކެޓެއް ދެވޭނެއެވެ."],
   prizes: ["ޓްރޮފީ", "ފައިސާގެ އިނާމު", "ސެޓްފިކެޓް"],
   join: ["ބޮޑެތި މީހުން އަދި ސުކޫލްދަރިވަރުންގެ", "ހިފްޡު ކުލާހުގައި", "ބައިވެރިވުމަށް ކެޕްޝަންގައިވާ ފޯމް ފުރާލާ"],
@@ -334,8 +332,14 @@ function drawIcon(ctx, draw, x, y, size) {
 export const nameWords = (name) => String(name || "").trim().split(/\s+/).filter(Boolean);
 
 // name: student's name (Thaana); age: years (optional); juz: juz memorised
-// (0–30); blur: indexes of the name's words to blur; size: "feed" | "story".
-export async function drawHifzPoster({ name, age, juz, blur = [], size = "feed" }) {
+// (0–30); blur: indexes of the name's words to blur; size: "feed" | "story";
+// startFrom: "first" (juz 1 onwards) or "last" (juz 30 backwards), which juz
+// blocks are filled in.
+export const START_FROM = [
+  { key: "first", label: "Juz 1", hint: "Juz 1 onwards" },
+  { key: "last", label: "Juz 30", hint: "the last juz backwards" },
+];
+export async function drawHifzPoster({ name, age, juz, blur = [], size = "feed", startFrom = "first" }) {
   await loadFonts();
   const [logo, pattern] = await Promise.all([loadImage("/images/logo-full-white.png"), loadImage("/images/tp-pattern-main.png")]);
   const L = LAYOUT[size] || LAYOUT.feed;
@@ -376,7 +380,7 @@ export async function drawHifzPoster({ name, age, juz, blur = [], size = "feed" 
   ctx.restore();
 
   // Blocks top to bottom, spread evenly like the HTML version.
-  const blocks = { top: 226, student: 220, tracker: 291, prizes: 171, join: 102, blessing: 39 };
+  const blocks = { top: 226, student: 220, tracker: 264, prizes: 171, join: 102, blessing: 39 };
   const heights = Object.values(blocks);
   const gap = (H - L.top - L.bottom - heights.reduce((a, b) => a + b, 0)) / (heights.length - 1);
   const at = {};
@@ -516,26 +520,30 @@ export async function drawHifzPoster({ name, age, juz, blur = [], size = "feed" 
     const bookX = inR - Math.min(Math.max((barW * pct) / 100, 40), barW - 40);
     shadowed(ctx, "rgba(13,79,133,0.35)", 10, 8, () => ctx.drawImage(book, bookX - 75, barTop + 17 - 60.3));
 
+    // One block per juz, juz 1 on the right to juz 30 on the left, numbered
+    // underneath. Filled from juz 1, or from juz 30 for a student who started
+    // at the end of the Quran.
     const cellsTop = barTop + 34 + 26;
     const cellW = (barW - 6 * (TOTAL_JUZ - 1)) / TOTAL_JUZ;
+    const fromEnd = startFrom === "last";
     for (let i = 0; i < TOTAL_JUZ; i++) {
+      const juzNo = i + 1;
+      const done = fromEnd ? juzNo > TOTAL_JUZ - juzCount : juzNo <= juzCount;
       const cx = inR - cellW - i * (cellW + 6);
       roundRect(ctx, cx, cellsTop, cellW, 16, 5);
-      if (i < juzCount) {
+      if (done) {
         const g = ctx.createLinearGradient(0, cellsTop, 0, cellsTop + 16);
         g.addColorStop(0, C.blue); g.addColorStop(1, C.teal);
         ctx.fillStyle = g;
       } else ctx.fillStyle = C.track;
       ctx.fill();
+      ctx.direction = "ltr";
+      ctx.textAlign = "center";
+      ctx.font = `${done ? 700 : 500} 15px ${INTER}`;
+      ctx.fillStyle = done ? C.navy : "#9AB0C6";
+      fillMid(ctx, String(juzNo), cx + cellW / 2, cellsTop + 16 + 15);
+      ctx.direction = "rtl";
     }
-
-    const footY = cellsTop + 16 + 16 + 19.5;
-    const t = { font: FARUMA, size: 26, color: C.foot, gap: 7 };
-    const n = { font: INTER, size: 26, weight: 500, color: C.foot, ltr: true, gap: 7 };
-    const b = { font: INTER, size: 26, weight: 700, color: C.navy, ltr: true, gap: 7 };
-    drawRuns(ctx, [{ ...n, text: String(TOTAL_JUZ) }, { ...t, text: TEXT.ofJuz }, { ...b, text: String(juzCount) }, { ...t, text: TEXT.juz }], inR, footY);
-    const done = [{ ...b, text: `${pct}%` }, { ...t, text: TEXT.complete }];
-    drawRuns(ctx, done, inL + runsWidth(ctx, done), footY);
   }
 
   // Prizes for each juz.
