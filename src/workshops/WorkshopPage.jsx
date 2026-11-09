@@ -162,14 +162,15 @@ export default function WorkshopPage() {
     <div className="wk" dir="rtl" lang="dv">
       <style>{CSS}</style>
       <main className="wk-wrap">
-        <Hero w={w} compact={step > 0 && !sent} />
+        {!sent && <Hero w={w} compact={step > 0} />}
 
         {sent ? (
-          <section className="wk-card wk-done" aria-live="polite">
-            <CheckCircle2 size={52} aria-hidden="true" />
+          <section className="wk-card wk-done wk-sent" aria-live="polite">
+            <img className="wk-done-logo" src="/images/logo-full-color.png" alt="Aflaah Quran Class" />
+            <CheckCircle2 size={56} aria-hidden="true" />
             <h2>ޝުކުރިއްޔާ!</h2>
-            <p>ރަޖިސްޓްރޭޝަން ލިބިއްޖެ. ސްލިޕް ޗެކްކުރުމަށްފަހު ވައިބަރ މެދުވެރިކޮށް ގުޅާނަން.</p>
-            <p className="wk-small"><Num>{students.length}</Num> ދަރިވަރުން · ޖުމްލަ <Num>{total}</Num> ރުފިޔާ</p>
+            <p>ސްލިޕް ވެރިފައިކުރުމަށްފަހު، ވޯކްޝޮޕްއަށް ޚާއްސަކުރެވިފައިވާ ގުރޫއްޕަށް އެޑް ކޮށްލެވިގެން ދާނެއެވެ.</p>
+            <p className="wk-small"><Num>{students.length}</Num> {students.length === 1 ? "ދަރިވަރު" : "ދަރިވަރުން"} · ޖުމްލަ <Num>{total}</Num> ރުފިޔާ</p>
           </section>
         ) : !open ? (
           <section className="wk-card wk-done">
@@ -365,6 +366,8 @@ const CSS = `
   .wk-submit:disabled { opacity: .65; cursor: progress; }
   .wk-small { margin: 12px 0 0; text-align: center; font-size: 14px; color: var(--muted); }
   .wk-done { text-align: center; }
+  .wk-sent { margin-top: max(24px, 18vh); padding: 28px 20px 30px; }
+  .wk-done-logo { display: block; width: 110px; margin: 0 auto 18px; }
   .wk-done svg { color: #1E8A5A; }
   .wk-done h2 { margin: 10px 0 6px; font: 400 26px/1.4 Aammu; }
   .wk-done p { margin: 0; font-size: 16px; line-height: 1.7; }

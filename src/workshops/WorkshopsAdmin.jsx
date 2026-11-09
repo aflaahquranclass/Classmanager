@@ -4,14 +4,24 @@
 // admin opens here to check. Accepting or rejecting only records the
 // decision; the admin contacts the family on Viber. Saved in
 // workshop_registrations (supabase/migrations/20261120_workshop_registrations.sql).
+// Once accepted, the admin can send the workshop's acceptance message by SMS
+// to the sign-up's Viber number(s) (the app's usual SMS, saved in
+// Notifications history).
 
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, Copy, ExternalLink, FileText, CalendarCheck, Users } from "lucide-react";
+import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, Copy, ExternalLink, FileText, CalendarCheck, Users, MessageSquare, Send, Check } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { WORKSHOPS } from "./workshops.js";
+import { createNotification } from "../notifications/smsSend.js";
+
+const MSG_AUDIENCE = "workshop_accepted";
+// The SMS is saved with this label in Notifications history; the tag at the
+// end links it back to the sign-up, so its card can show it was sent.
+const msgTag = (id) => `#${id.slice(0, 8)}`;
+const numbersOf = (r) => [...new Set((r.students || []).map((s) => String(s.viber).trim()).filter(Boolean))];
 
 const SLIP_BUCKET = "registration-slips";
 const FILTERS = [
@@ -58,6 +68,8 @@ export function AdminWorkshops({ showToast, onCountChange }) {
   const [all, setAll] = useState([]); // every sign-up for the summary
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [sentAt, setSentAt] = useState({}); // sign-up tag → { at, status } of its last message
+  const [compose, setCompose] = useState(null); // { id, text } — the message being written
 
   const load = useCallback(async () => {
     setError("");
@@ -67,6 +79,12 @@ export function AdminWorkshops({ showToast, onCountChange }) {
     if (err) { setError(err.message); setRows([]); setAll([]); return; }
     setAll(data || []);
     setRows((data || []).filter((r) => filter === "all" || r.status === filter));
+    const { data: notes } = await supabase.from("notifications").select("audience_label, created_at, notification_recipients(sms_status)").eq("audience", MSG_AUDIENCE).order("created_at");
+    setSentAt(Object.fromEntries((notes || []).map((n) => {
+      const st = (n.notification_recipients || []).map((x) => x.sms_status);
+      const status = st.length && st.every((x) => x === "sent") ? "sent" : st.some((x) => x === "failed" || x === "no_phone") ? "failed" : "pending";
+      return [n.audience_label?.split(" ").pop(), { at: n.created_at, status }];
+    })));
   }, [w.key, filter]);
 
   useEffect(() => { load(); }, [load]);
@@ -85,9 +103,29 @@ export function AdminWorkshops({ showToast, onCountChange }) {
     const { error: err } = await supabase.from("workshop_registrations").update({ status, reviewed_at: new Date().toISOString() }).eq("id", r.id);
     setBusyId(null);
     if (err) { showToast(`Couldn’t update: ${err.message}`); return; }
-    showToast(status === "accepted" ? "Sign-up accepted." : status === "rejected" ? "Sign-up rejected." : "Moved back to waiting.");
+    showToast(status === "accepted" ? "Sign-up accepted. Send them the message below." : status === "rejected" ? "Sign-up rejected." : "Moved back to waiting.");
+    if (status === "accepted" && w.acceptedMessage && !sentAt[msgTag(r.id)]) setCompose({ id: r.id, text: w.acceptedMessage });
     onCountChange?.();
     load();
+  };
+
+  const sendMessage = async (r) => {
+    const text = compose?.text?.trim();
+    if (!text) { showToast("Write the message first."); return; }
+    const numbers = numbersOf(r);
+    const name = r.students?.[0]?.name || "";
+    setBusyId(r.id);
+    const res = await createNotification({
+      title: "Workshop", body: text, audience: MSG_AUDIENCE,
+      audienceLabel: `Workshop accepted — ${name} ${msgTag(r.id)}`,
+      inApp: false, sms: true,
+      recipients: numbers.map((phone) => ({ name, phone, body: text })),
+    });
+    setBusyId(null);
+    if (!res.ok) { showToast(res.message); return; }
+    setCompose(null);
+    showToast(res.message || "Message sent.");
+    load(); // picks up the SMS status
   };
 
   const openSlip = async (r) => {
@@ -189,6 +227,24 @@ export function AdminWorkshops({ showToast, onCountChange }) {
                 ))}
               </ol>
               <div className="wa-sent">Sent {fmtWhen(r.created_at)}{r.reviewed_at ? ` · checked ${fmtWhen(r.reviewed_at)}` : ""}</div>
+              {r.status === "accepted" && w.acceptedMessage && (compose?.id === r.id ? (
+                <div className="wa-msg">
+                  <div className="wa-msg-head"><MessageSquare size={16} aria-hidden="true" /> SMS to {numbersOf(r).join(", ")}</div>
+                  <textarea className="wa-msg-text" dir="rtl" lang="dv" rows={9} value={compose.text} onChange={(e) => setCompose({ id: r.id, text: e.target.value })} />
+                  <div className="wa-msg-actions">
+                    <button type="button" className="tp-btn-gradient" disabled={busy} onClick={() => sendMessage(r)}><Send size={16} aria-hidden="true" /> {busy ? "Sending…" : "Send SMS"}</button>
+                    <button type="button" className="tp-btn-outline" disabled={busy} onClick={() => setCompose(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : sentAt[msgTag(r.id)] ? (
+                <div className={`wa-msg-done ${sentAt[msgTag(r.id)].status}`}>
+                  {sentAt[msgTag(r.id)].status === "sent" ? <Check size={16} aria-hidden="true" /> : <MessageSquare size={16} aria-hidden="true" />}
+                  {sentAt[msgTag(r.id)].status === "sent" ? "SMS sent" : sentAt[msgTag(r.id)].status === "failed" ? "SMS failed" : "SMS waiting to send"} · {fmtWhen(sentAt[msgTag(r.id)].at)}
+                  <button type="button" className="wa-link-btn" onClick={() => setCompose({ id: r.id, text: w.acceptedMessage })}>{sentAt[msgTag(r.id)].status === "sent" ? "Send again" : "Try again"}</button>
+                </div>
+              ) : (
+                <button type="button" className="tp-btn-gradient wa-msg-btn" onClick={() => setCompose({ id: r.id, text: w.acceptedMessage })}><MessageSquare size={17} aria-hidden="true" /> Send message</button>
+              ))}
               <div className="wa-actions">
                 <button type="button" className="tp-btn-outline" disabled={busy} onClick={() => openSlip(r)}><FileText size={17} aria-hidden="true" /> View slip</button>
                 {r.status !== "accepted" && <button type="button" className="tp-btn-gradient" disabled={busy} onClick={() => setStatus(r, "accepted")}><CheckCircle2 size={17} aria-hidden="true" /> Accept</button>}
@@ -238,4 +294,14 @@ const waCss = () => `
   .wa-actions button { flex: 1 1 auto; justify-content: center; }
   .wa-actions .wa-delete { flex: 0 0 auto; color: #A5432C; border-color: #E3C3BA; }
   .wa-reject { color: #A5432C; border-color: #E3C3BA; }
+  .wa-msg { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; background: #F3F8FC; border: 1px solid ${TP.border}; }
+  .wa-msg-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: ${TP.navy}; }
+  .wa-msg-text { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid ${TP.border}; border-radius: 10px; font: 16px/1.7 ${THAANA_FONT}; color: ${TP.navy}; background: #fff; resize: vertical; }
+  .wa-msg-text:focus { outline: 2px solid ${TP.blue}; outline-offset: 0; }
+  .wa-msg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .wa-msg-btn { justify-content: center; }
+  .wa-msg-done { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 8px 12px; border-radius: 10px; background: #E3F5EA; color: #1E7A4C; font-size: 13px; font-weight: 700; }
+  .wa-msg-done.failed { background: #FBE9E4; color: #A5432C; }
+  .wa-msg-done.pending { background: #FDF3DC; color: #9C6B12; }
+  .wa-link-btn { margin-left: auto; border: none; background: none; color: ${TP.blue}; font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
 `;
