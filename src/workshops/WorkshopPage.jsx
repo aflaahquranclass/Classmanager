@@ -65,8 +65,10 @@ function CopyButton({ text }) {
 function Hero({ w, compact }) {
   const head = (
     <>
-      <img className="wk-logo" src="/images/logo-full-color.png" alt="Aflaah Quran Class" />
-      <div className="wk-label">{w.label}</div>
+      <div className="wk-top">
+        <div className="wk-label">{w.label}</div>
+        <img className="wk-logo" src="/images/logo-full-color.png" alt="Aflaah Quran Class" />
+      </div>
       <h1 className="wk-title"><span className="t1">{w.title[0]}</span> <span className="t2">{w.title[1]}</span></h1>
     </>
   );
@@ -79,7 +81,7 @@ function Hero({ w, compact }) {
       <div className="wk-speaker">
         <img src={w.speaker.photo} alt={w.speaker.name} />
         <div>
-          <div className="wk-speaker-name">{w.speaker.name}</div>
+          <div className="wk-speaker-name">{w.speaker.name.split(" ")[0]}<b>{w.speaker.name.split(" ").slice(1).join(" ")}</b></div>
           <ul>{w.speaker.lines.map((l) => <li key={l}>{l}</li>)}</ul>
         </div>
       </div>
@@ -286,33 +288,37 @@ const CSS = `
     min-height: 100vh; font-family: Faruma, Inter, system-ui, sans-serif; color: var(--navy);
     background: url("/images/tp-pattern-main.png") right -180px top -160px / 720px no-repeat, linear-gradient(180deg, #FFFFFF 0%, #F3F8FC 100%); }
   .wk *, .wk *::before, .wk *::after { box-sizing: border-box; }
-  .wk-wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 48px; }
+  .wk-wrap { max-width: 640px; margin: 0 auto; padding: 14px 16px 32px; }
   .wk-num { font-family: Inter, sans-serif; font-weight: 700; unicode-bidi: isolate; white-space: nowrap; }
 
   .wk-hero { position: relative; text-align: right; }
-  .wk-logo { width: 104px; display: block; margin: 0 auto 14px 0; } /* left, opposite the heading */
-  .wk-label { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px 8px; border-radius: 999px; background: var(--grad); color: #fff; font: 17px/1.4 Aammu; box-shadow: 0 8px 18px rgba(13,79,133,.2); }
+  /* Logo small on the left, the session label on the right, one row. */
+  .wk-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .wk-logo { width: 64px; flex-shrink: 0; display: block; }
+  .wk-label { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px 8px; border-radius: 999px; background: var(--grad); color: #fff; font: 15px/1.4 Aammu; box-shadow: 0 8px 18px rgba(13,79,133,.2); }
   .wk-label::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--cyan); }
-  .wk-title { margin: 18px 0 0; font: 400 clamp(38px, 10.5vw, 60px)/1.25 Aammu; }
+  .wk-title { margin: 12px 0 0; font: 400 clamp(38px, 10.5vw, 60px)/1.25 Aammu; }
   .wk-title span { display: inline-block; padding: .2em .03em .3em; margin: -.2em -.03em -.3em; -webkit-background-clip: text; background-clip: text; color: transparent; }
   .wk-title .t1 { background-image: var(--grad); }
   .wk-title .t2 { background-image: linear-gradient(120deg, var(--teal), var(--cyan)); }
-  .wk-title::after { content: ""; display: block; height: 4px; margin-top: 10px; border-radius: 999px; background: linear-gradient(270deg, var(--deep), var(--blue) 40%, var(--cyan) 75%, rgba(34,211,224,0)); }
-  .wk-age { display: inline-flex; align-items: center; gap: 8px; margin-top: 16px; padding: 6px 14px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); font-size: 16px; color: var(--navy); }
+  .wk-title::after { content: ""; display: block; height: 4px; margin-top: 6px; border-radius: 999px; background: linear-gradient(270deg, var(--deep), var(--blue) 40%, var(--cyan) 75%, rgba(34,211,224,0)); }
+  .wk-age { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; padding: 4px 12px; border-radius: 12px; background: var(--soft); border: 1px solid var(--line); font-size: 15px; color: var(--navy); }
   .wk-age svg { color: var(--blue); }
 
-  .wk-speaker { position: relative; display: flex; align-items: flex-end; gap: 14px; margin-top: 64px; min-height: 150px; padding: 18px 18px 18px 0; border-radius: 22px; background: var(--grad); color: #fff; box-shadow: 0 16px 36px rgba(13,79,133,.25); }
-  .wk-speaker img { position: absolute; left: 10px; bottom: 0; height: 205px; width: auto; filter: drop-shadow(0 6px 8px rgba(6,30,60,.18)); }
-  .wk-speaker > div { margin-left: 150px; align-self: center; }
-  .wk-speaker-name { font: 22px/1.4 Aammu; }
-  .wk-speaker ul { margin: 6px 0 0; padding: 0; list-style: none; font-size: 14px; line-height: 1.6; }
+  .wk-speaker { position: relative; display: flex; align-items: flex-end; gap: 14px; margin-top: 46px; min-height: 124px; padding: 14px 16px 14px 0; border-radius: 22px; background: var(--grad); color: #fff; box-shadow: 0 16px 36px rgba(13,79,133,.25); }
+  .wk-speaker img { position: absolute; left: 10px; bottom: 0; height: 168px; width: auto; filter: drop-shadow(0 6px 8px rgba(6,30,60,.18)); }
+  .wk-speaker > div { flex: 1; margin-left: 150px; min-width: 0; align-self: center; }
+  .wk-speaker-name { font: 14px/1.3 Aammu; opacity: .9; }
+  .wk-speaker-name b { display: block; font-weight: 400; font-size: clamp(18px, 5.4vw, 24px); line-height: 1.4; white-space: nowrap; opacity: 1; }
+  .wk-speaker ul { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.55; overflow-wrap: anywhere; }
   .wk-speaker li::before { content: "• "; color: var(--cyan); }
 
-  .wk-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
-  .wk-fact { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 16px; background: #fff; border: 1px solid var(--line); }
-  .wk-fact svg { flex-shrink: 0; width: 38px; height: 38px; padding: 9px; border-radius: 11px; background: var(--grad); color: #fff; }
-  .wk-fact b { display: block; font: 400 16px/1.45 Aammu; }
-  .wk-fact div > span { display: block; font-size: 13px; color: var(--muted); }
+  .wk-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 10px; }
+  .wk-fact { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 16px; background: #fff; border: 1px solid var(--line); }
+  .wk-fact svg { flex-shrink: 0; width: 32px; height: 32px; padding: 7px; border-radius: 10px; background: var(--grad); color: #fff; }
+  .wk-fact b { display: block; font: 400 15px/1.4 Aammu; }
+  .wk-fact div > span { display: block; font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+  .wk-fact > div { min-width: 0; }
   .wk-fact.online b { color: #D92D20; }
   .wk-fact.online svg { background: linear-gradient(135deg, #F04438, #B42318); }
 
@@ -374,11 +380,11 @@ const CSS = `
   .wk-msg { padding: 60px 0; text-align: center; font-size: 18px; }
 
   /* Form steps: a smaller header, the step dots, back and next */
-  .wk-hero.compact .wk-logo { width: 72px; margin-bottom: 4px; }
+  .wk-hero.compact .wk-logo { width: 56px; margin-right: auto; }
   .wk-hero.compact .wk-label { display: none; }
   .wk-hero.compact .wk-title { margin-top: 10px; font-size: clamp(26px, 7vw, 36px); }
   .wk-hero.compact .wk-title::after { height: 3px; margin-top: 6px; }
-  .wk-start { margin-top: 22px; }
+  .wk-start { margin-top: 14px; }
   .wk-steps { display: flex; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
   .wk-steps li { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 12px; background: #fff; border: 1px solid var(--line); color: var(--muted); font-size: 15px; }
   .wk-steps li span { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; background: var(--soft); color: var(--blue); font-size: 13px; }
