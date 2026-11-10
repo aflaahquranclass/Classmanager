@@ -49,12 +49,41 @@ export const isWorkshopOpen = (w) =>
 
 // Same private bucket and rules as class registration slips.
 const BUCKET = "registration-slips";
-export const SLIP_MAX_BYTES = 5 * 1024 * 1024;
+export const SLIP_MAX_BYTES = 5 * 1024 * 1024; // the bucket's limit
+// A bigger phone photo is shrunk before upload, so up to this size is fine.
+export const SLIP_PICK_MAX_BYTES = 25 * 1024 * 1024;
+
+// Phone photos of slips are often several MB. A photo bigger than 1.5 MB is
+// redrawn at most 2000 px on its long side as a JPEG, which keeps the text
+// readable and makes it a few hundred KB. PDFs, and photos the browser can't
+// open (e.g. HEIC outside Safari), are sent as they are.
+export async function shrinkSlip(file) {
+  if (!file.type.startsWith("image/") || file.size <= 1.5 * 1024 * 1024) return file;
+  try {
+    const img = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const k = Math.min(1, 2000 / Math.max(img.width, img.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.width * k);
+    c.height = Math.round(img.height * k);
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    img.close?.();
+    const blob = await new Promise((resolve) => c.toBlob(resolve, "image/jpeg", 0.85));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
 export const SLIP_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,application/pdf";
 
 // students: [{ name, age, address, viber }]. Uploads the slip under new/, then
 // files the sign-up. The visitor can't read either back; only admins can.
-export async function submitWorkshopRegistration({ workshop, students, file }) {
+export async function submitWorkshopRegistration({ workshop, students, file: picked }) {
+  const file = await shrinkSlip(picked);
+  if (file.size > SLIP_MAX_BYTES) throw new Error("bigSlip");
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
   const path = `new/workshop-${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
   const up = await supabase.storage.from(BUCKET).upload(path, file, { contentType: file.type || undefined });

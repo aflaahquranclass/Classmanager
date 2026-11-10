@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { CheckCircle2, Send, Upload, FileText, Landmark, Copy, Check, Plus, Trash2, Users, CalendarDays, Clock, Video, Banknote, Lock, ArrowLeft, ArrowRight } from "lucide-react";
 import { BANK } from "../payments/slips.js";
-import { WORKSHOPS, workshopSlugOf, isWorkshopOpen, submitWorkshopRegistration, SLIP_ACCEPT, SLIP_MAX_BYTES } from "./workshops.js";
+import { WORKSHOPS, workshopSlugOf, isWorkshopOpen, submitWorkshopRegistration, SLIP_ACCEPT, SLIP_PICK_MAX_BYTES } from "./workshops.js";
 
 const MAX_STUDENTS = 10;
 const EMPTY = { name: "", age: "", address: "", viber: "" };
@@ -20,7 +20,7 @@ const ERRORS = {
   invalid: "ދަރިވަރުންގެ މަޢުލޫމާތު ބައްލަވާފައި އަލުން ފޮނުއްވާ.",
   save: "ރަޖިސްޓްރޭޝަން ނުފޮނުވުނު. އަލުން މަސައްކަތް ކުރައްވާ.",
   noSlip: "ފައިސާ ޖަމާކުރި ސްލިޕް އަޕްލޯޑް ކުރައްވާ.",
-  bigSlip: "ސްލިޕްގެ ފައިލް 5 MB އަށްވުރެ ބޮޑު. ކުޑަ ފައިލެއް އަޕްލޯޑް ކުރައްވާ.",
+  bigSlip: "ސްލިޕްގެ ފައިލް ވަރަށް ބޮޑު. ސްކްރީންޝޮޓެއް ނުވަތަ ކުޑަ ފައިލެއް އަޕްލޯޑް ކުރައްވާ.",
 };
 
 // What is wrong with one student's details, or "".
@@ -126,7 +126,7 @@ export default function WorkshopPage() {
   const chooseFile = (e) => {
     const f = e.target.files?.[0] || null;
     setError("");
-    if (f && f.size > SLIP_MAX_BYTES) { setFile(null); setError(ERRORS.bigSlip); e.target.value = ""; return; }
+    if (f && f.size > SLIP_PICK_MAX_BYTES) { setFile(null); setError(ERRORS.bigSlip); e.target.value = ""; return; }
     setFile(f);
   };
 
@@ -257,7 +257,7 @@ export default function WorkshopPage() {
                   <span>ފައިސާ ޖަމާކުރި ސްލިޕް</span>
                   <span className={`wk-file ${file ? "on" : ""}`}>
                     {file ? <FileText size={20} aria-hidden="true" /> : <Upload size={20} aria-hidden="true" />}
-                    <span>{file ? <span dir="ltr">{file.name}</span> : "ސްލިޕްގެ ފޮޓޯއެއް ނުވަތަ PDF އެއް އަޕްލޯޑް ކުރައްވާ (5 MB އަށްވުރެ ކުޑަ)"}</span>
+                    <span>{file ? <span dir="ltr">{file.name}</span> : "ސްލިޕްގެ ފޮޓޯއެއް ނުވަތަ PDF އެއް އަޕްލޯޑް ކުރައްވާ"}</span>
                     <input type="file" accept={SLIP_ACCEPT} onChange={chooseFile} />
                   </span>
                 </label>

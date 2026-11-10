@@ -9,7 +9,7 @@
 // Notifications history).
 
 import { useState, useEffect, useCallback } from "react";
-import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, Copy, ExternalLink, FileText, CalendarCheck, Users, MessageSquare, Send, Check } from "lucide-react";
+import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, Copy, ExternalLink, FileText, CalendarCheck, Users, MessageSquare, Send, Check, Search, Download, Phone } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../App.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
@@ -64,6 +64,7 @@ export function AdminWorkshops({ showToast, onCountChange }) {
   const [slug, setSlug] = useState(LIST[0].slug);
   const w = WORKSHOPS[slug];
   const [filter, setFilter] = useState("pending");
+  const [search, setSearch] = useState("");
   const [rows, setRows] = useState(null); // this filter
   const [all, setAll] = useState([]); // every sign-up for the summary
   const [error, setError] = useState("");
@@ -154,6 +155,41 @@ export function AdminWorkshops({ showToast, onCountChange }) {
     load();
   };
 
+  // With ~100 sign-ups: find one by name, number or address.
+  const term = search.trim().toLowerCase();
+  const shown = (rows || []).filter((r) => !term || (r.students || []).some((s) =>
+    [s.name, s.address, s.viber].some((x) => String(x || "").toLowerCase().includes(term))));
+
+  // Every accepted family's Viber number, once each, for adding to the
+  // workshop's Viber group.
+  const copyNumbers = async () => {
+    const nums = [...new Set(all.filter((r) => r.status === "accepted").flatMap(numbersOf))];
+    if (!nums.length) { showToast("No accepted sign-ups yet."); return; }
+    const text = nums.join("\n");
+    try { await navigator.clipboard.writeText(text); showToast(`${nums.length} Viber number${nums.length === 1 ? "" : "s"} copied.`); }
+    catch { showToast(text); }
+  };
+
+  // The whole list as a spreadsheet (CSV, opens in Excel), one row per student.
+  const downloadList = () => {
+    const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const head = ["Status", "Name", "Age", "Address", "Viber", "Students in sign-up", "Total (MVR)", "Sent", "SMS"];
+    const lines = all.flatMap((r) => (r.students || []).map((st) => [
+      STATUS[r.status].label, st.name, st.age, st.address, st.viber, r.student_count, r.total,
+      new Date(r.created_at).toLocaleString("en-GB", { timeZone: "Indian/Maldives" }),
+      sentAt[msgTag(r.id)]?.status || "",
+    ].map(cell).join(",")));
+    const blob = new Blob(["\ufeff" + [head.map(cell).join(","), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `Workshop sign-ups - ${slug} - ${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
   const copyLink = async () => {
     const url = pageUrl(slug);
     try { await navigator.clipboard.writeText(url); showToast("Sign-up link copied."); }
@@ -196,22 +232,30 @@ export function AdminWorkshops({ showToast, onCountChange }) {
           <div><dt>Waiting</dt><dd>{summary.waiting}</dd></div>
         </dl>
         <p className="wa-note">Totals leave out rejected sign-ups.</p>
+        <div className="wa-link-actions">
+          <button type="button" className="tp-btn-outline" onClick={copyNumbers}><Phone size={16} aria-hidden="true" /> Copy accepted Viber numbers</button>
+          <button type="button" className="tp-btn-outline" onClick={downloadList} disabled={!all.length}><Download size={16} aria-hidden="true" /> Download list (Excel)</button>
+        </div>
       </div>
 
       <div className="tp-segment" role="group" aria-label="Sign-up status" style={{ marginBottom: 0, alignSelf: "flex-start" }}>
         {FILTERS.map((x) => (
-          <button key={x.key} type="button" aria-pressed={filter === x.key} className={`tp-segment-btn ${filter === x.key ? "tp-segment-btn-active" : ""}`} onClick={() => setFilter(x.key)}>{x.label}</button>
+          <button key={x.key} type="button" aria-pressed={filter === x.key} className={`tp-segment-btn ${filter === x.key ? "tp-segment-btn-active" : ""}`} onClick={() => setFilter(x.key)}>{x.label}{x.key !== "all" ? ` (${all.filter((r) => r.status === x.key).length})` : ` (${all.length})`}</button>
         ))}
       </div>
+      <label className="wa-search">
+        <Search size={17} aria-hidden="true" />
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, Viber number or address" dir="auto" />
+      </label>
 
       {error && <div className="tp-card wa-error" role="alert">Couldn’t load sign-ups: {error}</div>}
       {rows === null && <div className="tp-card">Loading…</div>}
-      {rows && rows.length === 0 && !error && (
-        <div className="tp-card wa-empty">{filter === "pending" ? "No sign-ups waiting." : "No sign-ups here."}</div>
+      {rows && shown.length === 0 && !error && (
+        <div className="tp-card wa-empty">{term ? "No sign-ups match the search." : filter === "pending" ? "No sign-ups waiting." : "No sign-ups here."}</div>
       )}
 
       <div className="wa-grid">
-        {(rows || []).map((r) => {
+        {shown.map((r) => {
           const st = STATUS[r.status];
           const busy = busyId === r.id;
           return (
@@ -305,6 +349,9 @@ const waCss = () => `
   .wa-actions button { flex: 1 1 auto; justify-content: center; }
   .wa-actions .wa-delete { flex: 0 0 auto; color: #A5432C; border-color: #E3C3BA; }
   .wa-reject { color: #A5432C; border-color: #E3C3BA; }
+  .wa-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; min-height: 44px; border: 1px solid ${TP.border}; border-radius: 12px; background: #fff; color: ${TP.secondaryText}; }
+  .wa-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 15px; color: ${TP.navy}; }
+  .wa-search:focus-within { outline: 2px solid ${TP.blue}; }
   .wa-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(18,59,103,.45); }
   .wa-dialog { width: min(100%, 520px); max-height: calc(100vh - 32px); overflow: auto; display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 18px; background: #fff; box-shadow: 0 24px 60px rgba(8,30,60,.35); }
   .wa-dialog h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 18px; color: ${TP.navy}; }
