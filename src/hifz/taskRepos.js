@@ -7,7 +7,7 @@
 //   getProfile() → profile | null          saveProfile(plan)   (see tasks.js: profile)
 //   getGoal() → goalYear | null            saveGoal(goalYear)  (the student's own target year)
 //   getLegacy() → { settings, rows } | null  (the student's old self-made plan)
-//   listTasks() → tasks                    addTasks([{ taskDate, activity, start, end, notes }])
+//   listTasks() → tasks                    addTasks([{ taskDate, activity, start, end, startAyah?, endAyah?, notes }])
 //   updateTask(id, patch)                  deleteTask(id)
 //   setTaskDone(id, done)                  (teacher: approved, the task is complete)
 //   setStudentDone(id, done)               (student: "I've finished", waits for the teacher)
@@ -22,15 +22,18 @@ import { selectAll } from "../thilawa/repos.js";
 
 const taskFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, taskDate: r.task_date, activity: r.activity, start: r.start_unit, end: r.end_unit,
-  notes: r.notes || "", completedAt: r.completed_at, studentDoneAt: r.student_done_at || null, createdAt: r.created_at, updatedAt: r.updated_at,
+  startAyah: r.start_ayah ?? null, endAyah: r.end_ayah ?? null, notes: r.notes || "", completedAt: r.completed_at, studentDoneAt: r.student_done_at || null, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const mistakeFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, taskId: r.task_id, page: r.page, line: r.word_line, verseKey: r.verse_key, position: r.word_position,
   wordText: r.word_text || "", category: r.category || null, note: r.note || "", correctedAt: r.corrected_at, tickedAt: r.student_ticked_at || null, createdAt: r.created_at,
 });
+// A portion changed without its ayahs (e.g. typed in by page and line) is no
+// longer the one marked by ayah: those are cleared.
+const withAyahs = (p) => (("start" in p || "end" in p) && !("startAyah" in p) ? { ...p, startAyah: null, endAyah: null } : p);
 const taskPatchToDb = (p) => {
-  const map = { taskDate: "task_date", activity: "activity", start: "start_unit", end: "end_unit", notes: "notes" };
-  return Object.fromEntries(Object.entries(p).filter(([k]) => map[k]).map(([k, v]) => [map[k], k === "notes" ? (v?.trim() || null) : v]));
+  const map = { taskDate: "task_date", activity: "activity", start: "start_unit", end: "end_unit", startAyah: "start_ayah", endAyah: "end_ayah", notes: "notes" };
+  return Object.fromEntries(Object.entries(p).filter(([k]) => map[k]).map(([k, v]) => [map[k], k === "notes" ? (v?.trim() || null) : v ?? null]));
 };
 
 const profileFromDb = (r) => ({
@@ -81,7 +84,7 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
       // One insert, so the student gets one notification for the whole set.
       check(await supabase.from("hifz_tasks").insert(rows.map((t) => ({ student_id: studentId, teacher_id: teacherId, ...taskPatchToDb(t) }))));
     },
-    async updateTask(id, patch) { check(await supabase.from("hifz_tasks").update(taskPatchToDb(patch)).eq("id", id).eq("student_id", studentId)); },
+    async updateTask(id, patch) { check(await supabase.from("hifz_tasks").update(taskPatchToDb(withAyahs(patch))).eq("id", id).eq("student_id", studentId)); },
     async deleteTask(id) { check(await supabase.from("hifz_tasks").delete().eq("id", id).eq("student_id", studentId)); },
     async setStudentDone(id, done) {
       check(await supabase.from("hifz_tasks").update({ student_done_at: done ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
@@ -146,14 +149,15 @@ export function createMemoryHifzRepo(store, studentId, { asStudent = false, teac
     async addTasks(rows) {
       teacherOnly();
       for (const t of rows) {
-        store.tasks.push({ notes: "", ...clone(t), id: `h${store.nextId++}`, studentId, teacherId, completedAt: null, studentDoneAt: null, createdAt: stamp() });
+        store.tasks.push({ notes: "", startAyah: null, endAyah: null, ...clone(t), id: `h${store.nextId++}`, studentId, teacherId, completedAt: null, studentDoneAt: null, createdAt: stamp() });
       }
       changed();
     },
     async updateTask(id, patch) {
       teacherOnly();
       const row = find("tasks", id);
-      for (const k of ["taskDate", "activity", "start", "end", "notes"]) if (patch[k] !== undefined) row[k] = patch[k];
+      const p = withAyahs(patch);
+      for (const k of ["taskDate", "activity", "start", "end", "startAyah", "endAyah", "notes"]) if (p[k] !== undefined) row[k] = p[k];
       changed();
     },
     async deleteTask(id) { teacherOnly(); find("tasks", id); store.tasks = store.tasks.filter((t) => t.id !== id); changed(); },

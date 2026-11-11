@@ -59,11 +59,10 @@ export function MistakeCategoryPicker({ value, onChange, disabled }) {
   );
 }
 
-// Pop-up next to a marked word: what kind of mistake it is, Corrected or
-// Remove. `anchor` is the word on screen (from MushafPage's onWordTap); it sits
-// below the word, or above it near the bottom of the screen, and follows it as
-// the page scrolls. Without the word on screen it docks at the bottom.
-export function MistakePopup({ anchor, mistake, busy, onCategory, onCorrected, onRemove, onClose }) {
+// A pop-up next to `anchor` (an element on screen): under it, or above when
+// there's no room; docked at the bottom when the anchor is gone. Esc closes it
+// before anything behind it. `deps`: what changes its size.
+export function AnchoredPopup({ anchor, label, onClose, deps = [], children }) {
   const ref = useRef(null);
   const [pos, setPos] = useState(null);
   useLayoutEffect(() => {
@@ -85,16 +84,27 @@ export function MistakePopup({ anchor, mistake, busy, onCategory, onCorrected, o
     window.addEventListener("scroll", later, true);
     window.addEventListener("resize", later);
     return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", later, true); window.removeEventListener("resize", later); };
-  }, [anchor, mistake.id, mistake.category]);
-  // Esc closes the pop-up before anything behind it.
+  }, [anchor, ...deps]);
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onClose]);
   return (
-    <div ref={ref} className={`mc-pop ${pos ? "" : "mc-pop-docked"}`} style={pos || undefined} role="dialog" aria-label="Marked word">
+    <div ref={ref} className={`mc-pop ${pos ? "" : "mc-pop-docked"}`} style={pos || undefined} role="dialog" aria-label={label}>
       <style>{CSS}</style>
+      {children}
+    </div>
+  );
+}
+
+// Pop-up next to a marked word: what kind of mistake it is, Corrected or
+// Remove. `anchor` is the word on screen (from MushafPage's onWordTap); it sits
+// below the word, or above it near the bottom of the screen, and follows it as
+// the page scrolls. Without the word on screen it docks at the bottom.
+export function MistakePopup({ anchor, mistake, busy, onCategory, onCorrected, onRemove, onClose }) {
+  return (
+    <AnchoredPopup anchor={anchor} label="Marked word" onClose={onClose} deps={[mistake.id, mistake.category]}>
       <div className="mc-pop-head">
         <b lang="ar">{mistake.wordText}</b>
         <span>Page {mistake.page} · Ayah {mistake.verseKey}</span>
@@ -106,7 +116,7 @@ export function MistakePopup({ anchor, mistake, busy, onCategory, onCorrected, o
         <button type="button" className="hz-btn hz-btn-primary" disabled={busy} onClick={onCorrected}><Check size={16} aria-hidden="true" />Corrected</button>
         <button type="button" className="hz-btn hz-btn-outline" disabled={busy} onClick={onRemove}>Remove</button>
       </div>
-    </div>
+    </AnchoredPopup>
   );
 }
 

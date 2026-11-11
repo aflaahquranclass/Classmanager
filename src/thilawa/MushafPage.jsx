@@ -8,7 +8,11 @@
 // fades the lines outside a portion; `marks` highlights mistakes (open in
 // red, or their category's colour, with no outline; corrected in green when `showCorrected`); `onWordTap(word)` lets the
 // teacher tap words (`selectedKey`: the word the pop-up is for); `letters`
-// (Arabic letters) shows those letters in orange. A word is one glyph in these
+// (Arabic letters) shows those letters in orange. `ayahMarks`
+// ({ "2:6": "new" | "short" | "both" }) fills those ayah numbers with the
+// activity's colour (where a New Hifz or Short Muraja'ah starts and ends);
+// `onAyahTap({ verseKey, page, line, el })` lets the teacher tap ayah numbers
+// (`selectedAyah`: the one a menu is open for). A word is one glyph in these
 // fonts, so a word with any of them is drawn from its text in the King Fahd
 // Complex's Uthmanic Hafs font instead, fitted to the printed word's width,
 // with just those letters in orange.
@@ -256,6 +260,16 @@ ${MISTAKE_CATEGORIES.map((c) => `  .mp-mistake.mp-cat-${c.id} { color: ${c.fg}; 
 ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyframes mp-mark-${n} { from { opacity: 0; transform: scale(0.6); } 60% { opacity: 1; transform: scale(1.1); } to { transform: none; } }`).join("\n")}
   @media (prefers-reduced-motion: reduce) { .mp-word::before { animation: none !important; } }
   .mp-tap:focus-visible { outline: 2px solid #176FD1; outline-offset: 1px; }
+  /* Ayah numbers: tappable for the teacher; a marked one is filled with its
+     activity's colour (New Hifz blue, Short Muraja'ah teal, both half and half). */
+  .mp-end.mp-ayah-tap { cursor: pointer; }
+  .mp-end.mp-ayah-tap:hover::before { background: #FFF1C2; border-radius: 50%; }
+  .mp-end.mp-ayah-on::before { border-radius: 50%; inset: -0.07em; animation: mp-mark-plain 340ms ease-out; }
+  .mp-end.mp-ayah-on { color: #FFFFFF; }
+  .mp-ayah-new::before, .mp-end.mp-ayah-tap.mp-ayah-new:hover::before { background: #176FD1; }
+  .mp-ayah-short::before, .mp-end.mp-ayah-tap.mp-ayah-short:hover::before { background: #0A7F96; }
+  .mp-ayah-both::before, .mp-end.mp-ayah-tap.mp-ayah-both:hover::before { background: linear-gradient(90deg, #176FD1 50%, #0A7F96 50%); }
+  .mp-ayah-sel::after { content: ""; position: absolute; inset: -0.12em; border-radius: 50%; border: 0.06em dashed #123B67; pointer-events: none; }
   .mp-surah { display: flex; align-items: center; justify-content: center; height: 1.95em; }
   .mp-frame { position: relative; width: 100%; height: 1.55em; display: flex; align-items: center; justify-content: center; border-radius: 0.3em;
     background: linear-gradient(90deg, #DCEBFB, #F3F8FE 30%, #F3F8FE 70%, #DCEBFB); border: 0.06em solid #176FD1; box-shadow: inset 0 0 0 0.08em #FFFFFF, inset 0 0 0 0.11em #8DBBEA; }
@@ -272,7 +286,7 @@ ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyf
 
 // `wordStyles` ({ "78:1:2": { background, opacity, … } }) styles single words,
 // e.g. Check my Reading colouring each word as it is recited.
-export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null }) {
+export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null, ayahMarks = null, onAyahTap = null, selectedAyah = null }) {
   const [state, setState] = useState({ status: "loading", page, lines: [] });
   const [attempt, setAttempt] = useState(0);
   const bodyRef = useRef(null);
@@ -395,7 +409,17 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
                     ? <><span className="mp-glyph">{w.code}</span><span className="mp-hafs" aria-hidden="true">{parts.map((p, j) => (p.on ? <b key={j}>{p.text}</b> : p.text))}</span></>
                     : w.code;
                   const style = wordStyles?.[w.key];
-                  if (!onWordTap || w.end) return <span key={k} className={cls} style={style}>{glyph}</span>;
+                  if (w.end) {
+                    const kind = ayahMarks?.[w.verseKey];
+                    const ayahCls = `${cls} ${kind ? `mp-ayah-on mp-ayah-${kind}` : ""} ${selectedAyah === w.verseKey ? "mp-ayah-sel" : ""}`;
+                    if (!onAyahTap) return <span key={k} className={ayahCls} style={style}>{glyph}</span>;
+                    const tapAyah = (e) => onAyahTap({ verseKey: w.verseKey, page, line: line.line, el: e.currentTarget });
+                    return (
+                      <span key={k} className={`${ayahCls} mp-ayah-tap`} style={style} role="button" tabIndex={0} aria-label={`Ayah ${w.verseKey}${kind ? " (marked)" : ""}`}
+                        onClick={tapAyah} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tapAyah(e); } }}>{glyph}</span>
+                    );
+                  }
+                  if (!onWordTap) return <span key={k} className={cls} style={style}>{glyph}</span>;
                   // el: the word on screen, for a pop-up next to it.
                   const tap = (e) => onWordTap({ ...w, page, line: line.line, el: e.currentTarget });
                   return (

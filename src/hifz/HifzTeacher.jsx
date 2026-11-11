@@ -2,6 +2,8 @@
 // Short and Long Muraja'ah portions for a day — changes or moves them, sets
 // the next day's portion in one tap, and while listening highlights mistakes
 // on the Madinah Mushaf (tap a word), clearing each one once it's corrected.
+// The next class's New Hifz and Short Muraja'ah are marked on the Mushaf too:
+// tap the ayah number where each starts, then where it ends.
 // The student's portal updates live and they get a phone notification.
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -14,13 +16,14 @@ import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, useHifz,
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, subtract, localDate } from "./engine.js";
 import { downloadClassTasks } from "./taskImage.js";
-import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE } from "./tasks.js";
+import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE, ayahNumber, ayahPortion, ayahMarksOf, nextClassDay } from "./tasks.js";
+import { ayahRef } from "./ayahs.js";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { loadHifz } from "./taskService.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
 import ClassBrowser from "../thilawa/ClassBrowser.jsx";
-import { MistakePopup, MistakeLegend } from "../thilawa/MistakeCategories.jsx";
+import { MistakePopup, MistakeLegend, AnchoredPopup } from "../thilawa/MistakeCategories.jsx";
 
 const teacherCss = `
   .ht { display: flex; flex-direction: column; gap: 18px; }
@@ -134,9 +137,32 @@ const teacherCss = `
     background: #FFFFFF; border-top: 1px solid #DCEBF8; box-shadow: 0 -6px 20px rgba(18,59,103,0.08); }
   .ht-full-foot .hz-btn { min-height: 48px; padding: 0 22px; font-size: 15px; }
   .ht-confirm { background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 16px; padding: 16px; }
+  .ht-dot { display: inline-block; flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; }
+  .ht-dot-new { background: #176FD1; }
+  .ht-dot-short { background: #0A7F96; }
+  .ht-dot-long { background: #5B4BB7; }
+  .ht-mark-hint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: #E4F1FC; color: #0D4F85; font-size: 14px; }
+  .ht-mark-hint b { font-weight: 700; }
+  .ht-mark-hint .hz-btn { min-height: 34px; margin-inline-start: auto; }
+  .ht-nextclass { background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 16px; overflow: hidden; }
+  .ht-nextclass-head { padding: 12px 14px; font-weight: 700; color: #123B67; }
+  .ht-nextclass-row { display: grid; grid-template-columns: 14px 132px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid #EEF3F9; font-size: 14px; }
+  .ht-nextclass-row b { color: #123B67; }
+  .ht-nextclass-row small { display: block; color: #6B7A90; font-size: 12px; margin-top: 2px; }
+  .ht-nextclass-row .ht-plan { color: #6B7A90; }
+  .ht-ayah-head { display: flex; align-items: center; gap: 10px; }
+  .ht-ayah-head span { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; }
+  .ht-ayah-opts { display: flex; flex-direction: column; gap: 6px; }
+  .ht-ayah-opt { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.4); background: transparent; color: #FFFFFF; font: 600 15px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; text-align: left; cursor: pointer; }
+  .ht-ayah-opt:hover { background: rgba(255,255,255,0.12); }
+  .ht-ayah-opt .ht-dot { box-shadow: 0 0 0 2px rgba(255,255,255,0.7); }
+  .ht-ayah-opt-quiet { font-weight: 400; border-color: transparent; opacity: 0.85; }
   .ht-steps { display: flex; gap: 6px; font-size: 12px; font-weight: 600; color: #8FADC0; }
   .ht-steps b { color: #FFFFFF; }
   @media (max-width: 640px) {
+    .ht-nextclass-row { grid-template-columns: 14px minmax(0, 1fr); }
+    .ht-then { display: none; }
+    .ht-nextclass-row > :last-child { grid-column: 2; }
     .ht-full-inner { padding: 10px 6px 20px; }
     .ht-full-top .hz-btn span { display: none; }
   }
@@ -182,7 +208,7 @@ function PortionFields({ value, onChange }) {
 }
 
 // "p. 158 · 1 page · Al-A'raf 58 – 67"
-const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeAmount(r.end - r.start)} · ${describeAyahs([r.start, r.end])}`;
+const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeAmount(r.end - r.start)} · ${describeAyahs(r)}`;
 
 // ---------- the student's Hifz plan ----------
 // What was memorised before (page to page or whole juz from the front or
@@ -402,7 +428,10 @@ function EditTask({ task, onSave, onCancel, busy, saveLabel = "Save changes", ca
       </div>
       <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 12 }}>
         <button className="hz-btn hz-btn-outline" onClick={onCancel}>{cancelLabel}</button>
-        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave(draft)}>{saveLabel}</button>
+        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => onSave(
+          // Still the portion marked by ayah, unless its pages or lines were changed.
+          draft.start === task.start && draft.end === task.end && task.startAyah ? { ...draft, startAyah: task.startAyah, endAyah: task.endAyah } : { ...draft, startAyah: null, endAyah: null },
+        )}>{saveLabel}</button>
       </div>
     </div>
   );
@@ -471,7 +500,9 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const [anchor, setAnchor] = useState(null); // the selected word on screen
   const [drafts, setDrafts] = useState({}); // activity → the teacher's confirmed next task
   const [nextOpen, setNextOpen] = useState(null); // task whose next task is being looked at
-  const [markStep, setMarkStep] = useState("mark"); // full screen: "mark" the Mushaf, then "next" to confirm
+  const [markStep, setMarkStep] = useState("mark"); // full screen: "mark" the Mushaf, then "next" to confirm (Long Muraja'ah)
+  const [ayahMenu, setAyahMenu] = useState(null); // { verseKey, page, el }: the ayah number just tapped
+  const [pendingStart, setPendingStart] = useState(null); // { activity, ayah }: a start waiting for its end
   useBackLayer(!!markingId, () => closeMarking(), "teacher-hifz-mushaf");
   const generating = useRef(false);
   // Marking is instant: a tapped word is highlighted (and its pop-up opens)
@@ -542,8 +573,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     return result;
   };
   const marking = tasks.find((t) => t.id === markingId) || null;
-  const openMarking = (t) => { setSelectedKey(null); setMarkStep("mark"); setMarkingId(t.id); };
-  function closeMarking() { setMarkingId(null); setSelectedKey(null); setMarkStep("mark"); }
+  const openMarking = (t) => { setSelectedKey(null); setAyahMenu(null); setMarkStep("mark"); setMarkingId(t.id); };
+  function closeMarking() { setMarkingId(null); setSelectedKey(null); setMarkStep("mark"); setAyahMenu(null); setPendingStart(null); }
   const selected = openMistakes.find((m) => `${m.verseKey}:${m.position}` === selectedKey) || null;
   const needsProfile = !data.hasProfile || data.profile?.fromLegacy;
 
@@ -567,7 +598,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     return run(async () => {
       await queue.current.chain; // every mark saved first
       await repo.setTaskDone(t.id, true);
-      if (next && !stillOpen) await repo.addTasks([{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "" }]);
+      if (next && !stillOpen) {
+        await repo.addTasks([{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "",
+          ...(next.startAyah ? { startAyah: next.startAyah, endAyah: next.endAyah } : {}) }]);
+      }
       setDrafts((d) => { const n = { ...d }; delete n[t.activity]; return n; });
       setNextOpen(null);
       // Listening: straight on to the day's next task (still full screen).
@@ -599,6 +633,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   };
 
   const tapWord = (w) => {
+    setAyahMenu(null);
     setSelectedKey(w.key);
     setAnchor(w.el);
     if (openMistakes.some((m) => wordKey(m) === w.key)) return; // tapping a marked word selects it
@@ -626,16 +661,126 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     if (await confirmDialog({ title: `Delete this ${what}?`, message: "This can't be undone.", confirmLabel: "Delete" })) run(fn);
   };
 
-  // Listen & mark, full screen: 1) the task's pages in the Mushaf, tap words
-  // to mark mistakes; Continue → 2) the next class day's task, change it if
-  // needed and Confirm: this task is marked done, the next one is set and
-  // the student is notified.
+  // ---- the next class's New Hifz and Short Muraja'ah, marked on the Mushaf ----
+  // While listening to a day's tasks the teacher taps the ayah number where
+  // the next class's portion starts, then where it ends. It's for the task
+  // that comes after that day's one: the open task already set for a later
+  // day (changed at once), or else the one finishing that day's task sets
+  // (kept as the teacher's confirmed next task until then). The marked
+  // portion stays on its day until the teacher changes it. Long Muraja'ah
+  // still comes from the plan.
+  const MARKED = ["new", "short"];
+  const nextTarget = (a) => {
+    const day = marking.taskDate;
+    const later = tasks.filter((x) => x.activity === a && !x.completedAt && x.taskDate > day).sort((x, y) => (x.taskDate < y.taskDate ? -1 : 1))[0];
+    if (later) return { kind: "task", task: later, taskDate: later.taskDate, portion: later, marked: !!later.startAyah };
+    const dayTask = dayOf(marking).find((x) => x.activity === a);
+    if (dayTask && !dayTask.completedAt) {
+      const next = nextOf(dayTask);
+      return { kind: "draft", dayTask, taskDate: next?.taskDate || nextClassDay(student.schedule, day > today ? day : today), portion: next, marked: !!drafts[a]?.startAyah };
+    }
+    return { kind: "add", taskDate: nextClassDay(student.schedule, day > today ? day : today), portion: null, marked: false };
+  };
+  const assignAyahs = (a, first, last) => {
+    const t = nextTarget(a);
+    const portion = ayahPortion(first, last);
+    if (t.kind === "draft") setDrafts((d) => ({ ...d, [a]: { taskDate: t.taskDate, notes: d[a]?.notes || "", ...portion } }));
+    else if (t.kind === "task") run(() => repo.updateTask(t.task.id, portion));
+    else {
+      generating.current = true;
+      run(() => repo.addTasks([{ activity: a, taskDate: t.taskDate, notes: "", ...portion }])).finally(() => { generating.current = false; });
+    }
+  };
+  const clearDraft = (a) => setDrafts((d) => { const n = { ...d }; delete n[a]; return n; });
+  const tapAyah = (w) => { setSelectedKey(null); setAyahMenu(w); };
+  // The ayah numbers to colour: each marked portion's start and end, and a start waiting for its end.
+  const nextMarks = () => ayahMarksOf(MARKED.map((a) => {
+    if (pendingStart?.activity === a) return { activity: a, startAyah: pendingStart.ayah, open: true };
+    const t = nextTarget(a);
+    return t.marked ? { activity: a, startAyah: t.portion.startAyah, endAyah: t.portion.endAyah } : null;
+  }));
+  const ayahMenuBox = () => {
+    const n = ayahNumber(ayahMenu.verseKey);
+    const ref = ayahRef(n);
+    const close = () => setAyahMenu(null);
+    const opts = [];
+    if (pendingStart) {
+      const { title } = ACTIVITY_INFO[pendingStart.activity];
+      opts.push({ key: "end", dot: pendingStart.activity, label: `${title} ends here`, run: () => { assignAyahs(pendingStart.activity, pendingStart.ayah, n); setPendingStart(null); } });
+      opts.push({ key: "cancel", label: `Cancel the ${title} start`, quiet: true, run: () => setPendingStart(null) });
+    } else {
+      for (const a of MARKED) opts.push({ key: `start-${a}`, dot: a, label: `${ACTIVITY_INFO[a].title} starts here`, run: () => setPendingStart({ activity: a, ayah: n }) });
+      for (const a of MARKED) {
+        const t = nextTarget(a);
+        if (t.kind === "draft" && t.marked && (t.portion.startAyah === n || t.portion.endAyah === n)) {
+          opts.push({ key: `clear-${a}`, label: `Clear ${ACTIVITY_INFO[a].title} (back to the plan)`, quiet: true, run: () => clearDraft(a) });
+        }
+      }
+    }
+    return (
+      <AnchoredPopup anchor={ayahMenu.el} label={`Ayah ${ayahMenu.verseKey}`} onClose={close} deps={[ayahMenu.verseKey, !!pendingStart]}>
+        <div className="ht-ayah-head">
+          <span>{ayahName(ref)} · page {ayahMenu.page}</span>
+          <button type="button" className="mc-pop-close" onClick={close} aria-label="Close"><X size={16} aria-hidden="true" /></button>
+        </div>
+        <div className="ht-ayah-opts">
+          {opts.map((o) => (
+            <button key={o.key} type="button" className={`ht-ayah-opt ${o.quiet ? "ht-ayah-opt-quiet" : ""}`} disabled={busy} onClick={() => { close(); o.run(); }}>
+              {o.dot && <i className={`ht-dot ht-dot-${o.dot}`} aria-hidden="true" />}{o.label}
+            </button>
+          ))}
+        </div>
+      </AnchoredPopup>
+    );
+  };
+  // What's set for the next class, under the Mushaf.
+  const nextClassPanel = () => {
+    const rows = ACTIVITIES.map((a) => {
+      const { title } = ACTIVITY_INFO[a];
+      if (a === "long") {
+        const dayTask = dayOf(marking).find((x) => x.activity === "long");
+        const later = tasks.find((x) => x.activity === "long" && !x.completedAt && x.taskDate > marking.taskDate);
+        const p = later || (dayTask && !dayTask.completedAt ? nextOf(dayTask) : null);
+        return { a, title, text: p ? portionSummary(p) : "From the plan", sub: "From the plan, as before", plan: true };
+      }
+      if (pendingStart?.activity === a) return { a, title, text: `Starts at ${ayahName(ayahRef(pendingStart.ayah))}`, sub: "Now tap the ayah number where it ends" };
+      const t = nextTarget(a);
+      const when = fmtDay(t.taskDate);
+      if (t.marked) {
+        const sub = t.kind === "draft" ? `Marked · set for ${when} when you finish today's ${title}` : `Marked · set for ${when}`;
+        return { a, title, text: `${describeAyahs(t.portion)} · ${describeRange([t.portion.start, t.portion.end])}`, sub };
+      }
+      if (t.portion) return { a, title, text: portionSummary(t.portion), sub: `From the plan · ${when} · tap ayah numbers to change it`, plan: true };
+      return { a, title, text: "Nothing set", sub: "Tap the ayah number where it starts", plan: true };
+    });
+    const dates = MARKED.map((a) => nextTarget(a).taskDate);
+    return (
+      <div className="ht-nextclass" aria-label="Next class">
+        <div className="ht-nextclass-head">Next class · {fmtDay(dates[0])}</div>
+        {rows.map((r) => (
+          <div key={r.a} className="ht-nextclass-row">
+            <i className={`ht-dot ht-dot-${r.a}`} aria-hidden="true" />
+            <b>{r.title}</b>
+            <div className={r.plan ? "ht-plan" : ""}>{r.text}<small>{r.sub}</small></div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Listen & mark, full screen: the day's tasks in the whole Mushaf. Tap
+  // words to mark mistakes, and ayah numbers to mark the next class's New
+  // Hifz and Short Muraja'ah. Finish: this task is marked done, the next one
+  // is set (as marked, or from the plan) and the student is notified. Long
+  // Muraja'ah, as before: Continue → its next task from the plan, change it
+  // if needed and Confirm.
   const listenAndMark = () => {
     const { title, Icon } = ACTIVITY_INFO[marking.activity];
     const count = mistakesForTask(marking, mistakes).length;
     const next = nextOf(marking);
     const alreadySet = tasks.find((x) => x.activity === marking.activity && !x.completedAt && x.id !== marking.id) || null;
     const onNext = markStep === "next";
+    const marksNext = MARKED.includes(marking.activity); // New Hifz / Short Muraja'ah: no second step
     // On the page body, so nothing in the portal layout can cover or clip it.
     return createPortal(
       <div className="ht-full" role="dialog" aria-modal="true" aria-label={`Listen and mark · ${title}`}>
@@ -658,9 +803,21 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
                   <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
                   <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
                   <MistakeLegend />
+                  <span><i style={{ background: "#176FD1", borderRadius: "50%" }} />New Hifz start / end</span>
+                  <span><i style={{ background: "#0A7F96", borderRadius: "50%" }} />Short Muraja'ah start / end</span>
                 </div>
+                {pendingStart ? (
+                  <div className="ht-mark-hint" role="status">
+                    <i className={`ht-dot ht-dot-${pendingStart.activity}`} aria-hidden="true" />
+                    <span><b>{ACTIVITY_INFO[pendingStart.activity].title}</b> starts at {ayahName(ayahRef(pendingStart.ayah))}. Now tap the ayah number where it ends (turn the page if needed).</span>
+                    <button type="button" className="hz-btn hz-btn-outline" onClick={() => setPendingStart(null)}>Cancel</button>
+                  </div>
+                ) : (
+                  <div className="ht-mark-hint">Tap a word to mark a mistake. Tap an ayah number to mark where the next class's New Hifz or Short Muraja'ah starts and ends.</div>
+                )}
                 {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
                 <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
+                  fade={false} jump ayahMarks={nextMarks()} onAyahTap={tapAyah} selectedAyah={ayahMenu?.verseKey || null}
                   header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
                 {selected && (
                   <MistakePopup key={selectedKey} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
@@ -668,7 +825,9 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
                     onCorrected={() => change(selected, { correctedAt: new Date().toISOString() }, (id) => repo.setMistakeCorrected(id, true))}
                     onRemove={() => change(selected, { removed: true }, (id) => repo.deleteMistake(id))} />
                 )}
+                {ayahMenu && ayahMenuBox()}
                 </TaskReader>
+                {nextClassPanel()}
               </>
             ) : (
               <div className="ht-confirm">
@@ -696,8 +855,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
               ? (followingOf(marking)
                 ? <button className="hz-btn hz-btn-primary" onClick={() => openMarking(followingOf(marking))}>Go to {ACTIVITY_INFO[followingOf(marking).activity].title}<ArrowRight size={18} aria-hidden="true" /></button>
                 : <button className="hz-btn hz-btn-primary" onClick={closeMarking}>Close</button>)
-              : onNext
-                ? <button className="hz-btn hz-btn-primary" disabled={busy} onClick={() => markDone(marking)}><CheckCircle2 size={18} aria-hidden="true" />Finish</button>
+              : onNext || marksNext
+                ? <button className="hz-btn hz-btn-primary" disabled={busy || !!pendingStart} onClick={() => markDone(marking)}><CheckCircle2 size={18} aria-hidden="true" />Finish{marksNext ? ` ${title}` : ""}{marksNext && followingOf(marking) && <span className="ht-then"> · then {ACTIVITY_INFO[followingOf(marking).activity].title}</span>}</button>
                 : <button className="hz-btn hz-btn-primary" onClick={() => { setSelectedKey(null); setMarkStep("next"); }}>Continue{followingOf(marking) ? ` · then ${ACTIVITY_INFO[followingOf(marking).activity].title}` : ""}<ArrowRight size={18} aria-hidden="true" /></button>}
           </div>
         )}
@@ -710,7 +869,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const ready = openTasks.filter((t) => t.studentDoneAt).length;
   // One short line for a portion: "p. 158 · 1 page · Al-A'raf 58 – 67".
   const portionLine = (t) => (
-    <div className="ht-task-portion"><b>{describeRange([t.start, t.end])}</b>{describeAmount(t.end - t.start)} · {describeAyahs([t.start, t.end])}</div>
+    <div className="ht-task-portion"><b>{describeRange([t.start, t.end])}</b>{describeAmount(t.end - t.start)} · {describeAyahs(t)}</div>
   );
   const dayChip = (t) => (t.taskDate === today
     ? <span className="ht-day ht-day-today">Today</span>

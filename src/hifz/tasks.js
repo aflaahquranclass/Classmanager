@@ -6,7 +6,9 @@
 // recorded as already memorised (profile.memorized) plus every completed
 // New Hifz task.
 //
-// task:    { id, taskDate, activity, start, end, notes, completedAt, studentDoneAt, createdAt }
+// task:    { id, taskDate, activity, start, end, startAyah, endAyah, notes, completedAt, studentDoneAt, createdAt }
+//          startAyah/endAyah (1–6236, both included, or null): the ayahs the
+//          teacher tapped on the Mushaf; start/end are then worked out from them.
 //          studentDoneAt: the student says they've finished; completedAt: the
 //          teacher listened and approved (only then is it done and the next one set).
 // profile: the plan the teacher sets —
@@ -23,7 +25,7 @@ import { TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, unitToPage, pageToUnit } f
 import { unitsOf, union, intersect, subtract, toSet, computeStreak, localDate, addDays, memorizedAll, newHifzSequence, positionIn, takeFirst } from "./engine.js";
 import { juzOfPage, juzEndUnit, JUZ_START_PAGES } from "./quran.js";
 import { countAyahs, TOTAL_AYAHS, ayahRef, SURAH_AYAH_COUNTS } from "./ayahs.js";
-import { AYAH_START_LINE, AYAH_END_LINE } from "./ayahLines.js";
+import { AYAH_START_LINE, AYAH_END_LINE, AYAH_START_POS, AYAH_END_POS } from "./ayahLines.js";
 import { SURAHS } from "./quran.js";
 
 // In class order: Short Muraja'ah first, then New Hifz, then Long Muraja'ah.
@@ -55,10 +57,50 @@ export function unitOfAyah(surah, ayah, edge = "start") {
   return (edge === "end" ? AYAH_END_LINE[n - 1] : AYAH_START_LINE[n - 1]) * UNITS_PER_LINE;
 }
 
-// "Al-A'raf 58 – 67" / "Al-A'raf 200 – Al-Anfal 5" for a [start, end) portion.
-export function describeAyahs([s, e]) {
-  const a = ayahAtLine(s, "start");
-  const b = ayahAtLine(e - 1, "end");
+// ---------- portions marked on the Mushaf, by ayah ----------
+
+// "2:255" ↔ 1–6236.
+export const ayahNumber = (verseKey) => {
+  const [s, a] = String(verseKey).split(":").map(Number);
+  return SURAH_FIRST_AYAH[s - 1] + a - 1;
+};
+export const verseKeyOf = (n) => { const r = ayahRef(n); return `${r.surah}:${r.ayah}`; };
+
+// The portion from ayah `a` to ayah `b` (1–6236, both included, either
+// order) in half-line units: from the half-line the first ayah starts in to
+// the end of the half-line the last one ends in.
+export function ayahPortion(a, b) {
+  const first = Math.min(a, b), last = Math.max(a, b);
+  const start = Math.floor(AYAH_START_POS[first - 1] * UNITS_PER_LINE + 1e-6);
+  const end = Math.min(TOTAL_UNITS, Math.max(start + 1, Math.ceil(AYAH_END_POS[last - 1] * UNITS_PER_LINE - 1e-6)));
+  return { start, end, startAyah: first, endAyah: last };
+}
+
+// The ayah numbers to colour on the Mushaf for portions marked by ayah:
+// { "2:6": "new", "2:10": "new", "2:1": "short", … } ("both" when one ayah
+// is a New Hifz and a Short Muraja'ah start or end).
+export function ayahMarksOf(portions) {
+  const marks = {};
+  const put = (n, kind) => {
+    if (!n) return;
+    const k = verseKeyOf(n);
+    marks[k] = marks[k] && marks[k] !== kind ? "both" : kind;
+  };
+  for (const p of portions) {
+    if (!p) continue;
+    put(p.startAyah, p.activity);
+    put(p.endAyah ?? (p.open ? null : p.startAyah), p.activity);
+  }
+  return marks;
+}
+
+// "Al-A'raf 58 – 67" / "Al-A'raf 200 – Al-Anfal 5" for a portion: a task (or
+// { start, end, startAyah, endAyah }) or a [start, end) range. Exact for a
+// portion marked by ayah; otherwise from the lines it starts and ends on.
+export function describeAyahs(portion) {
+  const p = Array.isArray(portion) ? { start: portion[0], end: portion[1] } : portion;
+  const a = p.startAyah ? ayahRef(p.startAyah) : ayahAtLine(p.start, "start");
+  const b = p.endAyah ? ayahRef(p.endAyah) : ayahAtLine(p.end - 1, "end");
   if (a.surah !== b.surah) return `${ayahName(a)} – ${ayahName(b)}`;
   return a.ayah === b.ayah ? ayahName(a) : `${ayahName(a)} – ${b.ayah}`;
 }
@@ -164,7 +206,7 @@ export function classTaskSheet(students, tasksOf) {
     const open = [...(tasksOf(s) || [])].filter((t) => !t.completedAt).sort(byDateThenMade);
     const items = ACTIVITIES.map((activity) => {
       const t = open.find((x) => x.activity === activity);
-      return { activity, label: SHEET_LABELS[activity], text: t ? describeAyahs(range(t)) : null, date: t?.taskDate || null };
+      return { activity, label: SHEET_LABELS[activity], text: t ? describeAyahs(t) : null, date: t?.taskDate || null };
     });
     return { name: s.name, items };
   });
@@ -319,6 +361,7 @@ export function nextTasksToSet({ tasks, memorized, profile, today, schedule = nu
     const p = d || suggestPortion(a, all, memorized, profile, today);
     if (!p) continue;
     const row = { activity: a, taskDate: d?.taskDate || day, start: p.start, end: p.end, notes: d?.notes || "" };
+    if (d?.startAyah) Object.assign(row, { startAyah: d.startAyah, endAyah: d.endAyah });
     out.push(row);
     all = [...all, { ...row, id: `planned-${a}`, completedAt: null, createdAt: "~" }];
   }

@@ -249,3 +249,47 @@ test("class task sheet: each student's next Short, New and Long, A–Z, with the
   assert.equal(m.items[1].date, "2026-11-03"); // a different day keeps its own date
   assert.equal(m.items[2].text, null); // nothing set
 });
+
+test("a portion marked by ayah: units, exact names, and the ayah numbers to colour", async () => {
+  const { ayahNumber, verseKeyOf, ayahPortion, ayahMarksOf } = await import("../src/hifz/tasks.js");
+  assert.equal(ayahNumber("1:1"), 1);
+  assert.equal(ayahNumber("2:6"), 13);
+  assert.equal(verseKeyOf(13), "2:6");
+  // Al-Baqarah 6 – 16 is page 3 of the Madinah Mushaf.
+  const p = ayahPortion(ayahNumber("2:16"), ayahNumber("2:6")); // either order
+  assert.equal(p.startAyah, 13);
+  assert.equal(p.endAyah, 23);
+  assert.ok(p.start >= pageToUnit(3) && p.end <= pageToUnit(4) && p.end > p.start);
+  assert.equal(describeAyahs({ ...p }), "Al-Baqarah 6 – 16");
+  // One ayah is a portion too.
+  const one = ayahPortion(13, 13);
+  assert.ok(one.end > one.start);
+  assert.equal(describeAyahs(one), "Al-Baqarah 6");
+  // Start and end numbers are coloured; one ayah that's both a New Hifz and a Short Muraja'ah marker is "both".
+  assert.deepEqual(ayahMarksOf([{ activity: "new", ...p }, { activity: "short", startAyah: 8, endAyah: 13 }]),
+    { "2:6": "both", "2:16": "new", "2:1": "short" });
+  assert.deepEqual(ayahMarksOf([{ activity: "new", startAyah: 13, open: true }]), { "2:6": "new" });
+});
+
+test("marked ayahs go with the task, and are cleared when its pages are typed in", async () => {
+  const { ayahPortion } = await import("../src/hifz/tasks.js");
+  const store = createHifzMemoryStore();
+  const repo = createMemoryHifzRepo(store, "s1", { teacherId: "t1" });
+  await repo.addTasks([{ activity: "new", taskDate: "2026-11-12", notes: "", ...ayahPortion(13, 17) }]);
+  let [t] = await repo.listTasks();
+  assert.equal(t.startAyah, 13);
+  assert.equal(t.endAyah, 17);
+  await repo.updateTask(t.id, ayahPortion(18, 23));
+  [t] = await repo.listTasks();
+  assert.deepEqual([t.startAyah, t.endAyah], [18, 23]);
+  await repo.updateTask(t.id, { notes: "Slowly" }); // portion not touched
+  [t] = await repo.listTasks();
+  assert.equal(t.startAyah, 18);
+  await repo.updateTask(t.id, { start: pageToUnit(4), end: pageToUnit(5) }); // typed by page
+  [t] = await repo.listTasks();
+  assert.deepEqual([t.startAyah, t.endAyah], [null, null]);
+  // The plan's next task keeps a confirmed (marked) portion's ayahs.
+  const rows = nextTasksToSet({ tasks: [], memorized: [], profile: { memorized: [], direction: "forward" }, today: "2026-11-11",
+    drafts: { new: { taskDate: "2026-11-12", ...ayahPortion(13, 17) } } });
+  assert.equal(rows.find((r) => r.activity === "new").startAyah, 13);
+});
