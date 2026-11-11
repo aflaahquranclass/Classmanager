@@ -121,7 +121,7 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
       {tools}
       {full
         ? <button type="button" className="hz-btn hz-btn-primary" onClick={exit}><X size={18} aria-hidden="true" />Exit full screen</button>
-        : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter}><Maximize2 size={16} aria-hidden="true" />Full screen</button>}
+        : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter} aria-label="Full screen"><Maximize2 size={16} aria-hidden="true" /><span className="mf-open-text">Full screen</span></button>}
     </div>
   );
   if (!full) {
@@ -161,6 +161,8 @@ const presentCss = `
   .mf-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
   .mf-content { display: flex; flex-direction: column; gap: 12px; }
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
+  /* Next to a page picker on a phone: just the icon. */
+  @media (max-width: 520px) { .mf-bar:has(.hz-go) .mf-open-text { display: none; } .mf-bar:has(.hz-go) .mf-open { width: 38px; padding: 0; justify-content: center; } }
   .mf-full { position: fixed; inset: 0; z-index: 3000; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box;
     color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
   .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }

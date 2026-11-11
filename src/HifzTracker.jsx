@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useBackLayer } from "./useBackNav.js";
-import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2, ArrowRight } from "lucide-react";
+import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2, ArrowRight } from "lucide-react";
 import { TP } from "./App.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { unitsOf, intersect } from "./hifz/engine.js";
@@ -196,6 +196,11 @@ export const HIFZ_CSS = `
   .hz-jump .hz-select { flex: 0 1 220px; min-width: 0; min-height: 38px; }
   .hz-jump .hz-input { flex: 0 0 76px; width: 76px; min-height: 38px; }
   @media (max-width: 420px) { .hz-jump > span:first-child { display: none; } }
+  .hz-go { display: flex; align-items: center; gap: 6px; margin-right: auto; min-width: 0; flex: 1; }
+  .hz-go .hz-go-main { flex: 0 1 auto; justify-content: space-between; }
+  .hz-go .hz-btn { min-height: 38px; font-size: 13px; }
+  .hz-go-main { min-width: 0; padding: 0 12px; gap: 6px; }
+  .hz-go-main span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hz-out { color: #8A5A00; font-weight: 600; }
   .hz-btn.hz-back-portion { min-height: 0; padding: 0 4px; font-size: 13px; }
   .hz-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 6px; padding: 4px; border-radius: 14px; background: #EEF3F8; }
@@ -340,12 +345,15 @@ export function PortionText({ task }) {
 // portion is bright and the rest faded.
 // Teacher mode: onWordTap / selectedKey / showCorrected, onAyahTap /
 // selectedAyah (see MushafPage); `fade={false}` shows every page in full;
-// `jump` adds a surah and page picker to go anywhere in the Mushaf.
+// `compact`: no page title or Previous/Next row; one button next to Full
+// screen instead — the surah and page — which opens a surah and page picker
+// to go anywhere in the Mushaf (pages also turn by swiping, or with the
+// arrows in full screen).
 // `ayahMarks`: the ayah numbers to colour; by default the task's own start
 // and end when it was marked by ayah.
 // `header` goes above the page (e.g. the day's tasks to switch between) and
 // `children` under it; both stay with it in full screen.
-export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, header = null, children, fade = true, jump = false, ayahMarks = null, onAyahTap = null, selectedAyah = null }) {
+export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, header = null, children, fade = true, compact = false, ayahMarks = null, onAyahTap = null, selectedAyah = null }) {
   const pages = task ? taskPages(task) : [focus ?? 1];
   const first = pages[0];
   const last = pages[pages.length - 1];
@@ -369,9 +377,18 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
   const prev = () => setPage(Math.max(1, shown - 1));
   const swipe = useMushafSwipe(next, prev);
   const marks = ayahMarks || (task?.startAyah ? ayahMarksOf([task]) : null);
+  const [jumpOpen, setJumpOpen] = useState(false);
+  const go = compact && (
+    <div className="hz-go">
+      <button type="button" className="hz-btn hz-btn-outline hz-go-main" aria-expanded={jumpOpen} aria-label="Go to a surah or page" onClick={() => setJumpOpen((o) => !o)}>
+        <span>{surahsOnPages(shown, shown)[0]?.name} · p. {shown}</span><ChevronDown size={16} aria-hidden="true" />
+      </button>
+    </div>
+  );
   return (
-    <MushafPresent onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}><div className="hz-reader" ref={topRef}>
+    <MushafPresent tools={go || null} onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}><div className="hz-reader" ref={topRef}>
       {header}
+      {compact ? (jumpOpen && <PageJump page={shown} onGo={(p) => { setPage(p); setJumpOpen(false); }} />) : (
       <div className="hz-reader-nav">
         <button className="hz-btn hz-btn-outline" disabled={shown >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
         <div className="hz-reader-title">Page {shown} · {surahsOnPages(shown, shown).map((s) => s.name).join(", ")}
@@ -381,8 +398,7 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
             {open ? ` · ${open} mistake${open === 1 ? "" : "s"} here` : ""}</small>
         </div>
         <button className="hz-btn hz-btn-outline" disabled={shown <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
-      </div>
-      {jump && <PageJump page={shown} onGo={setPage} />}
+      </div>)}
       <div {...swipe}><MushafPage page={shown} range={fade && task && inTask ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected}
         ayahMarks={marks} onAyahTap={onAyahTap} selectedAyah={selectedAyah} /></div>
       {children}

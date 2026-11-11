@@ -23,7 +23,7 @@ import { loadHifz } from "./taskService.js";
 import { selectAll } from "../thilawa/repos.js";
 import { maldivesToday } from "../dates.js";
 import ClassBrowser from "../thilawa/ClassBrowser.jsx";
-import { MistakePopup, MistakeLegend, AnchoredPopup } from "../thilawa/MistakeCategories.jsx";
+import { MistakePopup, AnchoredPopup } from "../thilawa/MistakeCategories.jsx";
 
 const teacherCss = `
   .ht { display: flex; flex-direction: column; gap: 18px; }
@@ -136,14 +136,10 @@ const teacherCss = `
   .ht-full-foot { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom));
     background: #FFFFFF; border-top: 1px solid #DCEBF8; box-shadow: 0 -6px 20px rgba(18,59,103,0.08); }
   .ht-full-foot .hz-btn { min-height: 48px; padding: 0 22px; font-size: 15px; }
-  .ht-confirm { background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 16px; padding: 16px; }
   .ht-dot { display: inline-block; flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; }
   .ht-dot-new { background: #176FD1; }
   .ht-dot-short { background: #0A7F96; }
   .ht-dot-long { background: #5B4BB7; }
-  .ht-mark-hint { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: 12px; background: #E4F1FC; color: #0D4F85; font-size: 14px; }
-  .ht-mark-hint b { font-weight: 700; }
-  .ht-mark-hint .hz-btn { min-height: 34px; margin-inline-start: auto; }
   .ht-nextclass { background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 16px; overflow: hidden; }
   .ht-nextclass-head { padding: 12px 14px; font-weight: 700; color: #123B67; }
   .ht-nextclass-row { display: grid; grid-template-columns: 14px 132px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid #EEF3F9; font-size: 14px; }
@@ -157,11 +153,8 @@ const teacherCss = `
   .ht-ayah-opt:hover { background: rgba(255,255,255,0.12); }
   .ht-ayah-opt .ht-dot { box-shadow: 0 0 0 2px rgba(255,255,255,0.7); }
   .ht-ayah-opt-quiet { font-weight: 400; border-color: transparent; opacity: 0.85; }
-  .ht-steps { display: flex; gap: 6px; font-size: 12px; font-weight: 600; color: #8FADC0; }
-  .ht-steps b { color: #FFFFFF; }
   @media (max-width: 640px) {
     .ht-nextclass-row { grid-template-columns: 14px minmax(0, 1fr); }
-    .ht-then { display: none; }
     .ht-nextclass-row > :last-child { grid-column: 2; }
     .ht-full-inner { padding: 10px 6px 20px; }
     .ht-full-top .hz-btn span { display: none; }
@@ -500,7 +493,6 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const [anchor, setAnchor] = useState(null); // the selected word on screen
   const [drafts, setDrafts] = useState({}); // activity → the teacher's confirmed next task
   const [nextOpen, setNextOpen] = useState(null); // task whose next task is being looked at
-  const [markStep, setMarkStep] = useState("mark"); // full screen: "mark" the Mushaf, then "next" to confirm (Long Muraja'ah)
   const [ayahMenu, setAyahMenu] = useState(null); // { verseKey, page, el }: the ayah number just tapped
   const [pendingStart, setPendingStart] = useState(null); // { activity, ayah }: a start waiting for its end
   useBackLayer(!!markingId, () => closeMarking(), "teacher-hifz-mushaf");
@@ -540,10 +532,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     if (!markingId) return undefined;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const onKey = (e) => { if (e.key === "Escape") { if (markStep === "next") setMarkStep("mark"); else closeMarking(); } };
+    const onKey = (e) => { if (e.key === "Escape") closeMarking(); };
     window.addEventListener("keydown", onKey);
     return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
-  }, [markingId, markStep]);
+  }, [markingId]);
 
   if (!data) return <div className="ht">{error ? <div className="hz-error" role="alert">{error}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
 
@@ -573,8 +565,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     return result;
   };
   const marking = tasks.find((t) => t.id === markingId) || null;
-  const openMarking = (t) => { setSelectedKey(null); setAyahMenu(null); setMarkStep("mark"); setMarkingId(t.id); };
-  function closeMarking() { setMarkingId(null); setSelectedKey(null); setMarkStep("mark"); setAyahMenu(null); setPendingStart(null); }
+  const openMarking = (t) => { setSelectedKey(null); setAyahMenu(null); setMarkingId(t.id); };
+  function closeMarking() { setMarkingId(null); setSelectedKey(null); setAyahMenu(null); setPendingStart(null); }
   const selected = openMistakes.find((m) => `${m.verseKey}:${m.position}` === selectedKey) || null;
   const needsProfile = !data.hasProfile || data.profile?.fromLegacy;
 
@@ -665,8 +657,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   // While listening to a day's tasks the teacher taps the ayah number where
   // the next class's portion starts, then where it ends. It's for the task
   // that comes after that day's one: the open task already set for a later
-  // day (changed at once), or else the one finishing that day's task sets
-  // (kept as the teacher's confirmed next task until then). The marked
+  // day (changed at once), or else the one Finish sets (kept as the
+  // teacher's confirmed next task until then). The marked
   // portion stays on its day until the teacher changes it. Long Muraja'ah
   // still comes from the plan.
   const MARKED = ["new", "short"];
@@ -747,7 +739,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
       const t = nextTarget(a);
       const when = fmtDay(t.taskDate);
       if (t.marked) {
-        const sub = t.kind === "draft" ? `Marked · set for ${when} when you finish today's ${title}` : `Marked · set for ${when}`;
+        const sub = t.kind === "draft" ? `Marked · set for ${when} when you press Finish` : `Marked · set for ${when}`;
         return { a, title, text: `${describeAyahs(t.portion)} · ${describeRange([t.portion.start, t.portion.end])}`, sub };
       }
       if (t.portion) return { a, title, text: portionSummary(t.portion), sub: `From the plan · ${when} · tap ayah numbers to change it`, plan: true };
@@ -768,98 +760,74 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     );
   };
 
-  // Listen & mark, full screen: the day's tasks in the whole Mushaf. Tap
-  // words to mark mistakes, and ayah numbers to mark the next class's New
-  // Hifz and Short Muraja'ah. Finish: this task is marked done, the next one
-  // is set (as marked, or from the plan) and the student is notified. Long
-  // Muraja'ah, as before: Continue → its next task from the plan, change it
-  // if needed and Confirm.
+  // Finish (Listen & mark): every task of the day being listened to that
+  // isn't done yet is approved at once, and each one's next task is set on
+  // the next class day — as marked on the Mushaf, or from the plan — in one
+  // insert, so the student gets one notification. Then the Mushaf closes.
+  const finishDay = () => {
+    const open = dayOf(marking).filter((t) => !t.completedAt);
+    // Worked out before anything changes (each as if the day's tasks were done).
+    const rows = open.flatMap((t) => {
+      const next = nextOf(t);
+      const stillOpen = tasks.some((x) => x.activity === t.activity && !x.completedAt && x.id !== t.id);
+      if (!next || stillOpen) return [];
+      return [{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "",
+        ...(next.startAyah ? { startAyah: next.startAyah, endAyah: next.endAyah } : {}) }];
+    });
+    generating.current = true;
+    return run(async () => {
+      await queue.current.chain; // every mark saved first
+      for (const t of open) await repo.setTaskDone(t.id, true);
+      if (rows.length) await repo.addTasks(rows);
+      setDrafts((d) => { const n = { ...d }; open.forEach((t) => delete n[t.activity]); return n; });
+      closeMarking();
+    }).then((ok) => { if (ok) onMarked?.(); return ok; }).finally(() => { generating.current = false; });
+  };
+
+  // Listen & mark, full screen: the day's tasks in the whole Mushaf, with
+  // tabs to look at each. Tap words to mark mistakes, and ayah numbers to
+  // mark the next class's New Hifz and Short Muraja'ah. Finish: the whole
+  // day is done (see finishDay).
   const listenAndMark = () => {
-    const { title, Icon } = ACTIVITY_INFO[marking.activity];
-    const count = mistakesForTask(marking, mistakes).length;
-    const next = nextOf(marking);
-    const alreadySet = tasks.find((x) => x.activity === marking.activity && !x.completedAt && x.id !== marking.id) || null;
-    const onNext = markStep === "next";
-    const marksNext = MARKED.includes(marking.activity); // New Hifz / Short Muraja'ah: no second step
+    const { title } = ACTIVITY_INFO[marking.activity];
+    const count = dayOf(marking).reduce((n, t) => n + mistakesForTask(t, mistakes).length, 0);
+    const allDone = dayOf(marking).every((t) => t.completedAt);
     // On the page body, so nothing in the portal layout can cover or clip it.
     return createPortal(
-      <div className="ht-full" role="dialog" aria-modal="true" aria-label={`Listen and mark · ${title}`}>
+      <div className="ht-full" role="dialog" aria-modal="true" aria-label={`Listen and mark · ${student.name}`}>
         <div className="ht-full-top">
-          <button className="hz-btn" onClick={() => (onNext ? setMarkStep("mark") : closeMarking())}>
-            <ChevronLeft size={18} aria-hidden="true" /><span>{onNext ? "Back to Mushaf" : "Back"}</span>
+          <button className="hz-btn" onClick={closeMarking}>
+            <ChevronLeft size={18} aria-hidden="true" /><span>Back</span>
           </button>
           <div className="ht-full-title">
-            {onNext ? "Confirm the next task" : <>{title} · {student.name}</>}
-            <small>{onNext ? `${title} · ${student.name}` : `${fmtDay(marking.taskDate)} · ${portionSummary(marking)}`}</small>
+            {title} · {student.name}
+            <small>{fmtDay(marking.taskDate)} · {portionSummary(marking)}</small>
           </div>
-          <div className="ht-steps" aria-hidden="true">{onNext ? <>1 · <b>2</b></> : <><b>1</b> · 2</>}</div>
         </div>
 
         <div className="ht-full-body">
           <div className="ht-full-inner">
-            {!onNext ? (
-              <>
-                <div className="hz-legend">
-                  <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To fix</span>
-                  <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
-                  <MistakeLegend />
-                  <span><i style={{ background: "#176FD1", borderRadius: "50%" }} />New Hifz start / end</span>
-                  <span><i style={{ background: "#0A7F96", borderRadius: "50%" }} />Short Muraja'ah start / end</span>
-                </div>
-                {pendingStart ? (
-                  <div className="ht-mark-hint" role="status">
-                    <i className={`ht-dot ht-dot-${pendingStart.activity}`} aria-hidden="true" />
-                    <span><b>{ACTIVITY_INFO[pendingStart.activity].title}</b> starts at {ayahName(ayahRef(pendingStart.ayah))}. Now tap the ayah number where it ends (turn the page if needed).</span>
-                    <button type="button" className="hz-btn hz-btn-outline" onClick={() => setPendingStart(null)}>Cancel</button>
-                  </div>
-                ) : (
-                  <div className="ht-mark-hint">Tap a word to mark a mistake. Tap an ayah number to mark where the next class's New Hifz or Short Muraja'ah starts and ends.</div>
-                )}
-                {marking.notes && <div className="hz-task-notes">{marking.notes}</div>}
-                <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
-                  fade={false} jump ayahMarks={nextMarks()} onAyahTap={tapAyah} selectedAyah={ayahMenu?.verseKey || null}
-                  header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
-                {selected && (
-                  <MistakePopup key={selectedKey} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
-                    onCategory={(c) => change(selected, { category: c || null }, (id) => repo.setMistakeCategory(id, c))}
-                    onCorrected={() => change(selected, { correctedAt: new Date().toISOString() }, (id) => repo.setMistakeCorrected(id, true))}
-                    onRemove={() => change(selected, { removed: true }, (id) => repo.deleteMistake(id))} />
-                )}
-                {ayahMenu && ayahMenuBox()}
-                </TaskReader>
-                {nextClassPanel()}
-              </>
-            ) : (
-              <div className="ht-confirm">
-                <div className="ht-next-head"><Icon size={18} aria-hidden="true" />Next {title}{next && !alreadySet ? ` · ${fmtDay(next.taskDate)}` : ""}</div>
-                {alreadySet ? (
-                  <p className="hz-muted" style={{ margin: 0 }}>Next {title} already set: {fmtDay(alreadySet.taskDate)} · {portionSummary(alreadySet)}.</p>
-                ) : !next ? (
-                  <p className="hz-muted" style={{ margin: 0 }}>Nothing comes next on the plan.</p>
-                ) : (
-                  <>
-                    <EditTask key={`${marking.id}-${next.taskDate}-${next.start}-${next.end}`} task={{ ...next, id: `next-${marking.id}`, notes: next.notes || "" }} busy={busy}
-                      saveLabel="Confirm & finish" onCancel={() => setMarkStep("mark")} cancelLabel="Back"
-                      onSave={(d) => markDone(marking, d)} />
-                  </>
-                )}
-              </div>
+            <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
+              fade={false} compact ayahMarks={nextMarks()} onAyahTap={tapAyah} selectedAyah={ayahMenu?.verseKey || null}
+              header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
+            {selected && (
+              <MistakePopup key={selectedKey} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
+                onCategory={(c) => change(selected, { category: c || null }, (id) => repo.setMistakeCategory(id, c))}
+                onCorrected={() => change(selected, { correctedAt: new Date().toISOString() }, (id) => repo.setMistakeCorrected(id, true))}
+                onRemove={() => change(selected, { removed: true }, (id) => repo.deleteMistake(id))} />
             )}
+            {ayahMenu && ayahMenuBox()}
+            </TaskReader>
+            {nextClassPanel()}
           </div>
         </div>
 
-        {(!onNext || alreadySet || !next) && (
-          <div className="ht-full-foot">
-            <span className="hz-muted">{count} mistake{count === 1 ? "" : "s"} marked on these pages</span>
-            {marking.completedAt
-              ? (followingOf(marking)
-                ? <button className="hz-btn hz-btn-primary" onClick={() => openMarking(followingOf(marking))}>Go to {ACTIVITY_INFO[followingOf(marking).activity].title}<ArrowRight size={18} aria-hidden="true" /></button>
-                : <button className="hz-btn hz-btn-primary" onClick={closeMarking}>Close</button>)
-              : onNext || marksNext
-                ? <button className="hz-btn hz-btn-primary" disabled={busy || !!pendingStart} onClick={() => markDone(marking)}><CheckCircle2 size={18} aria-hidden="true" />Finish{marksNext ? ` ${title}` : ""}{marksNext && followingOf(marking) && <span className="ht-then"> · then {ACTIVITY_INFO[followingOf(marking).activity].title}</span>}</button>
-                : <button className="hz-btn hz-btn-primary" onClick={() => { setSelectedKey(null); setMarkStep("next"); }}>Continue{followingOf(marking) ? ` · then ${ACTIVITY_INFO[followingOf(marking).activity].title}` : ""}<ArrowRight size={18} aria-hidden="true" /></button>}
-          </div>
-        )}
+        <div className="ht-full-foot">
+          <span className="hz-muted">{count} mistake{count === 1 ? "" : "s"} marked</span>
+          {allDone
+            ? <button className="hz-btn hz-btn-primary" onClick={closeMarking}>Close</button>
+            : <button className="hz-btn hz-btn-primary" disabled={busy || !!pendingStart} onClick={finishDay}><CheckCircle2 size={18} aria-hidden="true" />Finish</button>}
+        </div>
       </div>,
       document.body,
     );
