@@ -174,7 +174,21 @@
 .ld-review { width: 340px; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 26px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 1px 3px rgba(18, 59, 103, .06); }
 .ld-review-top { display: flex; justify-content: space-between; align-items: flex-start; }
 .ld-quote { font-family: var(--serif); font-size: 54px; line-height: .7; color: var(--teal); opacity: .5; }
-.ld-review p { margin: 0; font-family: var(--serif); font-size: 17px; line-height: 1.6; flex: 1; }
+.ld-review p { margin: 0; font-family: var(--serif); font-size: 17px; line-height: 1.6; }
+/* The text stops after five lines (four on a phone) so the cards stay
+   compact; a cut-off review gets a "Read more" link that opens the whole of
+   it in a pop-up. The footer sits at the bottom of the card. */
+.ld-review-text { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; }
+.ld-review .ld-person { margin-top: auto; }
+.ld-review-more { align-self: flex-start; margin-top: -6px; padding: 2px 0; background: none; border: 0; color: var(--blue); font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.6; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.ld-review-more:hover { color: var(--navy); }
+.ld-review-dlg { padding: 0; border: 0; background: none; width: min(520px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 48px); overflow: visible; }
+.ld-review-dlg::backdrop { background: rgba(18, 59, 103, .45); }
+.ld-review-dlg-in { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.ld-review-full { width: 100%; align-self: stretch; max-height: calc(100dvh - 120px); box-shadow: 0 20px 50px rgba(18, 59, 103, .25); }
+.ld-review-full .ld-review-text { display: block; overflow: auto; -webkit-line-clamp: unset; line-clamp: none; }
+.ld-review-close { background: #fff; color: var(--navy); border: 1px solid var(--line); border-radius: 999px; padding: 8px 22px; font-family: inherit; font-size: 14px; font-weight: 600; line-height: 1.4; cursor: pointer; }
+.ld-review-close:hover { border-color: var(--blue); color: var(--blue); }
 .ld-person { border-top: 1px solid var(--line); padding-top: 14px; }
 .ld-person { display: flex; align-items: center; gap: 10px; }
 .ld-av { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 600; font-size: 14px; flex-shrink: 0; }
@@ -393,6 +407,8 @@
   .ld-reviews { margin-top: 18px; }
   .ld-review { width: 260px; padding: 18px; gap: 10px; }
   .ld-review p { font-size: 15px; }
+  .ld-review-text { -webkit-line-clamp: 4; line-clamp: 4; }
+  .ld-review-full .ld-review-text { -webkit-line-clamp: unset; line-clamp: none; }
   .ld-quote { font-size: 42px; }
 
   /* Portal features: compact rows */

@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import { ArrowRight, Flame, ListChecks, FileText, UserRound } from "lucide-react";
 import { HERO, WHY, BOOKS, SHOW } from "./content.js";
 import { usePublicReviews } from "./reviews.js";
@@ -42,8 +43,53 @@ export function Hero({ navigate, reviews }) {
   );
 }
 
+// One review. In the strip the text stops after a few lines, so every card
+// keeps the same modest height; only when it is actually cut off does a
+// "Read more" link appear, opening the whole review in a pop-up (full).
+function ReviewCard({ r, i, copy = false, full = false, onOpen }) {
+  const { t } = useLang();
+  const textRef = useRef(null);
+  const [cut, setCut] = useState(false);
+  useEffect(() => {
+    const el = textRef.current;
+    if (full || !el) return;
+    const check = () => setCut(el.scrollHeight > el.clientHeight + 1);
+    check();
+    document.fonts?.ready.then(check);
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [r.text, full]);
+  return (
+    <figure className={`ld-review${full ? " ld-review-full" : ""}`} aria-hidden={copy || undefined}>
+      <div className="ld-review-top"><span className="ld-quote" aria-hidden="true">“</span><Stars size={14} rating={r.rating ?? 5} /></div>
+      <p ref={textRef} className="ld-review-text" dir="auto">{r.text}</p>
+      {cut && (
+        <button type="button" className="ld-review-more" tabIndex={copy ? -1 : undefined} onClick={() => onOpen(r, i)}>
+          {t("reviews.more")}
+        </button>
+      )}
+      <figcaption className="ld-person">
+        <span className="ld-av" style={{ background: avatarColor(i) }}>{initials(r.name)}</span>
+        <span className="ld-person-who">
+          <b dir="auto">{r.name}</b>
+          <small dir="auto">{r.role}</small>
+          {r.roleDv && <small className="ld-dv" lang="dv" dir="rtl">{r.roleDv}</small>}
+        </span>
+      </figcaption>
+    </figure>
+  );
+}
+
 export function Reviews({ reviews }) {
   const { t } = useLang();
+  const [open, setOpen] = useState(null); // { r, i } of the review in the pop-up
+  const dialog = useRef(null);
+  useEffect(() => {
+    const d = dialog.current;
+    if (open && d && !d.open) d.showModal();
+  }, [open]);
+  const close = () => dialog.current?.close();
   return (
     <section className="ld-sec ld-soft" id="reviews">
       <div className="ld-wrap ld-center ld-reveal">
@@ -56,22 +102,20 @@ export function Reviews({ reviews }) {
           items={reviews}
           minItems={8}
           secondsPerItem={4}
-          render={(r, i, copy) => (
-            <figure className="ld-review" aria-hidden={copy || undefined}>
-              <div className="ld-review-top"><span className="ld-quote" aria-hidden="true">“</span><Stars size={14} rating={r.rating ?? 5} /></div>
-              <p dir="auto">{r.text}</p>
-              <figcaption className="ld-person">
-                <span className="ld-av" style={{ background: avatarColor(i) }}>{initials(r.name)}</span>
-                <span className="ld-person-who">
-                  <b dir="auto">{r.name}</b>
-                  <small dir="auto">{r.role}</small>
-                  {r.roleDv && <small className="ld-dv" lang="dv" dir="rtl">{r.roleDv}</small>}
-                </span>
-              </figcaption>
-            </figure>
-          )}
+          render={(r, i, copy) => <ReviewCard r={r} i={i} copy={copy} onOpen={(rv, at) => setOpen({ r: rv, i: at })} />}
         />
       </div>
+      {/* A click on the dimmed backdrop (the dialog itself, outside its
+          inner box) or Escape closes it. */}
+      <dialog ref={dialog} className="ld-review-dlg" aria-label={open ? `${t("reviews.tag")}: ${open.r.name}` : undefined}
+        onClose={() => setOpen(null)} onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
+        {open && (
+          <div className="ld-review-dlg-in">
+            <ReviewCard r={open.r} i={open.i} full />
+            <button type="button" className="ld-review-close" onClick={close}>{t("reviews.close")}</button>
+          </div>
+        )}
+      </dialog>
     </section>
   );
 }

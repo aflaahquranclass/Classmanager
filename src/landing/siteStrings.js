@@ -73,6 +73,8 @@ export const SITE_STRINGS = [
   s("Reviews", "reviews.tag", "Reviews", "ރިވިއުތައް"),
   s("Reviews", "reviews.title", "Kind words from our students and parents", "ދަރިވަރުންނާއި ބެލެނިވެރިންގެ ހެޔޮ ބަސްތައް"),
   s("Reviews", "reviews.lead", "Honest reviews of our classes, shared by the people who learn with us.", "އަޅުގަނޑުމެންނާއެކު ކިޔަވާ މީހުން ހިއްސާކުރައްވާފައިވާ، ކުލާސްތަކާ ބެހޭ ތެދު ޚިޔާލުތައް."),
+  s("Reviews", "reviews.more", "Read more", "އިތުރަށް ކިޔާލުމަށް"),
+  s("Reviews", "reviews.close", "Close", "ބަންދުކުރައްވާ"),
 
   s("Student portal", "portal.tag", "Student portal", "ދަރިވަރުންގެ ޕޯޓަލް"),
   s("Student portal", "portal.title", "Watch your child's hifz grow", "ދަރިފުޅުގެ ހިފްޒު ކުރިއަރަމުންދާ ގޮތް ބައްލަވާ"),
