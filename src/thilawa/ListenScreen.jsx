@@ -18,7 +18,7 @@ import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CheckCircle2, Presentation } from "lucide-react";
 import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
 import { TOTAL_PAGES, describePages, pageLabel } from "./engine.js";
-import { MistakePopup, MistakeLegend } from "./MistakeCategories.jsx";
+import { MistakePopup } from "./MistakeCategories.jsx";
 import LettersPanel, { LetterChips, LettersSide } from "./LettersPanel.jsx";
 import Whiteboard from "./Whiteboard.jsx";
 
@@ -52,15 +52,12 @@ const CSS = `
   .lm-row { display: flex; gap: 12px; align-items: flex-start; }
   .lm-page { flex: 1; min-width: 0; }
   .lm-board { min-height: 38px; padding: 0 12px; font-size: 13px; gap: 6px; }
-  /* Phone: the letters open from a tab on the right edge. */
-  .lm-ltab { display: none; position: fixed; right: 0; top: 116px; width: 24px; padding: 8px 0; border-radius: 12px 0 0 12px; border: 1px solid #C7DDF4; border-right: none;
-    background: #FFFFFF; color: #123B67; box-shadow: -4px 4px 14px rgba(18,59,103,0.14); cursor: pointer; flex-direction: column; align-items: center; gap: 6px; }
-  .lm-ltab i { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 500 15px/1 "Noto Naskh Arabic", "Geeza Pro", serif; font-style: normal; }
-  .lm-ltab b { min-width: 18px; height: 18px; line-height: 18px !important; border-radius: 999px; background: #E8650A; color: #FFFFFF; font: 700 11px/20px Inter, system-ui, sans-serif; text-align: center; }
-  .lm-ltab:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
-  /* In full screen it goes under the ☰ and whiteboard tabs. */
-  .mf-edge-full .lm-ltab { top: calc(max(12px, env(safe-area-inset-top)) + 104px); }
-  @media (max-width: 760px) { .lm-row .ls { display: none; } .lm-ltab { display: flex; } }
+  /* Letters: one button next to Whiteboard (a tab on the side in full
+     screen); in full screen on a wide screen the table sits beside the page. */
+  .lm-row .ls { display: none; }
+  .lm-letters i { font: 500 17px/1 "Noto Naskh Arabic", "Geeza Pro", serif; font-style: normal; }
+  .lm-letters b { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #E8650A; color: #FFFFFF; font: 700 11px/18px Inter, system-ui, sans-serif; text-align: center; }
+  @media (min-width: 761px) { .mf-full .lm-row .ls { display: block; } .mf-full .lm-letters { display: none; } }
   .lm-count { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #176FD1; color: #FFFFFF; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
   @media (max-width: 640px) {
     .lm-inner { padding: 10px 6px 20px; }
@@ -74,7 +71,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
   const [goto, setGoto] = useState(null); // the page number being typed
   const [selectedKey, setSelectedKey] = useState(null);
   const [anchor, setAnchor] = useState(null); // the selected word on screen
-  const [lettersOpen, setLettersOpen] = useState(false); // the letters sheet (phone)
+  const [lettersOpen, setLettersOpen] = useState(false); // the letters table
   const [board, setBoard] = useState(false); // the whiteboard
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -202,26 +199,21 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
 
       <div className="lm-body">
         <div className="lm-inner">
-          <div className="hz-legend">
-            <span><i style={{ background: "#FBD5CC", boxShadow: "0 0 0 1px #F2A595" }} />To correct</span>
-            <span><i style={{ background: "#DDF5E9" }} />Corrected</span>
-            <MistakeLegend />
-          </div>
           {a.instructions && <div className="hz-task-notes">{a.instructions}</div>}
           <LetterChips letters={a.letters} inMushaf />
           {error && <div className="hz-error" role="alert">{error}</div>}
           {/* The letters table goes inside, so it shows in full screen too. */}
-          {/* The letters sit beside the page (a tab on the edge on a phone), and the whiteboard is one tap away, in full screen too. */}
+          {/* Letters and the whiteboard are one tap away, in full screen too (there the letters sit beside the page on a wide screen). */}
           <MushafPresent onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}
-            quick={<button type="button" className="hz-btn hz-btn-outline lm-board" onClick={() => { setSelectedKey(null); setBoard(true); }} aria-label="Whiteboard" title="Whiteboard"><Presentation size={18} aria-hidden="true" /><span>Whiteboard</span></button>}
-            edge={<>
-              <button type="button" className="lm-ltab" onClick={() => { setSelectedKey(null); setLettersOpen(true); }} aria-expanded={lettersOpen}
-                aria-label={`Letters to improve${a.letters.length ? ` (${a.letters.length} chosen)` : ""}`}>
-                <i lang="ar" aria-hidden="true"><span>أ</span><span>ب</span><span>ت</span></i>{a.letters.length > 0 && <b aria-hidden="true">{a.letters.length}</b>}
+            quick={<>
+              <button type="button" className="hz-btn hz-btn-outline lm-board lm-letters" onClick={() => { setSelectedKey(null); setLettersOpen(true); }} aria-expanded={lettersOpen}
+                aria-label={`Letters to improve${a.letters.length ? ` (${a.letters.length} chosen)` : ""}`} title="Letters to improve">
+                <i lang="ar" aria-hidden="true">أب</i><span>Letters</span>{a.letters.length > 0 && <b aria-hidden="true">{a.letters.length}</b>}
               </button>
-              {lettersOpen && <LettersPanel key={student.id} value={a.letters} studentName={student.name} busy={busy} onClose={() => setLettersOpen(false)}
-                onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />}
-            </>}>
+              <button type="button" className="hz-btn hz-btn-outline lm-board" onClick={() => { setSelectedKey(null); setBoard(true); }} aria-label="Whiteboard" title="Whiteboard"><Presentation size={18} aria-hidden="true" /><span>Whiteboard</span></button>
+            </>}
+            edge={lettersOpen && <LettersPanel key={student.id} value={a.letters} studentName={student.name} busy={busy} onClose={() => setLettersOpen(false)}
+              onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />}>
           <div className="lm-nav">
             <button className="hz-btn hz-btn-outline" disabled={page >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
             <div className="lm-nav-title">{pageLabel(page)}

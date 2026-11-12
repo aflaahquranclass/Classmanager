@@ -1,6 +1,7 @@
 // The Arabic letters table: in Listen & mark the teacher taps the letters a
-// student needs to work on. LettersSide sits beside the Mushaf page (always in
-// view); on a phone LettersPanel is a sheet from the bottom. The letters are
+// student needs to work on. LettersPanel opens from the Letters button (a
+// sheet from the bottom on a phone); in full screen on a wide screen
+// LettersSide sits beside the Mushaf page instead. The letters are
 // saved with the reading or lesson once the teacher stops tapping (or the
 // table closes), and the student sees them with it (LetterChips).
 
@@ -70,8 +71,8 @@ function useLetterPicks(value, onChange) {
   return { chosen, set, toggle };
 }
 
-// The letters beside the Mushaf page, always in view (it stays put as the
-// page scrolls). Hidden on narrow screens, where LettersPanel opens from a tab.
+// The letters beside the Mushaf page, in full screen on a wide screen (it
+// stays put as the page scrolls). Elsewhere LettersPanel opens from a button.
 export function LettersSide({ value, studentName, busy, onChange }) {
   const { chosen, set, toggle } = useLetterPicks(value, onChange);
   return (
