@@ -96,6 +96,10 @@ export const thilawaCss = () => `
   .th-hadith b { display: block; color: #7A5410; margin-bottom: 4px; }
   @media (max-width: 520px) {
     .th-pick { grid-template-columns: 1fr; }
+    /* Phones: the Read / Open button drops under the text instead of squeezing the teacher's instructions into a thin column. */
+    .th-item { flex-wrap: wrap; }
+    .th-item-body { flex: 1 1 180px; }
+    .th-tick ~ .hz-btn { margin-left: 56px; }
     .th-reader-card { padding: 12px 6px; }
     .th-reader-card > .hz-row, .th-reader-card > .th-instr, .th-reader-card > .hz-error { margin-left: 8px !important; margin-right: 8px !important; }
     .th-reader .mp-page { padding: 4% 2.5% 2%; border-radius: 10px; }

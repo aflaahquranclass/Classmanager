@@ -5,7 +5,7 @@ import { thaanaChange } from "../notifications/thaanaKeyboard.js";
 import { REVIEW_CLASSES as CLASS_OPTIONS } from "./content.js";
 import { FormHeader } from "./parts.jsx";
 
-// Review form (/review?k=…), in English and Dhivehi. It only works through
+// Review form (/review?k=…), in Dhivehi. It only works through
 // the private link the admin shares in class groups (Admin → Reviews); the
 // website doesn't link to it. A review waits for the admin's OK before it
 // shows on the home page. The Viber number and the request stay private.
@@ -19,11 +19,10 @@ const STAR_WORDS = [
   { en: "Excellent", dv: "ވަރަށް ފުރިހަމަ" },
 ];
 
-function Label({ en, dv, required, htmlFor }) {
+function Label({ text, required, htmlFor }) {
   return (
     <label className="ld-f-label" htmlFor={htmlFor}>
-      <span>{en}:{required && <b aria-hidden="true"> *</b>}</span>
-      <span className="ld-dv" lang="dv" dir="rtl">{dv}:</span>
+      <span className="ld-dv">{text}:{required && <b aria-hidden="true"> *</b>}</span>
     </label>
   );
 }
@@ -36,17 +35,9 @@ function FormUnavailable({ closed }) {
         <div className="ld-rv-card ld-rv-done">
           <FormHeader />
           <Lock size={44} aria-hidden="true" />
-          {closed ? (
-            <>
-              <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">މިހާރު މި ފޯމު ބަންދުކޮށްފައިވަނީ.</p>
-              <p className="ld-lead">This review form is closed at the moment.</p>
-            </>
-          ) : (
-            <>
-              <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">މި ފޯމު ފުރިހަމަކުރެވޭނީ ކުލާހުގެ ގްރޫޕަށް ފޮނުވާ ލިންކުން އެކަނި.</p>
-              <p className="ld-lead">This form can only be opened with the link shared in your class group.</p>
-            </>
-          )}
+          <p className="ld-dv ld-rv-big">
+            {closed ? "މިހާރު މި ފޯމު ބަންދުކޮށްފައިވަނީ." : "މި ފޯމު ފުރިހަމަކުރެވޭނީ ކުލާހުގެ ގްރޫޕަށް ފޮނުވާ ލިންކުން އެކަނި."}
+          </p>
         </div>
       </div>
     </section>
@@ -81,8 +72,8 @@ export default function ReviewPage() {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.className) { setError("Please choose your class. · ކުލާސް ޚިޔާރުކުރައްވާ."); return; }
-    if (!rating) { setError("Please choose the number of stars. · ތަރީގެ ޢަދަދު ޚިޔާރުކުރައްވާ."); return; }
+    if (!form.className) { setError("ކުލާސް ޚިޔާރުކުރައްވާ."); return; }
+    if (!rating) { setError("ތަރީގެ ޢަދަދު ޚިޔާރުކުރައްވާ."); return; }
     setBusy(true);
     setError("");
     const { error: err } = await supabase.rpc("submit_review", {
@@ -96,7 +87,7 @@ export default function ReviewPage() {
     });
     setBusy(false);
     if (err?.message?.includes("closed or invalid")) { setStatus("closed"); return; }
-    if (err) { setError("Couldn’t send your review. Please try again. · ފޮނުވޭކަށް ނެތް، އަލުން މަސައްކަތް ކުރައްވާ."); return; }
+    if (err) { setError("ފޮނުވޭކަށް ނެތް، އަލުން މަސައްކަތް ކުރައްވާ."); return; }
     setSent(true);
     window.scrollTo(0, 0);
   };
@@ -111,11 +102,9 @@ export default function ReviewPage() {
           <div className="ld-rv-card ld-rv-done">
             <FormHeader />
             <CheckCircle2 size={52} aria-hidden="true" />
-            <h1 className="ld-h2">Thank you!</h1>
-            <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">ޝުކުރިއްޔާ!</p>
-            <p className="ld-lead">Your review has been sent. It will appear on our website once it is approved.</p>
-            <p className="ld-dv" lang="dv" dir="rtl">ތިޔަ ފޮނުއްވި ޚިޔާލު ލިބިއްޖެ. އެޑްމިން ބަލައިގަތުމުން ވެބްސައިޓުގައި ފެންނާނެ.</p>
-            <button type="button" className="ld-btn ld-btn-outline" onClick={() => { setForm(EMPTY); setRating(0); setSent(false); }}>Send another · އިތުރު ޚިޔާލެއް</button>
+            <h1 className="ld-h2">ޝުކުރިއްޔާ!</h1>
+            <p className="ld-lead">ތިޔަ ފޮނުއްވި ޚިޔާލު ލިބިއްޖެ. އެޑްމިން ބަލައިގަތުމުން ވެބްސައިޓުގައި ފެންނާނެ.</p>
+            <button type="button" className="ld-btn ld-btn-outline" onClick={() => { setForm(EMPTY); setRating(0); setSent(false); }}>އިތުރު ޚިޔާލެއް ފޮނުއްވާ</button>
           </div>
         </div>
       </section>
@@ -129,69 +118,68 @@ export default function ReviewPage() {
         <form className="ld-rv-card" onSubmit={submit}>
           <FormHeader />
           <div className="ld-rv-head">
-            <p className="ld-tag">Student review</p>
-            <h1 className="ld-dv ld-rv-big ld-rv-title" lang="dv" dir="rtl">ކުލާހާމެދު ދެކޭގޮތް ފާޅުކުރައްވާ!</h1>
+            <p className="ld-tag">ދަރިވަރުންގެ ޚިޔާލު</p>
+            <h1 className="ld-dv ld-rv-big ld-rv-title">ކުލާހާމެދު ދެކޭގޮތް ފާޅުކުރައްވާ!</h1>
           </div>
 
           <div className="ld-rv-kbd">
-            <span>Typing in Dhivehi on a computer? <span className="ld-dv" lang="dv" dir="rtl">ދިވެހިން ލިޔުމަށް</span></span>
+            <span className="ld-dv">ކޮމްޕިއުޓަރުން ދިވެހިން ލިޔުއްވާނަމަ</span>
             <button type="button" className={`ld-rv-toggle ${dhivehi ? "on" : ""}`} aria-pressed={dhivehi} onClick={() => setDhivehi((d) => !d)}>
-              <span lang="dv">ދިވެހި</span> {dhivehi ? "on" : "off"}
+              <span lang="dv">ދިވެހި ކީބޯޑު: {dhivehi ? "ހުޅުވާފައި" : "ބަންދު"}</span>
             </button>
           </div>
 
           <div className="ld-f">
-            <Label en="Name" dv="ނަން" required htmlFor="rv-name" />
+            <Label text="ނަން" required htmlFor="rv-name" />
             <input className="ld-input" {...text("name")} required maxLength={80} autoComplete="name" />
           </div>
 
           <div className="ld-f">
-            <Label en="Viber number" dv="ވައިބަރ ނަންބަރ" required htmlFor="rv-viber" />
+            <Label text="ވައިބަރ ނަންބަރު" required htmlFor="rv-viber" />
             <input className="ld-input" id="rv-viber" type="tel" inputMode="tel" dir="ltr" required minLength={5} maxLength={20} pattern="[+0-9 \-]{5,20}" placeholder="7xxxxxx" autoComplete="tel"
               value={form.viber} onChange={(e) => setForm((f) => ({ ...f, viber: e.target.value }))} />
           </div>
 
           <div className="ld-f">
-            <Label en="Class" dv="ކުލާސް" required />
-            <div className="ld-rv-classes" role="radiogroup" aria-label="Class">
+            <Label text="ކުލާސް" required />
+            <div className="ld-rv-classes" role="radiogroup" aria-label="ކުލާސް">
               {CLASS_OPTIONS.map((c) => (
                 <label key={c.en} className={`ld-rv-class ${form.className === c.en ? "on" : ""}`}>
                   <input type="radio" name="rv-class" value={c.en} checked={form.className === c.en} onChange={() => { setForm((f) => ({ ...f, className: c.en })); setError(""); }} />
-                  <span className="ld-dv" lang="dv" dir="rtl">{c.dv}</span>
-                  <small>{c.en}</small>
+                  <span className="ld-dv">{c.dv}</span>
                 </label>
               ))}
             </div>
           </div>
 
           <div className="ld-f">
-            <Label en="Your rating" dv="ކުލާހަށް ދެއްވާ ތަރި" required />
-            <div className="ld-rv-stars" role="radiogroup" aria-label="Rating" onMouseLeave={() => setHover(0)}>
+            <Label text="ކުލާހަށް ދެއްވާ ތަރި" required />
+            <div className="ld-rv-stars" role="radiogroup" aria-label="ތަރި" onMouseLeave={() => setHover(0)}>
               {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} star${n > 1 ? "s" : ""}`}
+                <button key={n} type="button" role="radio" aria-checked={rating === n} aria-label={`${n} ތަރި`}
                   className={n <= shown ? "on" : ""} onMouseEnter={() => setHover(n)} onClick={() => { setRating(n); setError(""); }}>
                   <Star size={34} fill="currentColor" strokeWidth={1.5} aria-hidden="true" />
                 </button>
               ))}
-              {STAR_WORDS[shown] && <span className="ld-rv-word">{STAR_WORDS[shown].en} · <span className="ld-dv" lang="dv" dir="rtl">{STAR_WORDS[shown].dv}</span></span>}
+              {STAR_WORDS[shown] && <span className="ld-rv-word"><span className="ld-dv">{STAR_WORDS[shown].dv}</span></span>}
             </div>
           </div>
 
           <div className="ld-f">
-            <Label en="About the class" dv="ކުލާހާމެދު ދެކޭގޮތް" required htmlFor="rv-comment" />
+            <Label text="ކުލާހާމެދު ދެކޭގޮތް" required htmlFor="rv-comment" />
             <textarea className="ld-input" {...text("comment")} required maxLength={1000} rows={5} />
           </div>
 
           <div className="ld-f">
-            <Label en="Any request (optional)" dv="އެއްވެސް ހުށައެޅުމެއް ވާނަމަ" htmlFor="rv-request" />
+            <Label text="އެއްވެސް ހުށައެޅުމެއް ވާނަމަ (ލާޒިމެއް ނޫން)" htmlFor="rv-request" />
             <textarea className="ld-input" {...text("request")} maxLength={1000} rows={3} />
-            <small className="ld-f-note">Only the class office will see this. <span className="ld-dv" lang="dv" dir="rtl">މި މަޢުލޫމާތު ފެނިގެންދާނީ ޤުރްއާން ކުލާހުގެ އިދާރާއަށް އެކަންޏެވެ.</span></small>
+            <small className="ld-f-note">މި މަޢުލޫމާތު ފެނިގެންދާނީ ޤުރުއާން ކުލާހުގެ އިދާރާއަށް އެކަންޏެވެ.</small>
           </div>
 
           {error && <p className="ld-rv-error" role="alert">{error}</p>}
 
           <button type="submit" className="ld-btn ld-btn-primary ld-rv-submit" disabled={busy}>
-            <Send size={18} aria-hidden="true" />{busy ? "Sending…" : "Send review"} <span lang="dv">· ފޮނުވާ</span>
+            <Send size={18} aria-hidden="true" /><span>{busy ? "ފޮނުވަނީ…" : "ފޮނުވާ"}</span>
           </button>
         </form>
       </div>

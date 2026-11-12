@@ -8,7 +8,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, XCircle, RotateCw, Star, Trash2, Hourglass, Copy, Link2, Lock, LockOpen } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { usePendingReviewCount } from "../admin/adminData.js";
+export { usePendingReviewCount };
+import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { publicName } from "./reviewPost.js";
@@ -37,22 +39,6 @@ const formUrl = (key) => {
 };
 const newKey = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
-
-// Waiting-review count for the nav badge.
-export function usePendingReviewCount(enabled) {
-  const [count, setCount] = useState(0);
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    const { count: n, error } = await supabase.from("reviews").select("id", { count: "exact", head: true }).eq("status", "pending");
-    if (!error) setCount(n || 0);
-  }, [enabled]);
-  useEffect(() => {
-    load();
-    const timer = setInterval(load, 60_000);
-    return () => clearInterval(timer);
-  }, [load]);
-  return [count, load];
-}
 
 function StarRow({ rating }) {
   return (

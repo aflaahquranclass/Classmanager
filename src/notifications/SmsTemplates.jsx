@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo, useRef, useId } from "react";
 import { Save, Send, ChevronLeft, ChevronRight, Wallet, PartyPopper, Smartphone, Mail } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT } from "../exams/reportStrings.js";
 import { thaanaChange, hasThaana } from "./thaanaKeyboard.js";

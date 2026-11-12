@@ -11,7 +11,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, Copy, ExternalLink, FileText, CalendarCheck, Users, MessageSquare, Send, Check, Search, Download, Phone } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { usePendingWorkshopCount } from "../admin/adminData.js";
+export { usePendingWorkshopCount };
+import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { WORKSHOPS } from "./workshops.js";
@@ -43,22 +45,6 @@ const pageUrl = (slug) => {
 };
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const viberLink = (n) => `viber://chat?number=${encodeURIComponent(String(n).replace(/[^\d+]/g, "").replace(/^(\d{7})$/, "+960$1"))}`;
-
-// Waiting sign-up count for the nav badge.
-export function usePendingWorkshopCount(enabled) {
-  const [count, setCount] = useState(0);
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    const { count: n, error } = await supabase.from("workshop_registrations").select("id", { count: "exact", head: true }).eq("status", "pending");
-    if (!error) setCount(n || 0);
-  }, [enabled]);
-  useEffect(() => {
-    load();
-    const timer = setInterval(load, 60_000);
-    return () => clearInterval(timer);
-  }, [load]);
-  return [count, load];
-}
 
 export function AdminWorkshops({ showToast, onCountChange }) {
   const [slug, setSlug] = useState(LIST[0].slug);

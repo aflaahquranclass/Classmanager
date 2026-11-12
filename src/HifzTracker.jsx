@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useBackLayer } from "./useBackNav.js";
 import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2, ArrowRight } from "lucide-react";
-import { TP } from "./App.jsx";
+import { TP } from "./shared.jsx";
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { unitsOf, intersect } from "./hifz/engine.js";
 import { nearestAyahs } from "./hifz/ayahs.js";

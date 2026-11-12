@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { Bell } from "lucide-react";
-import { TP } from "../App.jsx";
+import { TP } from "../shared.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { loadTemplates, loadDvNames } from "./smsSend.js";
 import { loadMessageTemplates, automaticAsTemplates } from "./messageTemplates.js";

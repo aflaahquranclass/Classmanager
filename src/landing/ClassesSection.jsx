@@ -31,7 +31,7 @@ export default function ClassesSection({ navigate }) {
           {CATEGORIES.map((c, i) => {
             const Icon = ICONS[c.icon];
             return (
-              <Link key={c.key} to={`/register?cat=${c.key}`} navigate={navigate} className={`ld-card ld-cls-card ld-reveal ld-d${i + 1}`}>
+              <Link key={c.key} to={`/register/${c.key}`} navigate={navigate} className={`ld-card ld-cls-card ld-reveal ld-d${i + 1}`}>
                 <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
                 <h3>{t(`class.${c.key}.name`)}</h3>
                 {lang !== "dv" && <span className="ld-dv" lang="dv" dir="rtl">{c.dv}</span>}

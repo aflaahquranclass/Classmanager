@@ -7,7 +7,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { CheckCircle2, XCircle, FileText, RotateCw, X, ExternalLink, Hourglass } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP, monthLabel, fmtMoney } from "../App.jsx";
+import { usePendingSlipCount } from "../admin/adminData.js";
+export { usePendingSlipCount };
+import { TP, monthLabel, fmtMoney } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { createNotification } from "../notifications/smsSend.js";
 import { SLIP_BUCKET, SLIP_STATUS, isPdf } from "./slips.js";
@@ -21,22 +23,6 @@ const FILTERS = [
 ];
 
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
-
-// Pending-slip count for the Finance tab badge.
-export function usePendingSlipCount(enabled) {
-  const [count, setCount] = useState(0);
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    const { count: n, error } = await supabase.from("payment_slips").select("id", { count: "exact", head: true }).eq("status", "pending");
-    if (!error) setCount(n || 0);
-  }, [enabled]);
-  useEffect(() => {
-    load();
-    const timer = setInterval(load, 60_000);
-    return () => clearInterval(timer);
-  }, [load]);
-  return [count, load];
-}
 
 function notifyStudent(student, title, body) {
   if (!student?.userId) return;

@@ -1,7 +1,6 @@
 import React, { Suspense, lazy } from "react";
 import ReactDOM from "react-dom/client";
-import App, { PORTAL } from "./App.jsx";
-import StudentPortal from "./StudentPortal.jsx";
+import { PORTAL } from "./portal.js";
 import { ConfirmHost } from "./ConfirmDialog.jsx";
 import { SplashDone } from "./splash.jsx";
 
@@ -11,6 +10,10 @@ import { SplashDone } from "./splash.jsx";
 // in at admin.aflaahqc.com). The website is loaded on demand so the portals
 // don't download it.
 const Landing = lazy(() => import("./landing/Landing.jsx"));
+// Each portal is its own download too: a student never loads the staff app,
+// and a teacher never loads the Students Portal.
+const App = lazy(() => import("./App.jsx"));
+const StudentPortal = lazy(() => import("./StudentPortal.jsx"));
 const LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const oldStaffLogin = !PORTAL && window.location.pathname === "/login";
 if (oldStaffLogin) window.location.replace(LOCAL ? "/?portal=teacher" : "https://teachers.aflaahqc.com");
@@ -27,7 +30,7 @@ const teacherDemo = LOCAL && PORTAL === "teacher" && new URLSearchParams(window.
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : workshopPage ? <Suspense fallback={null}><WorkshopPage /><SplashDone /></Suspense> : teacherDemo ? <Suspense fallback={null}><TeacherDemo /></Suspense> : oldStaffLogin ? null : PORTAL === "student" ? <StudentPortal /> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <App />}
+    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : workshopPage ? <Suspense fallback={null}><WorkshopPage /><SplashDone /></Suspense> : teacherDemo ? <Suspense fallback={null}><TeacherDemo /></Suspense> : oldStaffLogin ? null : PORTAL === "student" ? <Suspense fallback={null}><StudentPortal /></Suspense> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <Suspense fallback={null}><App /></Suspense>}
     <ConfirmHost />
   </React.StrictMode>
 );

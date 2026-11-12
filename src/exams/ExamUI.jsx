@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { CalendarDays, Clock, Plus, RotateCw, Trash2, X, User, Eye, BookOpen, PlayCircle, CheckCircle2, XCircle, Pencil, Highlighter } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP, SearchableSelect } from "../App.jsx";
+import { TP, SearchableSelect } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { dhivehiInputCss } from "./DhivehiInput.jsx";
 import { fetchVerses, BASMALA, SURAH_NAMES_AR } from "./quranText.js";

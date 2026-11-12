@@ -8,6 +8,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Copy, Lock, LockOpen, RotateCw, Link2, ExternalLink, ChevronRight, X, CheckCircle2, Search, Ban, MessageCircle } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
+import { usePendingInfoCount } from "../admin/adminData.js";
+export { usePendingInfoCount };
 import { confirmDialog } from "../ConfirmDialog.jsx";
 
 const FILTERS = [
@@ -301,22 +303,6 @@ function ResponseBox({ resp, students, showToast, onClose, onStudentUpdated, onD
       </article>
     </div>
   );
-}
-
-// Waiting-response count, added to the Registrations badge.
-export function usePendingInfoCount(enabled) {
-  const [count, setCount] = useState(0);
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    const { count: n, error } = await supabase.from("student_info_updates").select("id", { count: "exact", head: true }).eq("status", "pending");
-    if (!error) setCount(n || 0);
-  }, [enabled]);
-  useEffect(() => {
-    load();
-    const timer = setInterval(load, 60_000);
-    return () => clearInterval(timer);
-  }, [load]);
-  return [count, load];
 }
 
 export const infoCss = (TP) => `

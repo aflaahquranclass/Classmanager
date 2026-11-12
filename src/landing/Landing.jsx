@@ -11,7 +11,8 @@ import ReviewPage from "./ReviewPage.jsx";
 import InstallPage from "./InstallPage.jsx";
 import RegisterPage from "./RegisterPage.jsx";
 import UpdatePage from "./UpdatePage.jsx";
-import { lockedCategory, categoryOf } from "../registrations/registrations.js";
+import HifzTestPage from "./HifzTestPage.jsx";
+import { registerPathOf, categoryOf, ageGroupOf } from "../registrations/registrations.js";
 import { LangProvider, LangSwitch, useLang } from "./i18n.jsx";
 
 // Public website on the main domain: Home, Hifz program, Store and Rules, the
@@ -21,10 +22,11 @@ const PAGES = {
   "/": "Aflaah Quran Class",
   "/hifz": "Hifz program · Aflaah Quran Class",
   "/store": "Book store · Aflaah Quran Class",
-  "/review": "Write a review · Aflaah Quran Class",
+  "/review": "ކުލާހާމެދު ދެކޭގޮތް · Aflaah Quran Class",
   "/install": "Install the app · Aflaah Quran Class",
-  "/register": "Register for a class · Aflaah Quran Class",
-  "/update": "Update student details · Aflaah Quran Class",
+  "/register": "ކުލާހަށް ރަޖިސްޓަރީވުން · Aflaah Quran Class",
+  "/update": "ދަރިވަރުގެ މަޢުލޫމާތު · Aflaah Quran Class",
+  "/hifz-test": "ހިފްޒު ޓެސްޓަށް ރަޖިސްޓަރީވުން · Aflaah Quran Class",
   ...(SHOW.rules ? { "/rules": "Rules and regulations · Aflaah Quran Class" } : {}),
 };
 
@@ -36,8 +38,11 @@ const LOGINS = [
   { label: "nav.admin", href: LOCAL ? "/?portal=admin" : "https://admin.aflaahqc.com", rel: "nofollow" },
 ];
 
-// Each class's own registration form (/register/hifz …) is the register page.
-const pageOf = (pathname) => (lockedCategory(pathname) ? "/register" : PAGES[pathname] ? pathname : "/");
+// Every registration address (/register/hifz/school …) is the register page.
+const pageOf = (pathname) => (registerPathOf(pathname) ? "/register" : PAGES[pathname] ? pathname : "/");
+// The forms are in Dhivehi only and stand on their own, without the site's
+// top bar and footer.
+const FORM_PAGES = ["/register", "/update", "/review", "/hifz-test"];
 const pathOf = (loc) => pageOf(loc.pathname);
 
 export default function Landing() {
@@ -74,8 +79,10 @@ function Site() {
   }, []);
 
   useEffect(() => {
-    const cat = path === "/register" && categoryOf(lockedCategory());
-    document.title = cat ? `Register for ${cat.en} · Aflaah Quran Class` : PAGES[path];
+    const place = path === "/register" && registerPathOf();
+    const cat = place && categoryOf(place.category);
+    const grp = place && ageGroupOf(place.ageGroup);
+    document.title = cat ? `${cat.dvName}${grp ? ` · ${grp.dv}` : ""} · Aflaah Quran Class` : PAGES[path];
   }, [path, visit]);
   // Keep the private review and info update forms out of search engines.
   useEffect(() => {
@@ -98,10 +105,12 @@ function Site() {
 
   const logins = LOGINS.map((l) => <a key={l.label} href={l.href} rel={l.rel}>{t(l.label)}</a>);
   const brand = <span className="ld-brand-name">{t("brand.name")}<small>{t("brand.sub")}</small></span>;
+  const formPage = FORM_PAGES.includes(path);
+  const pageLang = formPage ? "dv" : lang;
 
   return (
-    <div className="ld" lang={lang} dir={lang === "dv" ? "rtl" : "ltr"}>
-      <header className="ld-nav">
+    <div className={`ld ${formPage ? "ld-form-page" : ""}`} lang={pageLang} dir={pageLang === "dv" ? "rtl" : "ltr"}>
+      {!formPage && <header className="ld-nav">
         <div className="ld-wrap ld-nav-in">
           <Link to="/" navigate={navigate} className="ld-brand"><img src="/images/logo-icon-only.png" alt="" />{brand}</Link>
           <nav className={`ld-links ${menuOpen ? "open" : ""}`} aria-label="Main">
@@ -131,7 +140,7 @@ function Site() {
             </button>
           </div>
         </div>
-      </header>
+      </header>}
 
       <main>
         {path === "/" && <HomePage navigate={navigate} />}
@@ -140,11 +149,12 @@ function Site() {
         {path === "/rules" && <RulesPage />}
         {path === "/review" && <ReviewPage />}
         {path === "/install" && <InstallPage />}
-        {path === "/register" && <RegisterPage key={visit} />}
+        {path === "/register" && <RegisterPage key={visit} navigate={navigate} />}
         {path === "/update" && <UpdatePage />}
+        {path === "/hifz-test" && <HifzTestPage />}
       </main>
 
-      <footer className="ld-foot" id="contact">
+      {!formPage && <footer className="ld-foot" id="contact">
         <div className="ld-wrap">
           <div className="ld-foot-in">
             <div className="ld-foot-about">
@@ -173,7 +183,7 @@ function Site() {
           </div>
           <div className="ld-copy"><span>{t("foot.rights", { year: new Date().getFullYear() })}</span><span>{t("contact.location")}</span></div>
         </div>
-      </footer>
+      </footer>}
     </div>
   );
 }

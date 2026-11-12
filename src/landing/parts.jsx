@@ -160,8 +160,8 @@ export function FormHeader() {
   return (
     <div className="ld-rv-banner">
       <img className="ld-rv-logo" src="/images/logo-full-white.png" alt="Aflaah Quran Class" />
-      <img className="ld-callig" src="/images/calligraphy-khairukum.png" alt="خيركم من تعلم القرآن وعلمه — The best of you are those who learn the Quran and teach it" />
-      <p className="ld-callig-tr">“The best of you are those who learn the Quran and teach it.”</p>
+      <img className="ld-callig" src="/images/calligraphy-khairukum.png" alt="خيركم من تعلم القرآن وعلمه" />
+      <p className="ld-callig-tr ld-dv" lang="dv" dir="rtl">ތިޔަބައިމީހުންގެ ތެރެއިން އެންމެ ހެޔޮ މީހަކީ ޤުރުއާން ދަސްކޮށް، އަދި އެ ދަސްކޮށްދޭ މީހާއެވެ.</p>
     </div>
   );
 }

@@ -11,11 +11,10 @@ import { FormHeader } from "./parts.jsx";
 // doesn't link to it. The admin matches each response to a student.
 const EMPTY = { name: "", nic: "", atollIsland: "", viber: "", email: "" };
 
-function Label({ en, dv, required, htmlFor }) {
+function Label({ text, required, htmlFor }) {
   return (
     <label className="ld-f-label" htmlFor={htmlFor}>
-      <span>{en}:{required && <b aria-hidden="true"> *</b>}</span>
-      <span className="ld-dv" lang="dv" dir="rtl">{dv}:</span>
+      <span className="ld-dv">{text}:{required && <b aria-hidden="true"> *</b>}</span>
     </label>
   );
 }
@@ -27,17 +26,9 @@ function FormUnavailable({ closed }) {
         <div className="ld-rv-card ld-rv-done">
           <FormHeader />
           <Lock size={44} aria-hidden="true" />
-          {closed ? (
-            <>
-              <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">މިހާރު މި ފޯމު ބަންދުކޮށްފައިވަނީ.</p>
-              <p className="ld-lead">This form is closed at the moment.</p>
-            </>
-          ) : (
-            <>
-              <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">މި ފޯމު ފުރިހަމަކުރެވޭނީ ކުލާހުގެ ގްރޫޕަށް ފޮނުވާ ލިންކުން އެކަނި.</p>
-              <p className="ld-lead">This form can only be opened with the link shared in your class group.</p>
-            </>
-          )}
+          <p className="ld-dv ld-rv-big">
+            {closed ? "މިހާރު މި ފޯމު ބަންދުކޮށްފައިވަނީ." : "މި ފޯމު ފުރިހަމަކުރެވޭނީ ކުލާހުގެ ގްރޫޕަށް ފޮނުވާ ލިންކުން އެކަނި."}
+          </p>
         </div>
       </div>
     </section>
@@ -71,7 +62,7 @@ export default function UpdatePage() {
     });
     setBusy(false);
     if (err?.message?.includes("closed or invalid")) { setStatus("closed"); return; }
-    if (err) { setError("Couldn’t send. Please try again. · ފޮނުވޭކަށް ނެތް، އަލުން މަސައްކަތް ކުރައްވާ."); return; }
+    if (err) { setError("ފޮނުވޭކަށް ނެތް، އަލުން މަސައްކަތް ކުރައްވާ."); return; }
     setSent(true);
     window.scrollTo(0, 0);
   };
@@ -86,11 +77,9 @@ export default function UpdatePage() {
           <div className="ld-rv-card ld-rv-done">
             <FormHeader />
             <CheckCircle2 size={52} aria-hidden="true" />
-            <h1 className="ld-h2">Thank you!</h1>
-            <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">ޝުކުރިއްޔާ!</p>
-            <p className="ld-lead">Your details have been sent to the class office.</p>
-            <p className="ld-dv" lang="dv" dir="rtl">ތިޔަ މަޢުލޫމާތު ކުލާހުގެ އިދާރާއަށް ލިބިއްޖެ.</p>
-            <button type="button" className="ld-btn ld-btn-outline" onClick={() => { setForm(EMPTY); setSent(false); }}>Send for another student · އެހެން ދަރިވަރެއްގެ</button>
+            <h1 className="ld-h2">ޝުކުރިއްޔާ!</h1>
+            <p className="ld-lead">ތިޔަ މަޢުލޫމާތު ކުލާހުގެ އިދާރާއަށް ލިބިއްޖެ.</p>
+            <button type="button" className="ld-btn ld-btn-outline" onClick={() => { setForm(EMPTY); setSent(false); }}>އެހެން ދަރިވަރެއްގެ މަޢުލޫމާތު ފޮނުއްވާ</button>
           </div>
         </div>
       </section>
@@ -103,42 +92,41 @@ export default function UpdatePage() {
         <form className="ld-rv-card" onSubmit={submit}>
           <FormHeader />
           <div className="ld-rv-head">
-            <p className="ld-tag">Student information</p>
-            <h1 className="ld-h2" style={{ margin: 0 }}>Update your details</h1>
-            <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">ދަރިވަރުގެ މަޢުލޫމާތު</p>
-            <p className="ld-lead">For students already in the class. One form for each student.</p>
+            <p className="ld-tag">ދަރިވަރުގެ މަޢުލޫމާތު</p>
+            <h1 className="ld-h2" style={{ margin: 0 }}>މަޢުލޫމާތު އަޕްޑޭޓް ކުރުން</h1>
+            <p className="ld-lead">މިހާރު ކުލާހުގައި ކިޔަވާ ދަރިވަރުންނަށް. ކޮންމެ ދަރިވަރަކަށް ވަކި ފޯމެއް ފުރުއްވާ.</p>
           </div>
 
           <div className="ld-f">
-            <Label en="Student’s name" dv="ދަރިވަރުގެ ނަން" required htmlFor="up-name" />
+            <Label text="ދަރިވަރުގެ ފުރިހަމަ ނަން" required htmlFor="up-name" />
             <input className="ld-input" {...field("name")} dir="auto" required maxLength={80} autoComplete="name" />
           </div>
 
           <div className="ld-f">
-            <Label en="ID card number" dv="އައިޑީ ކާޑު ނަންބަރު" required htmlFor="up-nic" />
+            <Label text="އައިޑީ ކާޑު ނަންބަރު" required htmlFor="up-nic" />
             <input className="ld-input" {...field("nic")} dir="ltr" required minLength={4} maxLength={20} placeholder="A123456" autoCapitalize="characters" />
           </div>
 
           <div className="ld-f">
-            <Label en="Atoll and island" dv="އަތޮޅާއި ރަށް" required htmlFor="up-atollIsland" />
-            <input className="ld-input" {...field("atollIsland")} dir="auto" required maxLength={80} placeholder="e.g. K. Malé" />
+            <Label text="އަތޮޅާއި ރަށް" required htmlFor="up-atollIsland" />
+            <input className="ld-input" {...field("atollIsland")} dir="auto" required maxLength={80} placeholder="މިސާލު: ކ. މާލެ" />
           </div>
 
           <div className="ld-f">
-            <Label en="Viber number" dv="ވައިބަރ ނަންބަރ" required htmlFor="up-viber" />
+            <Label text="ވައިބަރ ނަންބަރު" required htmlFor="up-viber" />
             <input className="ld-input" {...field("viber")} type="tel" inputMode="tel" dir="ltr" required minLength={5} maxLength={20} pattern="[+0-9 \-]{5,20}" placeholder="7xxxxxx" autoComplete="tel" />
           </div>
 
           <div className="ld-f">
-            <Label en="Email (optional)" dv="އީމެއިލް" htmlFor="up-email" />
+            <Label text="އީމެއިލް (ލާޒިމެއް ނޫން)" htmlFor="up-email" />
             <input className="ld-input" {...field("email")} type="email" dir="ltr" maxLength={120} autoComplete="email" />
-            <small className="ld-f-note">Only the class office will see these details. <span className="ld-dv" lang="dv" dir="rtl">މި މަޢުލޫމާތު ފެނިގެންދާނީ ކުލާހުގެ އިދާރާއަށް އެކަންޏެވެ.</span></small>
+            <small className="ld-f-note">މި މަޢުލޫމާތު ފެނިގެންދާނީ ކުލާހުގެ އިދާރާއަށް އެކަންޏެވެ.</small>
           </div>
 
           {error && <p className="ld-rv-error" role="alert">{error}</p>}
 
           <button type="submit" className="ld-btn ld-btn-primary ld-rv-submit" disabled={busy}>
-            <Send size={18} aria-hidden="true" />{busy ? "Sending…" : "Send"} <span lang="dv">· ފޮނުވާ</span>
+            <Send size={18} aria-hidden="true" /><span>{busy ? "ފޮނުވަނީ…" : "ފޮނުވާ"}</span>
           </button>
         </form>
       </div>

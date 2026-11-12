@@ -1,72 +1,149 @@
 import { useState, useEffect, useMemo } from "react";
-import { CheckCircle2, Send, Upload, Landmark, FileText, ArrowLeft, ArrowRight, CalendarDays, Clock, Lock } from "lucide-react";
+import { CheckCircle2, Send, Upload, Landmark, FileText, ArrowLeft, ArrowRight, CalendarDays, Clock, Lock, Users, GraduationCap } from "lucide-react";
 import { BANK } from "../payments/slips.js";
 import { ICONS, FormHeader } from "./parts.jsx";
 import { useOfferings } from "./ClassesSection.jsx";
 import {
-  CATEGORIES, AGE_GROUPS, REG_SLIP_ACCEPT, REG_SLIP_MAX_BYTES,
-  submitRegistration, isFormOpen, lockedCategory, categoryOf, ageGroupOf, fmtTime, fmtDays, fmtMvr,
+  AGE_GROUPS, FORM_CATEGORY_ORDER, REG_SLIP_ACCEPT, REG_SLIP_MAX_BYTES,
+  submitRegistration, isFormOpen, registerPathOf, categoryOf, ageGroupOf, formKeyOf, formPath,
+  fmtTimeDv, fmtDaysDv, fmtMvrDv,
 } from "../registrations/registrations.js";
 
-// Class registration form, one step at a time: the class, then the age
-// group, then a day and time, then the student's details, and last the
-// registration fee and its transfer slip. It goes to Admin → Registrations;
-// nothing here is shown publicly.
+// Class registration, all in Dhivehi. There is one form for each class and
+// age group, /register/<class>/<school|adults> (e.g. /register/hifz/school),
+// which the admin opens and closes on its own (Admin → Registrations → Form
+// links). /register lists the three classes and /register/<class> its two
+// age groups; both only lead to a form.
 //
-// /register is the main form (Register buttons; /register?cat=<category> from
-// the home page's class cards starts with that class chosen). Each class also
-// has its own form for posters, /register/<category>, where the class is fixed
-// and the student starts at the age group. The admin can close each form.
+// A form goes one step at a time: a day and time, the student's details, and
+// last the registration fee and its transfer slip. It goes to Admin →
+// Registrations; nothing here is shown publicly.
 const EMPTY = { name: "", nic: "", age: "", atollIsland: "", viber: "" };
-const STEPS = [
-  { en: "Class", dv: "ކުލާސް" },
-  { en: "Age group", dv: "ޢުމުރު" },
-  { en: "Day & time", dv: "ދުވަސް އަދި ގަޑި" },
-  { en: "Your details", dv: "މަޢުލޫމާތު" },
-  { en: "Registration fee", dv: "ރަޖިސްޓްރޭޝަން ފީ" },
-];
+const STEPS = ["ދުވަސް އަދި ގަޑި", "ދަރިވަރުގެ މަޢުލޫމާތު", "ރަޖިސްޓްރޭޝަން ފީ"];
+const GROUP_ICONS = { children: GraduationCap, adults: Users };
+const ERRORS = {
+  closed: "މި ގަޑީގެ ރަޖިސްޓްރޭޝަން މިހާރު ބަންދުވެއްޖެ. ފަހަތަށް ގޮސް އެހެން ގަޑިއެއް ޚިޔާރުކުރައްވާ.",
+  slip: "ސްލިޕް އަޕްލޯޑް ނުކުރެވުނު. ފައިލް ބައްލަވާފައި އަލުން މަސައްކަތް ކުރައްވާ.",
+  waiting: "މި އައިޑީ ކާޑު ނަންބަރުގައި ފޮނުއްވާފައިވާ ރަޖިސްޓްރޭޝަނެއް ޗެކްކުރުމަށް މިހާރުވެސް އިންތިޒާރުގައި އެބަހުރި. ވައިބަރުން ގުޅާނަން.",
+  busy: "މިހާރު ވަރަށް ގިނަ ރަޖިސްޓްރޭޝަންތަކެއް ލިބެމުންދަނީ. އެއް ގަޑިއިރު ފަހުން އަލުން މަސައްކަތް ކުރައްވާ.",
+  save: "ރަޖިސްޓްރޭޝަން ނުފޮނުވުނު. އަލުން މަސައްކަތް ކުރައްވާ.",
+};
 
-function Label({ en, dv, required, htmlFor }) {
+function Label({ text, required, htmlFor }) {
   return (
     <label className="ld-f-label" htmlFor={htmlFor}>
-      <span>{en}:{required && <b aria-hidden="true"> *</b>}</span>
-      {dv && <span className="ld-dv" lang="dv" dir="rtl">{dv}:</span>}
+      <span className="ld-dv">{text}:{required && <b aria-hidden="true"> *</b>}</span>
     </label>
   );
 }
 
-const startingCategory = () => {
-  const cat = lockedCategory() || new URLSearchParams(window.location.search).get("cat");
-  return categoryOf(cat) ? cat : "";
-};
-
-// Shown instead of the form while the admin has it closed.
-function FormClosed({ cat }) {
+function Card({ children, done }) {
   return (
     <section className="ld-sec ld-soft ld-rv">
       <div className="ld-wrap">
-        <div className="ld-rv-card ld-rv-done">
+        <div className={`ld-rv-card ${done ? "ld-rv-done" : ""}`}>
           <FormHeader />
-          <Lock size={44} aria-hidden="true" />
-          <h1 className="ld-h2">Registration is closed</h1>
-          <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">މިހާރު ރަޖިސްޓްރޭޝަން ބަންދުކޮށްފައިވަނީ.</p>
-          <p className="ld-lead">{cat ? `Registration for the ${cat.en} class` : "Class registration"} is closed at the moment. Please follow our posters for the next intake.</p>
+          {children}
         </div>
       </div>
     </section>
   );
 }
 
-export default function RegisterPage() {
-  const locked = lockedCategory();
-  const formKey = locked || "all";
+function Head({ title, sub }) {
+  return (
+    <div className="ld-rv-head">
+      <p className="ld-tag">ކުލާހަށް ރަޖިސްޓަރީވުން</p>
+      <h1 className="ld-h2" style={{ margin: 0 }}>{title}</h1>
+      {sub && <p className="ld-lead" style={{ margin: 0 }}>{sub}</p>}
+    </div>
+  );
+}
+
+// Where the visitor is: /register?cat=<class> (older home page links) counts
+// as /register/<class>.
+function startingPlace() {
+  const place = registerPathOf() || { category: "", ageGroup: "" };
+  const cat = new URLSearchParams(window.location.search).get("cat");
+  if (!place.category && categoryOf(cat)) place.category = cat;
+  return place;
+}
+
+export default function RegisterPage({ navigate }) {
+  const [place] = useState(startingPlace);
+  if (place.category && place.ageGroup) return <RegisterForm category={place.category} ageGroup={place.ageGroup} navigate={navigate} />;
+  if (place.category) return <AgeChooser category={place.category} navigate={navigate} />;
+  return <ClassChooser navigate={navigate} />;
+}
+
+// /register: the three classes.
+function ClassChooser({ navigate }) {
+  return (
+    <Card>
+      <Head title="ކުލާހެއް ޚިޔާރުކުރައްވާ" sub="ކޮންމެ ކުލާހެއްގައި ސްކޫލް ދަރިވަރުންގެ ކުލާހާއި ބޮޑެތި މީހުންގެ ކުލާސް ވަކިން ހުންނާނެ." />
+      <div className="ld-wz-options">
+        {FORM_CATEGORY_ORDER.map((key) => {
+          const c = categoryOf(key);
+          const Icon = ICONS[c.icon];
+          return (
+            <button key={c.key} type="button" className="ld-wz-option" onClick={() => navigate(`/register/${c.key}`)}>
+              <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
+              <span className="ld-wz-option-text"><b>{c.dvName}</b><small>{c.dvBlurb}</small></span>
+              <ArrowRight size={20} aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+      <BackToSite navigate={navigate} />
+    </Card>
+  );
+}
+
+// /register/<class>: its school students' and adults' forms.
+function AgeChooser({ category, navigate }) {
+  const c = categoryOf(category);
+  return (
+    <Card>
+      <Head title={c.dvName} sub={c.dvBlurb} />
+      <div className="ld-wz-title"><h2 className="ld-dv">ކުލާސް ޚިޔާރުކުރައްވާ</h2></div>
+      <div className="ld-wz-options">
+        {AGE_GROUPS.map((g) => {
+          const Icon = GROUP_ICONS[g.key];
+          return (
+            <button key={g.key} type="button" className="ld-wz-option" onClick={() => navigate(formPath(formKeyOf(category, g.key)))}>
+              <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
+              <span className="ld-wz-option-text"><b>{g.dv}</b><small>{g.dvSub}</small></span>
+              <ArrowRight size={20} aria-hidden="true" />
+            </button>
+          );
+        })}
+      </div>
+      <div className="ld-wz-nav">
+        <button type="button" className="ld-btn ld-btn-outline" onClick={() => navigate("/register")}><ArrowLeft size={18} aria-hidden="true" /> އެހެން ކުލާހެއް</button>
+      </div>
+    </Card>
+  );
+}
+
+function BackToSite({ navigate }) {
+  return (
+    <div className="ld-wz-nav">
+      <button type="button" className="ld-btn ld-btn-outline" onClick={() => navigate("/")}><ArrowLeft size={18} aria-hidden="true" /> ވެބްސައިޓަށް</button>
+    </div>
+  );
+}
+
+// /register/<class>/<school|adults>: the form itself.
+function RegisterForm({ category, ageGroup, navigate }) {
+  const formKey = formKeyOf(category, ageGroup);
+  const cat = categoryOf(category);
+  const grp = ageGroupOf(ageGroup);
+  const other = AGE_GROUPS.find((g) => g.key !== ageGroup);
   const [formOpen, setFormOpen] = useState(null);
   useEffect(() => { isFormOpen(formKey).then((open) => setFormOpen(open !== false)); }, [formKey]);
   const offerings = useOfferings();
-  const [category, setCategory] = useState(startingCategory);
-  const [ageGroup, setAgeGroup] = useState("");
   const [offeringId, setOfferingId] = useState("");
-  const [step, setStep] = useState(() => (startingCategory() ? 1 : 0));
+  const [step, setStep] = useState(0);
   const [form, setForm] = useState(EMPTY);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -78,29 +155,29 @@ export default function RegisterPage() {
     [offerings, category, ageGroup],
   );
   const offering = slots.find((o) => o.id === offeringId) || null;
+  const ageError = grp.ageError;
 
   const go = (n) => { setError(""); setStep(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const field = (key) => ({ id: `rg-${key}`, value: form[key], onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })) });
 
   const chooseFile = (e) => {
     const f = e.target.files?.[0] || null;
-    if (f && f.size > REG_SLIP_MAX_BYTES) { setError("The slip is larger than 5 MB. Please attach a smaller photo or PDF."); e.target.value = ""; setFile(null); return; }
+    if (f && f.size > REG_SLIP_MAX_BYTES) { setError("ސްލިޕް 5 MB އަށްވުރެ ބޮޑު. އެއަށްވުރެ ކުޑަ ފޮޓޯއެއް ނުވަތަ PDF އެއް އަޕްލޯޑް ކުރައްވާ."); e.target.value = ""; setFile(null); return; }
     setError("");
     setFile(f);
   };
 
-  // Step 4 → 5: the browser checks the fields; this checks the age fits.
+  // Step 2 → 3: the browser checks the fields; this checks the age fits.
   const detailsDone = (e) => {
     e.preventDefault();
     const age = Number(form.age);
-    if (ageGroup === "children" && age > 14) { setError("The children's class is for students under 14. Go back and choose the teens and adults class."); return; }
-    if (ageGroup === "adults" && age < 15) { setError("The teens and adults class is for students 15 and above. Go back and choose the children's class."); return; }
-    go(4);
+    if ((grp.maxAge && age > grp.maxAge) || (grp.minAge && age < grp.minAge)) { setError(ageError); return; }
+    go(2);
   };
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!file) { setError("Please attach the registration fee transfer slip."); return; }
+    if (!file) { setError("ރަޖިސްޓްރޭޝަން ފީ ޖަމާކުރި ސްލިޕް އަޕްލޯޑް ކުރައްވާ."); return; }
     setBusy(true);
     setError("");
     try {
@@ -112,205 +189,154 @@ export default function RegisterPage() {
       window.scrollTo(0, 0);
     } catch (err) {
       if (err.message === "form-closed") { setFormOpen(false); return; }
-      setError(err.message === "closed"
-        ? "Registration for this class time has just closed. Please go back and choose another time."
-        : err.message === "slip"
-          ? "Couldn’t upload the slip. Please check the file and try again."
-          : err.message === "waiting"
-            ? "A registration with this ID card number is already waiting to be checked. We’ll contact you on Viber."
-            : err.message === "busy"
-              ? "We’re getting a lot of registrations right now. Please try again in an hour."
-              : "Couldn’t send your registration. Please try again.");
+      setError(err.message === "age" ? ageError : ERRORS[err.message] || ERRORS.save);
     } finally {
       setBusy(false);
     }
   };
 
-  const restart = () => {
-    setForm(EMPTY); setFile(null); setCategory(locked); setAgeGroup(""); setOfferingId(""); setSent(false); go(locked ? 1 : 0);
-  };
+  const restart = () => { setForm(EMPTY); setFile(null); setOfferingId(""); setSent(false); go(0); };
+  const title = `${cat.dvName} · ${grp.dv}`;
 
   if (formOpen === null) return <section className="ld-sec ld-soft ld-rv" />;
-  if (!formOpen) return <FormClosed cat={categoryOf(locked)} />;
-
-  if (sent) {
+  if (!formOpen) {
     return (
-      <section className="ld-sec ld-soft ld-rv">
-        <div className="ld-wrap">
-          <div className="ld-rv-card ld-rv-done">
-            <FormHeader />
-            <CheckCircle2 size={52} aria-hidden="true" />
-            <h1 className="ld-h2">Registration sent</h1>
-            <p className="ld-dv ld-rv-big" lang="dv" dir="rtl">ޝުކުރިއްޔާ!</p>
-            <p className="ld-lead">We’ll check your payment slip and contact you on Viber at {form.viber} to confirm your place.</p>
-            <button type="button" className="ld-btn ld-btn-outline" onClick={restart}>Register another student</button>
-          </div>
-        </div>
-      </section>
+      <Card done>
+        <Lock size={44} aria-hidden="true" />
+        <h1 className="ld-h2">މިހާރު ރަޖިސްޓްރޭޝަން ބަންދު</h1>
+        <p className="ld-lead">{title}<br />މި ކުލާހުގެ ރަޖިސްޓްރޭޝަން މިހާރު ބަންދުކޮށްފައިވަނީ. އަންނަ ފަހަރުގެ ރަޖިސްޓްރޭޝަނަށް އަޅުގަނޑުމެންގެ ޕޯސްޓަރުތަކަށް ސަމާލުކަން ދެއްވާ.</p>
+      </Card>
     );
   }
 
-  const cat = categoryOf(category);
-  const grp = ageGroupOf(ageGroup);
-  // What has been chosen so far; each one jumps back to its step.
-  const picks = [
-    cat && { step: 0, text: cat.en, fixed: !!locked },
-    step > 1 && grp && { step: 1, text: `${grp.en} · ${grp.sub}` },
-    step > 2 && offering && { step: 2, text: `${fmtDays(offering.days)} · ${fmtTime(offering.start_time)}–${fmtTime(offering.end_time)}` },
-  ].filter(Boolean);
-  const back = step > (locked ? 1 : 0) && (
-    <button type="button" className="ld-btn ld-btn-outline" onClick={() => go(step - 1)}><ArrowLeft size={18} aria-hidden="true" /> Back</button>
+  if (sent) {
+    return (
+      <Card done>
+        <CheckCircle2 size={52} aria-hidden="true" />
+        <h1 className="ld-h2">ޝުކުރިއްޔާ!</h1>
+        <p className="ld-rv-big">ރަޖިސްޓްރޭޝަން ފޮނުވިއްޖެ.</p>
+        <p className="ld-lead">ފައިސާ ޖަމާކުރި ސްލިޕް ޗެކްކޮށް، ތިޔަ ތަން ކަށަވަރުކުރުމަށް <span dir="ltr">{form.viber}</span> ވައިބަރ ނަންބަރަށް ގުޅާނަން.</p>
+        <button type="button" className="ld-btn ld-btn-outline" onClick={restart}>އެހެން ދަރިވަރަކު ރަޖިސްޓަރީ ކުރައްވާ</button>
+      </Card>
+    );
+  }
+
+  const back = step > 0 && (
+    <button type="button" className="ld-btn ld-btn-outline" onClick={() => go(step - 1)}><ArrowLeft size={18} aria-hidden="true" /> ފަހަތަށް</button>
   );
+  const picks = [
+    { step: -1, text: title, fixed: true },
+    step > 0 && offering && { step: 0, text: `${fmtDaysDv(offering.days)} · ${fmtTimeDv(offering.start_time)} – ${fmtTimeDv(offering.end_time)}` },
+  ].filter(Boolean);
 
   return (
-    <section className="ld-sec ld-soft ld-rv">
-      <div className="ld-wrap">
-        <div className="ld-rv-card">
-          <FormHeader />
-          <div className="ld-rv-head">
-            <p className="ld-tag">Class registration</p>
-            <h1 className="ld-h2" style={{ margin: 0 }}>{locked ? `Register for ${cat.en}` : "Register for a class"}</h1>
-          </div>
+    <Card>
+      <Head title={title} sub={`${cat.dvBlurb} · ${grp.dvSub}`} />
 
-          <ol className="ld-wz-steps" aria-label="Steps">
-            {STEPS.map((s, i) => (
-              <li key={s.en} className={i === step ? "on" : i < step ? "done" : ""} aria-current={i === step ? "step" : undefined}>
-                <span className="ld-wz-num">{i < step ? <CheckCircle2 size={16} aria-hidden="true" /> : i + 1}</span>
-                <span className="ld-wz-name">{s.en}</span>
-              </li>
-            ))}
-          </ol>
+      <ol className="ld-wz-steps" aria-label="ފިޔަވަޅުތައް">
+        {STEPS.map((s, i) => (
+          <li key={s} className={i === step ? "on" : i < step ? "done" : ""} aria-current={i === step ? "step" : undefined}>
+            <span className="ld-wz-num">{i < step ? <CheckCircle2 size={16} aria-hidden="true" /> : i + 1}</span>
+            <span className="ld-wz-name">{s}</span>
+          </li>
+        ))}
+      </ol>
 
-          {picks.length > 0 && (
-            <div className="ld-wz-picks">
-              {picks.map((p) => (
-                p.fixed
-                  ? <span key={p.step} className="ld-wz-pick ld-wz-pick-fixed">{p.text}</span>
-                  : <button key={p.step} type="button" className="ld-wz-pick" onClick={() => go(p.step)} title="Change">{p.text}</button>
-              ))}
-            </div>
-          )}
-
-          <div className="ld-wz-title">
-            <h2>Step {step + 1}: {STEPS[step].en}</h2>
-            <span className="ld-dv" lang="dv" dir="rtl">{STEPS[step].dv}</span>
-          </div>
-
-          {step === 0 && (
-            <div className="ld-wz-options">
-              {CATEGORIES.map((c) => {
-                const Icon = ICONS[c.icon];
-                return (
-                  <button key={c.key} type="button" className={`ld-wz-option ${category === c.key ? "on" : ""}`}
-                    onClick={() => { if (c.key !== category) { setAgeGroup(""); setOfferingId(""); } setCategory(c.key); go(1); }}>
-                    <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
-                    <span className="ld-wz-option-text"><b>{c.en}</b><span className="ld-dv" lang="dv" dir="rtl">{c.dv}</span><small>{c.blurb}</small></span>
-                    <ArrowRight size={20} aria-hidden="true" />
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {step === 1 && (
-            <>
-              <div className="ld-wz-options">
-                {AGE_GROUPS.map((g) => (
-                  <button key={g.key} type="button" className={`ld-wz-option ${ageGroup === g.key ? "on" : ""}`}
-                    onClick={() => { if (g.key !== ageGroup) setOfferingId(""); setAgeGroup(g.key); go(2); }}>
-                    <span className="ld-wz-option-text"><b>{g.en}</b><small>{g.sub}</small><span className="ld-dv" lang="dv" dir="rtl">{g.dv}</span></span>
-                    <ArrowRight size={20} aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
-              <div className="ld-wz-nav">{back}</div>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              {offerings === null && <p className="ld-f-note">Loading class times…</p>}
-              {offerings && slots.length === 0 && <p className="ld-rv-error">No times are open for this class right now. Please contact us to join the waiting list.</p>}
-              <div className="ld-wz-options">
-                {slots.map((o) => (
-                  <button key={o.id} type="button" className={`ld-wz-option ld-wz-slot ${offeringId === o.id ? "on" : ""}`} onClick={() => { setOfferingId(o.id); go(3); }}>
-                    <span className="ld-wz-option-text">
-                      <b><CalendarDays size={17} aria-hidden="true" />{fmtDays(o.days)}</b>
-                      <span className="ld-wz-time"><Clock size={16} aria-hidden="true" />{fmtTime(o.start_time)} – {fmtTime(o.end_time)}</span>
-                      {o.note && <small>{o.note}</small>}
-                    </span>
-                    <ArrowRight size={20} aria-hidden="true" />
-                  </button>
-                ))}
-              </div>
-              <div className="ld-wz-nav">{back}</div>
-            </>
-          )}
-
-          {step === 3 && (
-            <form className="ld-wz-form" onSubmit={detailsDone}>
-              <div className="ld-f">
-                <Label en="Name" dv="ނަން" required htmlFor="rg-name" />
-                <input className="ld-input" {...field("name")} dir="auto" required maxLength={80} autoComplete="name" />
-              </div>
-              <div className="ld-f">
-                <Label en="Age" dv="ޢުމުރު" required htmlFor="rg-age" />
-                <input className="ld-input" {...field("age")} type="number" inputMode="numeric" dir="ltr" required min={3} max={100} />
-              </div>
-              <div className="ld-f">
-                <Label en="ID card number" dv="އައިޑީ ކާޑު ނަންބަރު" required htmlFor="rg-nic" />
-                <input className="ld-input" {...field("nic")} dir="ltr" required minLength={4} maxLength={20} placeholder="A123456" autoCapitalize="characters" />
-              </div>
-              <div className="ld-f">
-                <Label en="Atoll and island" dv="އަތޮޅާއި ރަށް" required htmlFor="rg-atollIsland" />
-                <input className="ld-input" {...field("atollIsland")} dir="auto" required maxLength={80} placeholder="e.g. K. Malé" />
-              </div>
-              <div className="ld-f">
-                <Label en="Viber number" dv="ވައިބަރ ނަންބަރ" required htmlFor="rg-viber" />
-                <input className="ld-input" {...field("viber")} type="tel" inputMode="tel" dir="ltr" required minLength={5} maxLength={20} pattern="[+0-9 \-]{5,20}" placeholder="7xxxxxx" autoComplete="tel" />
-              </div>
-              {error && <p className="ld-rv-error" role="alert">{error}</p>}
-              <div className="ld-wz-nav">
-                {back}
-                <button type="submit" className="ld-btn ld-btn-primary">Next <ArrowRight size={18} aria-hidden="true" /></button>
-              </div>
-            </form>
-          )}
-
-          {step === 4 && offering && (
-            <form className="ld-wz-form" onSubmit={submit}>
-              <div className="ld-rg-pay">
-                <dl className="ld-wz-fees">
-                  <div><dt>Registration fee</dt><dd>{fmtMvr(offering.registration_fee)}</dd></div>
-                  <div><dt>Monthly class fee</dt><dd>{fmtMvr(offering.monthly_fee)}</dd></div>
-                </dl>
-                <div className="ld-rg-pay-head"><Landmark size={20} aria-hidden="true" /> Pay the registration fee of {fmtMvr(offering.registration_fee)}</div>
-                <p>Transfer it to the account below, then upload the transfer slip.</p>
-                <dl>
-                  <dt>Bank</dt><dd>{BANK.bank}</dd>
-                  <dt>Account name</dt><dd>{BANK.accountName}</dd>
-                  <dt>Account number</dt><dd className="ld-rg-acc">{BANK.accountNumber}</dd>
-                </dl>
-                <div className="ld-f">
-                  <Label en="Payment slip" dv="ފައިސާ ޖަމާކުރި ސްލިޕް" required htmlFor="rg-slip" />
-                  <label className={`ld-rg-file ${file ? "on" : ""}`} htmlFor="rg-slip">
-                    {file ? <FileText size={20} aria-hidden="true" /> : <Upload size={20} aria-hidden="true" />}
-                    <span>{file ? file.name : "Upload a photo or PDF of the slip (max 5 MB)"}</span>
-                  </label>
-                  <input id="rg-slip" className="ld-rg-file-input" type="file" accept={REG_SLIP_ACCEPT} onChange={chooseFile} />
-                </div>
-              </div>
-              {error && <p className="ld-rv-error" role="alert">{error}</p>}
-              <div className="ld-wz-nav">
-                {back}
-                <button type="submit" className="ld-btn ld-btn-primary" disabled={busy}>
-                  <Send size={18} aria-hidden="true" />{busy ? "Sending…" : "Send registration"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
+      <div className="ld-wz-picks">
+        {picks.map((p) => (
+          p.fixed
+            ? <span key={p.step} className="ld-wz-pick ld-wz-pick-fixed">{p.text}</span>
+            : <button key={p.step} type="button" className="ld-wz-pick" onClick={() => go(p.step)} title="ބަދަލުކުރައްވާ">{p.text}</button>
+        ))}
       </div>
-    </section>
+
+      <div className="ld-wz-title">
+        <h2 className="ld-dv">ފިޔަވަޅު {step + 1}: {STEPS[step]}</h2>
+      </div>
+
+      {step === 0 && (
+        <>
+          {offerings === null && <p className="ld-f-note">ކުލާހުގެ ގަޑިތައް ލޯޑުވަނީ…</p>}
+          {offerings && slots.length === 0 && <p className="ld-rv-error">މި ކުލާހަށް މިހާރު ހުޅުވިފައިވާ ގަޑިއެއް ނެތް. ވެއިޓިންގ ލިސްޓަށް ނަން ލިޔުއްވުމަށް އަޅުގަނޑުމެންނާ ގުޅުއްވާ.</p>}
+          <div className="ld-wz-options">
+            {slots.map((o) => (
+              <button key={o.id} type="button" className={`ld-wz-option ld-wz-slot ${offeringId === o.id ? "on" : ""}`} onClick={() => { setOfferingId(o.id); go(1); }}>
+                <span className="ld-wz-option-text">
+                  <b><CalendarDays size={17} aria-hidden="true" />{fmtDaysDv(o.days)}</b>
+                  <span className="ld-wz-time"><Clock size={16} aria-hidden="true" />{fmtTimeDv(o.start_time)} – {fmtTimeDv(o.end_time)}</span>
+                  <span className="ld-wz-fee">މަހު ފީ: {fmtMvrDv(o.monthly_fee)}</span>
+                  {o.note && <small>{o.note}</small>}
+                </span>
+                <ArrowRight size={20} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {step === 1 && (
+        <form className="ld-wz-form" onSubmit={detailsDone}>
+          <div className="ld-f">
+            <Label text="ދަރިވަރުގެ ފުރިހަމަ ނަން" required htmlFor="rg-name" />
+            <input className="ld-input" {...field("name")} dir="auto" required maxLength={80} autoComplete="name" />
+          </div>
+          <div className="ld-f">
+            <Label text="ޢުމުރު" required htmlFor="rg-age" />
+            <input className="ld-input" {...field("age")} type="number" inputMode="numeric" dir="ltr" required min={3} max={100} />
+            <small className="ld-f-note">{grp.dvSub}</small>
+          </div>
+          <div className="ld-f">
+            <Label text="އައިޑީ ކާޑު ނަންބަރު" required htmlFor="rg-nic" />
+            <input className="ld-input" {...field("nic")} dir="ltr" required minLength={4} maxLength={20} placeholder="A123456" autoCapitalize="characters" />
+          </div>
+          <div className="ld-f">
+            <Label text="އަތޮޅާއި ރަށް" required htmlFor="rg-atollIsland" />
+            <input className="ld-input" {...field("atollIsland")} dir="auto" required maxLength={80} placeholder="މިސާލު: ކ. މާލެ" />
+          </div>
+          <div className="ld-f">
+            <Label text="ވައިބަރ ނަންބަރު" required htmlFor="rg-viber" />
+            <input className="ld-input" {...field("viber")} type="tel" inputMode="tel" dir="ltr" required minLength={5} maxLength={20} pattern="[+0-9 \-]{5,20}" placeholder="7xxxxxx" autoComplete="tel" />
+          </div>
+          {error && <p className="ld-rv-error" role="alert">{error}</p>}
+          {error === ageError && (
+            <button type="button" className="ld-btn ld-btn-outline" onClick={() => navigate(formPath(formKeyOf(category, other.key)))}>{other.dvForm} <ArrowRight size={18} aria-hidden="true" /></button>
+          )}
+          <div className="ld-wz-nav">
+            {back}
+            <button type="submit" className="ld-btn ld-btn-primary">ކުރިއަށް <ArrowRight size={18} aria-hidden="true" /></button>
+          </div>
+        </form>
+      )}
+
+      {step === 2 && offering && (
+        <form className="ld-wz-form" onSubmit={submit}>
+          <div className="ld-rg-pay">
+            <div className="ld-rg-pay-head"><Landmark size={20} aria-hidden="true" /> {`${fmtMvrDv(offering.registration_fee)}ގެ ރަޖިސްޓްރޭޝަން ފީ ދައްކަވާ`}</div>
+            <p>ތިރީގައިވާ އެކައުންޓަށް ފައިސާ ޓްރާންސްފަރ ކުރައްވާފައި، ޓްރާންސްފަރ ސްލިޕް އަޕްލޯޑް ކުރައްވާ.</p>
+            <dl>
+              <dt>ބޭންކް</dt><dd dir="ltr">{BANK.bank}</dd>
+              <dt>އެކައުންޓުގެ ނަން</dt><dd dir="ltr">{BANK.accountName}</dd>
+              <dt>އެކައުންޓް ނަންބަރު</dt><dd className="ld-rg-acc" dir="ltr">{BANK.accountNumber}</dd>
+            </dl>
+            <div className="ld-f">
+              <Label text="ފައިސާ ޖަމާކުރި ސްލިޕް" required htmlFor="rg-slip" />
+              <label className={`ld-rg-file ${file ? "on" : ""}`} htmlFor="rg-slip">
+                {file ? <FileText size={20} aria-hidden="true" /> : <Upload size={20} aria-hidden="true" />}
+                <span>{file ? <span dir="ltr">{file.name}</span> : "ސްލިޕްގެ ފޮޓޯއެއް ނުވަތަ PDF އެއް އަޕްލޯޑް ކުރައްވާ (5 MB އަށްވުރެ ކުޑަ)"}</span>
+              </label>
+              <input id="rg-slip" className="ld-rg-file-input" type="file" accept={REG_SLIP_ACCEPT} onChange={chooseFile} />
+            </div>
+          </div>
+          {error && <p className="ld-rv-error" role="alert">{error}</p>}
+          <div className="ld-wz-nav">
+            {back}
+            <button type="submit" className="ld-btn ld-btn-primary" disabled={busy}>
+              <Send size={18} aria-hidden="true" />{busy ? "ފޮނުވަނީ…" : "ރަޖިސްޓްރޭޝަން ފޮނުވާ"}
+            </button>
+          </div>
+        </form>
+      )}
+    </Card>
   );
 }
+

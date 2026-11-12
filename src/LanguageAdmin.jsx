@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Languages, RotateCw, Save, Search, Check, ExternalLink, Undo2 } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
-import { TP } from "./App.jsx";
+import { TP } from "./shared.jsx";
 import { REPORT_STRINGS, loadThaanaFont, THAANA_FONT, nameKey, examNameKey, examNameToDhivehi } from "./exams/reportStrings.js";
 import { nameToThaana } from "./exams/thaanaNames.js";
 import { SITE_STRINGS, SITE_GROUPS } from "./landing/siteStrings.js";

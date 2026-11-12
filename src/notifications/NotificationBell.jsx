@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Bell, X, Smartphone } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { TP } from "../shared.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { hasThaana } from "./thaanaKeyboard.js";
 import { pushState, enablePush, disablePush, refreshPush, clearAppBadge, INSTALL_GUIDE_URL } from "./push.js";

@@ -9,19 +9,25 @@
 // - Website classes: the class times shown on the website, per class type
 //   and age group, with their registration and monthly fees. They're kept
 //   apart from the real classes under Classes.
-// - Form links: the main form and one per class type (for posters), each
-//   with its link to copy and its own open/close switch.
+// - Form links: one Dhivehi form per class and age group (Hifz · School
+//   students, Hifz · Adults …), each with its link to copy and its own
+//   open/close switch.
 // - Info updates: the student information update form for current students
 //   (ID card number, Viber, email) and its responses (InfoUpdatesAdmin.jsx).
+// - Hifz test: registrations from the Hifz test form, each
+//   accepted or rejected; students go into exams by hand (src/hifzTest/HifzTestAdmin.jsx).
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, FileText, Copy, Link2, Lock, LockOpen, ExternalLink, Inbox, MessageCircle, X, ChevronRight, ArrowLeft, Plus, Pencil, Eye, EyeOff, CalendarClock, PenLine, Contact } from "lucide-react";
+import { CheckCircle2, XCircle, RotateCw, Trash2, Hourglass, FileText, Copy, Link2, Lock, LockOpen, ExternalLink, Inbox, MessageCircle, X, ChevronRight, ArrowLeft, Plus, Pencil, Eye, EyeOff, CalendarClock, PenLine, Contact, BookOpenCheck } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { usePendingRegistrationCount } from "../admin/adminData.js";
+export { usePendingRegistrationCount };
+import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { registrationWelcomeText, sendRegistrationWelcome } from "../notifications/smsSend.js";
 import { InfoUpdates, infoCss } from "./InfoUpdatesAdmin.jsx";
-import { CATEGORIES, AGE_GROUPS, DAYS, FORMS, REG_BUCKET, categoryOf, ageGroupOf, formUrl, fmtTime, fmtDays, fmtMvr } from "./registrations.js";
+import { AdminHifzTest } from "../hifzTest/HifzTestAdmin.jsx";
+import { CATEGORIES, AGE_GROUPS, DAYS, FORMS, REG_BUCKET, categoryOf, ageGroupOf, formOf, formUrl, fmtTime, fmtDays, fmtMvr } from "./registrations.js";
 import { maldivesMonth } from "../dates.js";
 import { ProgramPicker, programsForCategory } from "../thilawa/programs.jsx";
 
@@ -30,6 +36,7 @@ const SECTIONS = [
   { key: "web", label: "Website classes", icon: CalendarClock, help: "The class times and fees students choose from on the website. They don’t change your classes under Classes." },
   { key: "links", label: "Form links", icon: Link2, help: "Copy a link to share or put on a poster. Close a form to stop new registrations." },
   { key: "info", label: "Info updates", icon: Contact, help: "Current students send their ID card number, atoll and island, Viber number and email. Match each one to the student and save it." },
+  { key: "hifztest", label: "Hifz test", icon: BookOpenCheck, help: "Hifz test registrations from the website. Accept or reject each one, then add the students to an exam in Exams." },
 ];
 const FILTERS = [
   { key: "pending", label: "Waiting" },
@@ -48,28 +55,13 @@ const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric
 const sortDays = (days) => DAYS.filter((d) => (days || []).includes(d));
 const overlaps = (a, b) => a.start_time < b.endTime && b.startTime < a.end_time;
 
-// Waiting-registration count for the nav badge.
-export function usePendingRegistrationCount(enabled) {
-  const [count, setCount] = useState(0);
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    const { count: n, error } = await supabase.from("class_registrations").select("id", { count: "exact", head: true }).eq("status", "pending");
-    if (!error) setCount(n || 0);
-  }, [enabled]);
-  useEffect(() => {
-    load();
-    const timer = setInterval(load, 60_000);
-    return () => clearInterval(timer);
-  }, [load]);
-  return [count, load];
-}
-
 // classes / teachers / students: the app's lists (camelCase).
 // onClassCreated(classRow): a class was made from the Accept box.
 // onAccepted(studentRow, monthKey): a registration became a student.
 // onEditWelcome(): open Notifications → Templates.
 // onStudentUpdated(studentRow): an info update was saved onto a student.
-export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0, infoCount = 0, onInfoCountChange, classes = [], teachers = [], students = [], onClassCreated, onAccepted, onEditWelcome, onStudentUpdated }) {
+// hifzTestCount / onHifzTestCountChange: waiting Hifz test registrations.
+export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0, infoCount = 0, onInfoCountChange, classes = [], teachers = [], students = [], onClassCreated, onAccepted, onEditWelcome, onStudentUpdated, hifzTestCount = 0, onHifzTestCountChange }) {
   const [view, setView] = useState("applications");
   const section = SECTIONS.find((s) => s.key === view);
   return (
@@ -84,6 +76,7 @@ export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0,
               <span>{s.label}</span>
               {s.key === "applications" && pendingCount > 0 && <span className="rg-count">{pendingCount}</span>}
               {s.key === "info" && infoCount > 0 && <span className="rg-count">{infoCount}</span>}
+              {s.key === "hifztest" && hifzTestCount > 0 && <span className="rg-count">{hifzTestCount}</span>}
             </button>
           );
         })}
@@ -98,6 +91,7 @@ export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0,
       {view === "web" && <WebClasses showToast={showToast} />}
       {view === "links" && <FormLinks showToast={showToast} />}
       {view === "info" && <InfoUpdates showToast={showToast} students={students} onStudentUpdated={onStudentUpdated} onCountChange={onInfoCountChange} />}
+      {view === "hifztest" && <AdminHifzTest embedded showToast={showToast} onCountChange={onHifzTestCountChange} />}
     </div>
   );
 }
@@ -244,7 +238,7 @@ function Applications({ showToast, onCountChange, classes, teachers, students, o
                   <span className="rg-class-tag">Chose on the website</span>
                   <b>{categoryOf(opened.category)?.en || "Class"}</b>
                   <span>{opened.class_label.split(" · ").slice(1).join(" · ")}</span>
-                  {opened.form !== "all" && <small>From the {categoryOf(opened.form)?.en} poster link</small>}
+                  {formOf(opened.form) ? <small>From the {formOf(opened.form).en} form</small> : opened.form !== "all" && <small>From the {categoryOf(opened.form)?.en} poster link</small>}
                 </div>
 
                 <dl className="rg-facts">
@@ -346,7 +340,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
     if (edited || !target) return;
     let cancelled = false;
     const preview = {
-      name: reg.name, className: target.name, fee: Number(fee) || 0, classType: { category: reg.category, ageGroup: web?.age_group || (reg.class_label.includes("Children") ? "children" : "adults") },
+      name: reg.name, className: target.name, fee: Number(fee) || 0, classType: { category: reg.category, ageGroup: web?.age_group || (/Children|School/.test(reg.class_label) ? "children" : "adults") },
       schedule: target.days?.length ? { days: sortDays(target.days), startTime: target.startTime, endTime: target.endTime } : null,
     };
     registrationWelcomeText(preview, teacherName(target.teacherId), lang).then((t) => { if (!cancelled) setMessage(t); });
@@ -507,7 +501,6 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
   );
 }
 
-
 // The class times shown on the website, per class type and age group.
 const blankTime = (category, age_group) => ({ category, age_group, days: [], start_time: "", end_time: "", registration_fee: "100", monthly_fee: "", note: "", is_open: true });
 
@@ -666,8 +659,8 @@ function FormLinks({ showToast }) {
           <article key={f.key} className="tp-card rg-card">
             <div className="rg-top">
               <div style={{ minWidth: 0 }}>
-                <div className="rg-name">{f.key === "all" ? "Main form" : categoryOf(f.key).en}</div>
-                <div className="rg-sub">{f.key === "all" ? "All classes · opened by the website’s Register buttons" : "For posters · class already chosen"}</div>
+                <div className="rg-name">{f.en}</div>
+                <div className="rg-sub">Ages {ageGroupOf(f.ageGroup).sub} · Dhivehi form</div>
               </div>
               <span className="rg-badge" style={open ? OPEN : CLOSED}>{open ? "Open" : "Closed"}</span>
             </div>

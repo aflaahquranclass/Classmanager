@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { RotateCw, Search, Smartphone, Trash2, ChevronDown, ChevronRight, Mail, Inbox } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { hasThaana } from "./thaanaKeyboard.js";
 import { sendPendingSms, sendPendingEmail } from "./smsSend.js";

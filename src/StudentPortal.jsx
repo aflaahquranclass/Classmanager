@@ -1,12 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { BookOpen, BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, Lock, CalendarCheck, Wallet, BookOpenCheck, ListChecks, BookMarked, Presentation, Eye, EyeOff, FileText, Play, PenLine, RotateCw, CheckCircle2, LineChart, Mic } from "lucide-react";
-import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./App.jsx";
+import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./shared.jsx";
 import { supabase } from "./supabaseClient.js";
 import CheckMyReading, { hifzReadingTasks } from "./checkReading/CheckMyReading.jsx";
 import { describePages } from "./thilawa/engine.js";
 import HifzTracker, { HifzProgress, ACTIVITY_INFO, HIFZ_CSS, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
 import { HOME_CSS, NextStepButton, QuickTiles } from "./StudentHome.jsx";
-import { TeacherHifzStudent } from "./hifz/HifzTeacher.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
 import { pageToUnit, describeRange } from "./hifz/quran.js";
 import { addDays } from "./hifz/engine.js";
@@ -22,11 +21,14 @@ import { NotificationBell } from "./notifications/NotificationBell.jsx";
 import { useStudentRecords, StudentAttendance, StudentFinance, RECORDS_CSS } from "./StudentRecords.jsx";
 import ThilawaHome from "./thilawa/ThilawaHome.jsx";
 import { ThilawaTracker, AssignedReading, FreeReading, THILAWA_HADITH, thilawaCss } from "./thilawa/ThilawaStudent.jsx";
-import { TeacherThilawaStudent } from "./thilawa/ThilawaTeacher.jsx";
 import { loadThilawa } from "./thilawa/service.js";
 import { createSupabaseThilawaRepo, createThilawaMemoryStore, createMemoryThilawaRepo, createSupabaseClassRepo, createClassMemoryStore, createMemoryClassRepo } from "./thilawa/repos.js";
 import { StudentClassReading, TeacherClassPanel, useClassThilawa } from "./thilawa/ClassThilawa.jsx";
-import { hasProgram } from "./thilawa/programs.jsx";
+import { hasProgram, classProgram } from "./thilawa/programs.jsx";
+
+// The teacher screens are only shown in the demo, so they load when it opens.
+const TeacherHifzStudent = lazy(() => import("./hifz/HifzTeacher.jsx").then((m) => ({ default: m.TeacherHifzStudent })));
+const TeacherThilawaStudent = lazy(() => import("./thilawa/ThilawaTeacher.jsx").then((m) => ({ default: m.TeacherThilawaStudent })));
 
 
 // Same Islamic pattern assets as the Teacher/Admin portals.
@@ -280,7 +282,11 @@ function SetPassword({ studentName, onDone, onCancel }) {
 async function loadStudentForUser(userId) {
   const { data, error } = await supabase.from("students").select("id, name, student_code, class_id, class_name, fee, joined_month, programs").eq("user_id", userId).maybeSingle();
   if (error) throw new Error(error.message);
-  return data;
+  // A class named for Hifz or Thilawa decides the section, as it does for the
+  // teacher (inProgramSection): a "Thilawa Class" student saved as Hifz still
+  // gets the Thilawa pages, so student and teacher see the same thing.
+  const fromClass = data && classProgram(data.class_name);
+  return fromClass ? { ...data, programs: [fromClass] } : data;
 }
 
 // Hifz and Thilawa pages only show for students enrolled in them.
@@ -370,7 +376,8 @@ export default function StudentPortal() {
   const signIn = async (email, password) => {
     setLoginError("");
     const { data, error } = await supabase.auth.signInWithPassword({ email: studentLoginEmail(email), password });
-    if (error) { setLoginError("Incorrect Student ID or password."); return; }
+    // Only a wrong ID/password says so; no internet or a server hiccup shouldn't make a student think their password is wrong.
+    if (error) { setLoginError(/invalid login credentials/i.test(error.message) ? "Incorrect Student ID or password." : "Couldn't sign in. Check your internet and try again."); return; }
     await routeUser(data.user);
   };
 
@@ -717,14 +724,14 @@ export default function StudentPortal() {
         {view === "thilawa-assigned" && doesThilawa && <AssignedReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "thilawa-free" && doesThilawa && <FreeReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "demo-teacher-hifz" && DEMO && (
-          <TeacherHifzStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }} repo={demoHifzTeacherRepo} />
+          <Suspense fallback={null}><TeacherHifzStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }} repo={demoHifzTeacherRepo} /></Suspense>
         )}
         {view === "demo-teacher" && DEMO && (
           <>
             <TeacherClassPanel className={student.class_name} classRepo={demoClassTeacherRepo} teacherId="demo-teacher"
               students={[{ id: student.id, name: student.name, studentCode: student.student_code }]} makeStudentRepo={demoMakeStudentRepo} onClosed={refreshThilawa} />
-            <TeacherThilawaStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }}
-              repo={demoTeacherRepo} onChanged={refreshThilawa} />
+            <Suspense fallback={null}><TeacherThilawaStudent student={{ id: student.id, name: student.name, studentCode: student.student_code }}
+              repo={demoTeacherRepo} onChanged={refreshThilawa} /></Suspense>
           </>
         )}
         {view === "attendance" && <StudentAttendance records={records} />}

@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Quote, RotateCw, Save, Undo2 } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
-import { TP } from "./App.jsx";
+import { TP } from "./shared.jsx";
 
 const TABLE = "student_motivation";
 

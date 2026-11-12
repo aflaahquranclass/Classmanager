@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { maldivesMonth } from "./dates.js";
 import { CalendarCheck, Wallet, CheckCircle2, XCircle, Repeat2, Ban, ChevronLeft, ChevronRight, RotateCw, Clock, AlertTriangle, Landmark, Copy, Check, Upload, FileText, X, Hourglass } from "lucide-react";
-import { TP, monthLabel, shiftMonth, fmtMoney } from "./App.jsx";
+import { TP, monthLabel, shiftMonth, fmtMoney } from "./shared.jsx";
 import { supabase } from "./supabaseClient.js";
 import { BANK, SLIP_STATUS, SLIP_ACCEPT, SLIP_MAX_BYTES, slipUrl, submitSlip, isPdf } from "./payments/slips.js";
 

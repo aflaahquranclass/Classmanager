@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Send, Search, Smartphone, MessageSquare, Mail, CheckCircle2, AlertTriangle, ChevronLeft, ChevronRight, Save, Users, Check, X } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { hasThaana, thaanaChange } from "./thaanaKeyboard.js";
 import { createNotification, loadEmailStatus, loadNameChecks, confirmNames, forgetPassword } from "./smsSend.js";

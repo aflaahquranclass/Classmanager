@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Download, Share2, RotateCw } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
-import { TP } from "../App.jsx";
+import { TP } from "../shared.jsx";
 import { drawReviewPost, postBlob, postFileName, postLanguage, publicName } from "./reviewPost.js";
 
 const LANGS = [

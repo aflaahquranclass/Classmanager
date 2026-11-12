@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Megaphone, Download, EyeOff, Eye } from "lucide-react";
-import { TP } from "../App.jsx";
+import { TP } from "../shared.jsx";
 import { drawHifzPoster, downloadHifzPoster, nameWords, POSTER_SIZES, START_FROM, TOTAL_JUZ } from "./hifzPoster.js";
 
 const ORDINAL = ["1st", "2nd", "3rd", "4th", "5th", "6th"];

@@ -509,6 +509,10 @@
 .ld-input:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23, 111, 209, .15); }
 .ld-f-note { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 13px; color: var(--muted); }
 .ld-f-note .ld-dv { font-size: 14px; }
+/* Hifz test form (/hifz-test) */
+.ld-ht-note { font-family: Faruma, Inter, system-ui, sans-serif; font-size: 14px; color: var(--muted); }
+.ld-ht-short { max-width: 220px; }
+.ld-input[dir="ltr"].ld-ht-short { text-align: left; font-family: Inter, system-ui, sans-serif; }
 .ld-rv-classes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ld-rv-class { position: relative; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
 .ld-rv-class input { position: absolute; opacity: 0; pointer-events: none; }
@@ -647,3 +651,13 @@ select.ld-input { appearance: auto; }
 .ld[lang="dv"] :is(.ld-badge-label, .ld-badge-tag, .ld-rating, .ld-foot-col, .ld-copy) { font-size: 15px; }
 .ld[lang="dv"] .ld-arch :is(.ld-panel, .ld-panel-row, .ld-mini div, .ld-tasks) { font-size: 14px; }
 .ld[lang="dv"] .ld-arch .ld-bar-foot { font-size: 12.5px; }
+
+/* The Dhivehi-only forms (/register…, /update, /review): right to left, with
+   no site top bar or footer. */
+.ld-form-page .ld-wz-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ld[dir="rtl"] .ld-wz-steps li:not(:last-child)::after { left: calc(-50% + 20px); right: calc(50% + 20px); }
+.ld[dir="rtl"] .ld-wz-option { text-align: right; }
+.ld[dir="rtl"] .lucide-arrow-left { transform: scaleX(-1); }
+.ld-form-page :is(.ld-wz-option-text small, .ld-f-note, .ld-rv-error, .ld-rg-pay p, .ld-wz-steps li) { line-height: 1.8; }
+.ld-form-page .ld-wz-steps li { font-size: 13px; }
+.ld-wz-fee { font-size: 15px; font-weight: 600; color: var(--teal); }
