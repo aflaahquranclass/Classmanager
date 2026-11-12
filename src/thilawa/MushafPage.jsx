@@ -20,7 +20,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Maximize2, Minimize2, X, Menu, ChevronLeft, ChevronRight } from "lucide-react";
-import { pageToUnit, UNITS_PER_LINE, TOTAL_PAGES, JUZ_START_PAGES, SURAHS, surahsOnPages } from "../hifz/quran.js";
+import { pageToUnit, UNITS_PER_LINE, LINES_PER_PAGE, TOTAL_PAGES, JUZ_START_PAGES, SURAHS, surahsOnPages } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
 
@@ -250,6 +250,26 @@ export function MushafPresent({ children, page = null, tools = null, onNext = nu
   }, [full]);
   // Closing the screen while in full screen leaves the browser's full screen too.
   useEffect(() => () => leaveNative(), []);
+  // The height under the title and buttons, for a page that fills the screen
+  // (a phone held upright, see presentCss). Phones change it as their
+  // browser bars show and hide, so it's kept up to date.
+  const layerRef = useRef(null);
+  useLayoutEffect(() => {
+    const layer = layerRef.current;
+    if (!full || !layer) return undefined;
+    const top = layer.querySelector(".mf-top");
+    const set = () => {
+      const cs = getComputedStyle(layer);
+      const h = window.innerHeight - (top?.offsetHeight || 0) - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 8;
+      layer.style.setProperty("--mf-avail", `${Math.max(300, Math.floor(h))}px`);
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    if (top) ro.observe(top);
+    window.addEventListener("resize", set);
+    window.visualViewport?.addEventListener("resize", set);
+    return () => { ro.disconnect(); window.removeEventListener("resize", set); window.visualViewport?.removeEventListener("resize", set); };
+  }, [full]);
 
   const edgeLayer = edge && createPortal(<div className={`mf-edge ${full ? "mf-edge-full" : ""}`}><style>{presentCss}</style>{edge}</div>, document.body);
   if (!full) {
@@ -269,7 +289,7 @@ export function MushafPresent({ children, page = null, tools = null, onNext = nu
   const surahs = (pageSurahs || (page ? surahsOnPages(page, page).map((x) => x.number) : [])).map((n) => SURAHS[n - 1]);
   const juz = page ? JUZ_START_PAGES.filter((p) => p <= page).length : 0;
   return [createPortal(
-    <div className={`mf mf-full ${menu ? "mf-menu" : ""}`} role="dialog" aria-modal="true" aria-label="Mushaf, full screen">
+    <div ref={layerRef} className={`mf mf-full ${menu ? "mf-menu" : ""}`} role="dialog" aria-modal="true" aria-label="Mushaf, full screen">
       <style>{presentCss}</style>
       <div className="mf-top">
         {page && (
@@ -363,11 +383,24 @@ const presentCss = `
     .mf-full .mf-top { padding: 0 4px; }
     .mf-full .mf-content { padding: 0; }
     .mf-full .mp-page { padding: 2% 1.5% 2%; }
-    .mf-tools { gap: 6px; }
-    .mf-tool, .mf-tools .hz-btn { height: 40px; padding: 0 6px; font-size: 12px; gap: 5px; }
+    .mf-tools { gap: 6px; margin: 4px 0 2px; }
+    /* Icon above its word, so whole words fit four to a row. */
+    .mf-tool, .mf-tools .hz-btn { height: 48px; padding: 4px 4px 3px; flex-direction: column; gap: 3px; font-size: 11px; border-radius: 12px; }
+    .mf-tools .hz-go-main { flex-direction: row; font-size: 12px; }
+    .mf-tools .lm-letters i { font-size: 16px; }
+    .mf-tools .lm-letters b { position: absolute; top: 3px; right: 6px; }
+    .mf-tools .lm-letters { position: relative; }
     .mf-head { font-size: 14px; }
   }
   @media (max-width: 640px) and (pointer: coarse) { .mf-side { display: none; } }
+  /* Held upright (a phone, a tablet): one whole page on the screen under the
+     buttons, its lines spread over the height, like the quran.com app.
+     Anything under the page (e.g. Finish) is a scroll away. */
+  @media (orientation: portrait) {
+    .mf-full .mpg .mp-page { --mp-fill: 1; height: var(--mf-avail, auto); display: flex; flex-direction: column; padding-top: 1.5%; padding-bottom: 1%; }
+    .mf-full .mpg .mp-body { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+    .mf-full .mpg .mp-foot { margin-top: 2px; }
+  }
   .mf-is-full .mtb { display: none !important; }
 `;
 
@@ -412,7 +445,7 @@ function loadPageLines(page) {
 export const mushafCss = `
   .mp-page { background: #FFFFFF; color: #1A1F36; border: 1px solid #E6E9EF; border-radius: 14px; box-shadow: 0 10px 30px rgba(18,59,103,0.07); padding: 4% 4.5% 2.5%; box-sizing: border-box; width: 100%; max-width: 760px; margin: 0 auto; }
   .mp-body { direction: rtl; }
-  .mp-line { display: flex; justify-content: space-between; align-items: center; white-space: nowrap; height: 1.95em; isolation: isolate; }
+  .mp-line { display: flex; justify-content: space-between; align-items: center; white-space: nowrap; height: var(--mp-lh, 1.95em); isolation: isolate; }
   .mp-line-center { justify-content: center; gap: 0.18em; }
   .mp-word { position: relative; display: inline-block; line-height: 1; font-feature-settings: normal; border-radius: 0.12em; padding: 0.04em 0; }
   /* A word's highlight sits underneath every word of its line: some words
@@ -449,15 +482,15 @@ ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyf
   .mp-ayah-short::before, .mp-end.mp-ayah-tap.mp-ayah-short:hover::before { background: #0A7F96; }
   .mp-ayah-both::before, .mp-end.mp-ayah-tap.mp-ayah-both:hover::before { background: linear-gradient(90deg, #176FD1 50%, #0A7F96 50%); }
   .mp-ayah-sel::after { content: ""; position: absolute; inset: -0.12em; border-radius: 50%; border: 0.06em dashed #123B67; pointer-events: none; }
-  .mp-surah { display: flex; align-items: center; justify-content: center; height: 1.95em; }
+  .mp-surah { display: flex; align-items: center; justify-content: center; height: var(--mp-lh, 1.95em); }
   .mp-frame { position: relative; width: 100%; height: 1.55em; display: flex; align-items: center; justify-content: center; border-radius: 0.3em;
     background: linear-gradient(90deg, #DCEBFB, #F3F8FE 30%, #F3F8FE 70%, #DCEBFB); border: 0.06em solid #176FD1; box-shadow: inset 0 0 0 0.08em #FFFFFF, inset 0 0 0 0.11em #8DBBEA; }
   .mp-frame::before, .mp-frame::after { content: "۞"; position: absolute; top: 50%; transform: translateY(-50%); color: #176FD1; font-size: 0.7em; font-family: serif; }
   .mp-frame::before { left: 0.6em; }
   .mp-frame::after { right: 0.6em; }
   .mp-surah-name { font-family: "QCF2_SurahNames", serif; font-size: 1.15em; line-height: 1; color: #0D4F85; direction: ltr; }
-  .mp-blank { height: 1.95em; }
-  .mp-basmala { display: flex; justify-content: center; align-items: center; height: 1.95em; font-family: "QCF2_P1", serif; }
+  .mp-blank { height: var(--mp-lh, 1.95em); }
+  .mp-basmala { display: flex; justify-content: center; align-items: center; height: var(--mp-lh, 1.95em); font-family: "QCF2_P1", serif; }
   .mp-foot { margin-top: 0.6em; text-align: center; font-family: Inter, system-ui, sans-serif; font-size: 13px; color: #7A8496; }
   .mp-first .mp-body { padding: 0 9%; }
   .mp-status { text-align: center; color: #7A8496; font-family: Inter, system-ui, sans-serif; font-size: 14px; padding: 40px 0; }
@@ -469,7 +502,9 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
   const [state, setState] = useState({ status: "loading", page, lines: [] });
   const [attempt, setAttempt] = useState(0);
   const bodyRef = useRef(null);
+  const pageRef = useRef(null);
   const [fontSize, setFontSize] = useState(null);
+  const [lineHeight, setLineHeight] = useState(null); // px, when the page fills a set height
   const [centered, setCentered] = useState(new Set());
   const [squeeze, setSqueeze] = useState(new Map()); // line → font scale, for a line wider than the page
   const [hafsReady, setHafsReady] = useState(false);
@@ -494,13 +529,29 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
   }, [wantHafs]);
 
   // Size the text so a full line fills the page's width on any screen.
+  // A page given a height to fill (`--mp-fill: 1`, full screen on a phone)
+  // is one whole page on the screen, like the quran.com app: the 15 lines
+  // share that height, and the text is made smaller where it wouldn't fit.
   useLayoutEffect(() => {
     const el = bodyRef.current;
-    if (!el) return undefined;
-    const fit = () => setFontSize(el.clientWidth / EM_PER_LINE);
+    const pg = pageRef.current;
+    if (!el || !pg) return undefined;
+    const fit = () => {
+      const byWidth = el.clientWidth / EM_PER_LINE;
+      const cs = getComputedStyle(pg);
+      if (cs.getPropertyValue("--mp-fill").trim() !== "1") { setFontSize(byWidth); setLineHeight(null); return; }
+      const foot = pg.querySelector(".mp-foot");
+      const footH = foot ? foot.offsetHeight + parseFloat(getComputedStyle(foot).marginTop || 0) : 0;
+      const avail = pg.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - footH;
+      const lh = avail / LINES_PER_PAGE;
+      const size = Math.min(byWidth, lh / 1.8);
+      setFontSize(size);
+      setLineHeight(Math.floor(Math.min(lh, size * 2.6) * 100) / 100);
+    };
     fit();
     const ro = new ResizeObserver(fit);
     ro.observe(el);
+    ro.observe(pg);
     return () => ro.disconnect();
   }, [state.status]);
 
@@ -556,7 +607,7 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
     return inRange(next ? next.line : l.line);
   });
   return (
-    <div className={`mp-page ${page <= 2 ? "mp-first" : ""}`} lang="ar">
+    <div className={`mp-page ${page <= 2 ? "mp-first" : ""}`} lang="ar" ref={pageRef}>
       <style>{mushafCss}</style>
       {state.status === "error" ? (
         <div className="mp-status">
@@ -564,7 +615,7 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
           <button type="button" className="hz-btn hz-btn-outline" onClick={() => setAttempt((n) => n + 1)}>Retry</button>
         </div>
       ) : (
-        <div className="mp-body" ref={bodyRef} style={{ fontSize: fontSize ? `${fontSize}px` : undefined, visibility: state.status === "ready" ? "visible" : "hidden" }}
+        <div className="mp-body" ref={bodyRef} style={{ fontSize: fontSize ? `${fontSize}px` : undefined, "--mp-lh": lineHeight ? `${lineHeight}px` : undefined, visibility: state.status === "ready" ? "visible" : "hidden" }}
           aria-busy={state.status !== "ready"}>
           {state.status !== "ready" && <div className="mp-status" style={{ visibility: "visible" }}>Loading page {page}…</div>}
           {state.status === "ready" && state.lines.map((line, i) => {
