@@ -36,8 +36,9 @@ function fitText(ctx, text, x, y, max, size, weight = 600) {
 
 export async function drawClassTasks({ className, sheet }) {
   await Promise.all(["400", "600", "700"].map((w) => document.fonts?.load(`${w} 28px Inter`).catch(() => {})));
-  const cardH = CARD_PAD * 2 + NAME_H + LINE_H * 3;
-  const H = HEAD_H + PAD + sheet.rows.length * (cardH + GAP) - GAP + PAD + 40;
+  // A card fits the student's parts (a part not given that class is left out).
+  const cardHOf = (row) => CARD_PAD * 2 + NAME_H + LINE_H * Math.max(1, row.items.length);
+  const H = HEAD_H + PAD + sheet.rows.reduce((h, row) => h + cardHOf(row) + GAP, 0) - GAP + PAD + 40;
   const scale = 2; // sharp on phones
   const canvas = document.createElement("canvas");
   canvas.width = W * scale;
@@ -68,6 +69,7 @@ export async function drawClassTasks({ className, sheet }) {
   // One card per student
   let y = HEAD_H + PAD;
   for (const row of sheet.rows) {
+    const cardH = cardHOf(row);
     ctx.save();
     ctx.shadowColor = "rgba(18,59,103,0.08)";
     ctx.shadowBlur = 16;
@@ -93,6 +95,11 @@ export async function drawClassTasks({ className, sheet }) {
       ctx.fillStyle = item.text ? NAVY : "#9AA9BA";
       fitText(ctx, text, x + LABEL_W, ly, W - PAD * 2 - CARD_PAD * 2 - LABEL_W, 28, item.text ? 600 : 400);
       ly += LINE_H;
+    }
+    if (row.items.length === 0) {
+      ctx.fillStyle = "#9AA9BA";
+      ctx.font = `400 26px ${FONT}`;
+      ctx.fillText("Nothing this class", x, ly);
     }
     y += cardH + GAP;
   }

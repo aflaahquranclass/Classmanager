@@ -199,7 +199,9 @@ export function summarizeHifz({ profile, tasks, mistakes = [], goalYear = null }
 // next task not done yet of each of New Hifz, Short and Long Muraja'ah, as
 // "Al-Baqarah 23 – 34". `tasksOf(student)` gives that student's tasks.
 // `date` is the day most of the tasks are for; a task for another day keeps
-// its own `date`.
+// its own `date`. A part the teacher isn't giving at the student's class (its
+// Given switch off: moved to a later day than the student's other parts) is
+// left out.
 export const SHEET_LABELS = { new: "Hifz", short: "Short Muraja'ah", long: "Long Muraja'ah" };
 export function classTaskSheet(students, tasksOf) {
   const rows = [...students].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })).map((s) => {
@@ -213,6 +215,11 @@ export function classTaskSheet(students, tasksOf) {
   const counts = new Map();
   for (const r of rows) for (const i of r.items) if (i.date) counts.set(i.date, (counts.get(i.date) || 0) + 1);
   const date = [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0]?.[0] || null;
+  for (const r of rows) {
+    // The student's class day: their soonest part, a late one counting as the class's day.
+    const day = r.items.filter((i) => i.date).map((i) => (date && i.date < date ? date : i.date)).sort()[0];
+    r.items = r.items.filter((i) => !i.date || i.date <= day);
+  }
   for (const r of rows) for (const i of r.items) if (i.date === date) i.date = null;
   return { date, rows };
 }

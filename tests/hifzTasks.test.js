@@ -246,8 +246,19 @@ test("class task sheet: each student's next Short, New and Long, A–Z, with the
   assert.deepEqual(a.items.map((i) => i.label), ["Short Muraja'ah", "Hifz", "Long Muraja'ah"]);
   assert.equal(a.items[1].text, describeAyahs(pages(11, 11)));
   assert.equal(a.items[1].date, null);
-  assert.equal(m.items[1].date, "2026-11-03"); // a different day keeps its own date
-  assert.equal(m.items[2].text, null); // nothing set
+  // Mohamed's New Hifz is on a later day than his other parts (not given this class): left out.
+  assert.deepEqual(m.items.map((i) => i.activity), ["short", "long"]);
+  assert.equal(m.items[1].text, null); // nothing set
+});
+
+test("class task sheet: a late part stays, and a student whose class is another day keeps that day", () => {
+  const late = [task("2026-11-01", "short", pages(5, 5)), task("2026-11-02", "new", pages(6, 6)), task("2026-11-02", "long", pages(1, 2))];
+  const other = [task("2026-11-04", "short", pages(40, 40)), task("2026-11-04", "new", pages(41, 41)), task("2026-11-05", "long", pages(1, 3))];
+  const sheet = classTaskSheet([{ id: "l", name: "Ali" }, { id: "o", name: "Zara" }], (s) => (s.id === "l" ? late : other));
+  assert.equal(sheet.date, "2026-11-02");
+  const [l, o] = sheet.rows;
+  assert.deepEqual(l.items.map((i) => [i.activity, i.date]), [["short", "2026-11-01"], ["new", null], ["long", null]]);
+  assert.deepEqual(o.items.map((i) => [i.activity, i.date]), [["short", "2026-11-04"], ["new", "2026-11-04"]]); // Long, a day later, left out
 });
 
 test("a portion marked by ayah: units, exact names, and the ayah numbers to colour", async () => {
