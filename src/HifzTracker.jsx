@@ -16,7 +16,7 @@ import { nearestAyahs } from "./hifz/ayahs.js";
 import { ACTIVITIES, ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs, ayahMarksOf } from "./hifz/tasks.js";
 import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
-import MushafPage, { MushafPresent, useMushafSwipe } from "./thilawa/MushafPage.jsx";
+import MushafPage, { MushafPresent, MushafPager } from "./thilawa/MushafPage.jsx";
 import { MistakeTag } from "./thilawa/MistakeCategories.jsx";
 import { mistakeColors } from "./thilawa/engine.js";
 
@@ -375,7 +375,6 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
   // Like a printed Mushaf: the next page is to the left.
   const next = () => setPage(Math.min(TOTAL_PAGES, shown + 1));
   const prev = () => setPage(Math.max(1, shown - 1));
-  const swipe = useMushafSwipe(next, prev);
   const marks = ayahMarks || (task?.startAyah ? ayahMarksOf([task]) : null);
   const [jumpOpen, setJumpOpen] = useState(false);
   const go = compact && (
@@ -386,7 +385,7 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
     </div>
   );
   return (
-    <MushafPresent tools={go || null} onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}><div className="hz-reader" ref={topRef}>
+    <MushafPresent page={shown} tools={go || null} onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}><div className="hz-reader" ref={topRef}>
       {header}
       {compact ? (jumpOpen && <PageJump page={shown} onGo={(p) => { setPage(p); setJumpOpen(false); }} />) : (
       <div className="hz-reader-nav">
@@ -399,8 +398,10 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
         </div>
         <button className="hz-btn hz-btn-outline" disabled={shown <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>)}
-      <div {...swipe}><MushafPage page={shown} range={fade && task && inTask ? [task.start, task.end] : null} marks={mistakes} onWordTap={onWordTap} selectedKey={selectedKey} showCorrected={showCorrected}
-        ayahMarks={marks} onAyahTap={onAyahTap} selectedAyah={selectedAyah} /></div>
+      <MushafPager page={shown} onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}>
+        {(p, current) => <MushafPage page={p} range={fade && task && p >= first && p <= last ? [task.start, task.end] : null} marks={mistakes} showCorrected={showCorrected} ayahMarks={marks}
+          onWordTap={current ? onWordTap : null} selectedKey={current ? selectedKey : null} onAyahTap={current ? onAyahTap : null} selectedAyah={current ? selectedAyah : null} />}
+      </MushafPager>
       {children}
     </div></MushafPresent>
   );

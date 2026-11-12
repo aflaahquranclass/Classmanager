@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import { useBackLayer } from "../useBackNav.js";
 import { AudioLines, Gauge, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
-import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
+import MushafPage, { MushafPresent, MushafPager } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
 import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, pagesWithMarks, mistakeCategory, mistakeColors } from "./engine.js";
 import { LetterChips } from "./LettersPanel.jsx";
@@ -245,12 +245,11 @@ export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, bu
   // Like a printed Mushaf: the next page is to the left.
   const next = () => { if (page < TOTAL_PAGES) onPage(page + 1); };
   const prev = () => { if (page > 1) onPage(page - 1); };
-  const swipe = useMushafSwipe(next, prev);
   useEffect(() => { window.scrollTo?.({ top: 0, behavior: "smooth" }); }, [page]);
   const whole = from <= 1 && to >= TOTAL_PAGES;
   const inPart = page >= from && page <= to;
   return (
-    <MushafPresent onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}><div className="th-reader">
+    <MushafPresent page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}><div className="th-reader">
       {header}
       <div className="th-reader-nav">
         <button className="hz-btn hz-btn-outline" disabled={page >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
@@ -261,7 +260,9 @@ export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, bu
         </div>
         <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
-      <div {...swipe}><MushafPage page={page} marks={marks} letters={letters} /></div>
+      <MushafPager page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}>
+        {(p) => <MushafPage page={p} marks={marks} letters={letters} />}
+      </MushafPager>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
         : <button className="hz-btn hz-btn-primary th-read-btn" disabled={busy} onClick={() => onTick(page)}><Circle size={18} aria-hidden="true" />I've read this page</button>)}

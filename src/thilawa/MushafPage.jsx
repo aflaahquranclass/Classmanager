@@ -19,52 +19,170 @@
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, X, Menu, ChevronLeft, ChevronRight } from "lucide-react";
-import { pageToUnit, UNITS_PER_LINE } from "../hifz/quran.js";
+import { Maximize2, Minimize2, X, Menu, ChevronLeft, ChevronRight } from "lucide-react";
+import { pageToUnit, UNITS_PER_LINE, TOTAL_PAGES, JUZ_START_PAGES, SURAHS, surahsOnPages } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
 
 export { buildLines };
 
-// Page turning like a printed Mushaf: swiping the page to the right (finger
-// moving left to right) goes to the next page, to the left goes back. Spread
-// the returned handlers on the element around the page. A short or mostly
-// vertical movement is a tap or a scroll and is ignored.
-export function useMushafSwipe(onNext, onPrev) {
-  const start = useRef(null);
-  return {
-    onTouchStart: (e) => { const t = e.touches[0]; start.current = e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null; },
-    onTouchEnd: (e) => {
-      const from = start.current;
-      start.current = null;
-      if (!from) return;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - from.x;
-      const dy = t.clientY - from.y;
-      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      if (dx > 0) onNext?.(); else onPrev?.();
-    },
+// Page turning like the quran.com app: the pages sit side by side, the next
+// one to the left as in a printed Mushaf, and the page follows the finger.
+// Let go past about a fifth of the page (or with a flick) and it turns, with
+// the next page sliding in; otherwise it springs back. Turning by a button or
+// the arrow keys (onNext / onPrev changing `page` by one) slides the same way.
+// A mostly vertical movement scrolls as usual; two fingers zoom.
+// children(page, current): draws one page; `current` is false for the pages
+// on either side (draw them without tap handlers).
+const PAGER_GAP = 16; // px between two pages while turning
+const EASE = "cubic-bezier(0.22, 0.61, 0.36, 1)";
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+export function MushafPager({ page, onNext = null, onPrev = null, children }) {
+  const wrapRef = useRef(null);
+  const stripRef = useRef(null);
+  const drag = useRef(null);
+  const offset = useRef(0); // the strip's shift in px (+ shows the next page)
+  const turning = useRef(null); // "next" | "prev": a drag let go to turn the page
+  const lastPage = useRef(page);
+  const settleTimer = useRef(null);
+  const noClickUntil = useRef(0);
+  const latest = useRef({ onNext, onPrev });
+  latest.current = { onNext, onPrev };
+
+  const span = () => (wrapRef.current?.clientWidth || 0) + PAGER_GAP;
+  const place = (x, ms = 0) => {
+    const el = stripRef.current;
+    if (!el) return;
+    offset.current = x;
+    el.style.transition = ms ? `transform ${ms}ms ${EASE}` : "none";
+    el.style.transform = x ? `translate3d(${x}px,0,0)` : "";
   };
+  // Where the strip is on screen right now (mid-slide too).
+  const shownAt = () => {
+    const el = stripRef.current;
+    if (!el) return 0;
+    const t = getComputedStyle(el).transform;
+    if (!t || t === "none") return 0;
+    return new DOMMatrixReadOnly(t).m41;
+  };
+  // Slide to x, then run done.
+  const settle = (x, ms, done) => {
+    clearTimeout(settleTimer.current);
+    if (!ms || reducedMotion()) { place(x); done?.(); return; }
+    place(x, ms);
+    settleTimer.current = setTimeout(() => done?.(), ms + 20);
+  };
+  useEffect(() => () => clearTimeout(settleTimer.current), []);
+
+  // A new page: after a drag the strip is already showing it, so it just
+  // comes back to rest under it; after a button it slides in from its side.
+  useLayoutEffect(() => {
+    const from = lastPage.current;
+    lastPage.current = page;
+    if (from === page) return;
+    clearTimeout(settleTimer.current);
+    if (turning.current) { turning.current = null; place(0); return; }
+    const dir = page - from;
+    if (Math.abs(dir) !== 1 || reducedMotion()) { place(0); return; }
+    // The old page is now beside the new one; start with it in view.
+    place(shownAt() - dir * span());
+    stripRef.current?.getBoundingClientRect(); // so the slide starts from there
+    settle(0, 340);
+  }, [page]);
+
+  const onTouchStart = (e) => {
+    if (e.touches.length !== 1) { drag.current = null; return; }
+    const t = e.touches[0];
+    const base = shownAt();
+    if (base) { clearTimeout(settleTimer.current); place(base); }
+    drag.current = { x0: t.clientX, y0: t.clientY, base, mode: null, x: base, lastX: t.clientX, lastT: e.timeStamp, v: 0 };
+  };
+  const onTouchMove = (e) => {
+    const d = drag.current;
+    if (!d) return;
+    if (e.touches.length !== 1) { drag.current = null; settle(0, 220); return; }
+    const t = e.touches[0];
+    const dx = t.clientX - d.x0;
+    const dy = t.clientY - d.y0;
+    if (!d.mode) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      d.mode = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+    if (d.mode !== "x") return;
+    const full = span();
+    let x = d.base + dx;
+    // No page that way: it gives a little, then stops.
+    if (x > 0 && !latest.current.onNext) x *= 0.25;
+    if (x < 0 && !latest.current.onPrev) x *= 0.25;
+    x = Math.max(-full, Math.min(full, x));
+    const dt = e.timeStamp - d.lastT;
+    if (dt > 0) d.v = 0.6 * ((t.clientX - d.lastX) / dt) + 0.4 * d.v;
+    d.lastX = t.clientX;
+    d.lastT = e.timeStamp;
+    d.x = x;
+    place(x);
+  };
+  const onTouchEnd = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || d.mode !== "x") return;
+    noClickUntil.current = Date.now() + 400;
+    const full = span();
+    const { onNext: goNext, onPrev: goPrev } = latest.current;
+    const flick = Math.abs(d.v) > 0.35;
+    const dir = (d.x > full * 0.2 || (flick && d.v > 0 && d.x > 24)) && goNext ? "next"
+      : (d.x < -full * 0.2 || (flick && d.v < 0 && d.x < -24)) && goPrev ? "prev" : null;
+    if (!dir) { settle(0, 260); return; }
+    const to = dir === "next" ? full : -full;
+    const ms = Math.round(Math.min(380, Math.max(170, Math.abs(to - d.x) / Math.max(Math.abs(d.v), 1.1))));
+    settle(to, ms, () => {
+      turning.current = dir;
+      (dir === "next" ? goNext : goPrev)();
+      // Nothing changed after all: back to the page shown.
+      setTimeout(() => { if (turning.current === dir) { turning.current = null; place(0); } }, 300);
+    });
+  };
+  // A drag that ends over a word isn't a tap on it.
+  const onClickCapture = (e) => { if (Date.now() < noClickUntil.current) { e.preventDefault(); e.stopPropagation(); } };
+
+  const pages = [page - 1, page, page + 1].filter((p) => p >= 1 && p <= TOTAL_PAGES);
+  return (
+    <div className="mpg" ref={wrapRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd} onClickCapture={onClickCapture}>
+      <div className="mpg-strip" ref={stripRef}>
+        {pages.map((p) => {
+          const d = p - page; // the next page (+1) is to the left
+          return (
+            <div key={p} className={`mpg-slot ${d ? "mpg-side" : ""}`} aria-hidden={d ? true : undefined} inert={d ? "" : undefined}
+              style={d ? { transform: `translateX(calc(${-d} * (100% + ${PAGER_GAP}px)))` } : undefined}>
+              {children(p, d === 0)}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // Full screen for presenting: `children` (the page with its Next / Previous)
-// fill the screen. Esc exits too. `tools`: more buttons beside Full screen /
-// Exit, there in both.
+// fill the screen. The Mushaf opens in full screen (`startFull`); Exit
+// leaves it for the screen behind. Esc exits too.
 // Full screen is its own layer on the page body (a portal), so nothing around
 // the Mushaf — a scrolling screen (the teacher's Listen & mark, which on
 // iPhone traps a fixed layer inside it and swallows the taps), a card's hover
 // lift, a stacking order — can clip it or catch its taps. Where the browser has
 // its own full screen (not on iPhone), the whole page goes full screen with it.
-// In full screen the controls over the page (Exit, tools, the task tabs, the
-// page title and its arrows) fold into a ☰ button, and see-through Next /
-// Previous buttons sit on the page's edges (onNext / onPrev; null hides one).
-// Swiping turns the page as before.
-// `quick`: a button to keep at hand (e.g. the whiteboard): in the bar, and in
-// full screen beside the ☰ button. `edge`: things that sit on the screen's
-// edge or slide over it (e.g. the letters tab on a phone), put on the page
-// body too, above full screen while it's on.
-export function MushafPresent({ children, tools = null, onNext = null, onPrev = null, quick = null, edge = null }) {
-  const [full, setFull] = useState(false);
+// In full screen, like the quran.com app: the Juz on the left and the page's
+// surahs on the right at the top (`page`), then one row of buttons — Exit,
+// `tools`, `quick` (e.g. the whiteboard) and More, which shows the controls
+// otherwise folded away (the task tabs, the page title and its arrows).
+// See-through Next / Previous buttons sit on the page's edges (onNext /
+// onPrev; null hides one) and ← / → turn the page; swiping turns it as before.
+// `edge`: things that sit on the screen's edge or slide over it (e.g. the
+// letters tab on a phone), put on the page body too, above full screen while
+// it's on.
+export function MushafPresent({ children, page = null, tools = null, onNext = null, onPrev = null, quick = null, edge = null, startFull = true }) {
+  const [full, setFull] = useState(startFull);
   const [menu, setMenu] = useState(false);
   const native = useRef(false); // the browser's own full screen is on because of us
   const leaveNative = () => {
@@ -73,21 +191,34 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     else if (document.webkitFullscreenElement) document.webkitExitFullscreen?.();
   };
-  const exit = () => { setFull(false); setMenu(false); leaveNative(); };
-  const enter = () => {
-    setFull(true);
-    setMenu(false);
-    // Asked for in the tap itself (browsers only allow it then), for the whole page.
+  // Browsers only allow it just after a tap (opening the Mushaf, or Full screen).
+  const goNative = () => {
     const el = document.documentElement;
     const request = el.requestFullscreen || el.webkitRequestFullscreen;
-    if (request && !document.fullscreenElement && !document.webkitFullscreenElement) {
-      try {
-        const p = request.call(el);
-        native.current = true;
-        p?.catch?.(() => { native.current = false; });
-      } catch { native.current = false; /* the layer still covers the window */ }
-    }
+    if (!request || document.fullscreenElement || document.webkitFullscreenElement) return;
+    try {
+      const p = request.call(el);
+      native.current = true;
+      p?.catch?.(() => { native.current = false; });
+    } catch { native.current = false; /* the layer still covers the window */ }
   };
+  const exit = () => { setFull(false); setMenu(false); leaveNative(); };
+  const enter = () => { setFull(true); setMenu(false); goNative(); };
+  useEffect(() => { if (startFull) goNative(); }, []);
+  // The surahs with words on this page, for the title (from the page itself:
+  // a surah that ends on the page where the next one starts is on it too).
+  const [pageSurahs, setPageSurahs] = useState(null);
+  useEffect(() => {
+    let live = true;
+    setPageSurahs(null);
+    if (page) loadPageLines(page).then((lines) => {
+      const nums = [...new Set(lines.flatMap((l) => (l.words || []).map((w) => +String(w.verseKey).split(":")[0])))].filter((n) => n >= 1 && n <= 114);
+      if (live && nums.length) setPageSurahs(nums);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [page]);
+  const turn = useRef({ onNext, onPrev });
+  turn.current = { onNext, onPrev };
   useEffect(() => {
     if (!full) return undefined;
     const before = document.body.style.overflow;
@@ -95,7 +226,13 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
     // The page's own bars (e.g. the phone tab bar) are hidden while the Mushaf fills the screen.
     document.body.classList.add("mf-is-full");
     // Caught first, so Esc leaves full screen without also closing a screen behind it.
-    const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); exit(); } };
+    const onKey = (e) => {
+      if (e.key === "Escape") { e.stopPropagation(); exit(); return; }
+      if (e.altKey || e.ctrlKey || e.metaKey || e.target.closest?.("input, select, textarea, [contenteditable]")) return;
+      // Like a printed Mushaf: the next page is to the left.
+      if (e.key === "ArrowLeft" && turn.current.onNext) { e.preventDefault(); turn.current.onNext(); }
+      if (e.key === "ArrowRight" && turn.current.onPrev) { e.preventDefault(); turn.current.onPrev(); }
+    };
     // Leaving the browser's full screen (its own Esc or gesture) leaves ours too.
     const onChange = () => {
       if (native.current && !document.fullscreenElement && !document.webkitFullscreenElement) { native.current = false; setFull(false); setMenu(false); }
@@ -115,36 +252,46 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
   useEffect(() => () => leaveNative(), []);
 
   const edgeLayer = edge && createPortal(<div className={`mf-edge ${full ? "mf-edge-full" : ""}`}><style>{presentCss}</style>{edge}</div>, document.body);
-  const bar = (
-    <div className="mf-bar">
-      {!full && quick}
-      {tools}
-      {full
-        ? <button type="button" className="hz-btn hz-btn-primary" onClick={exit}><X size={18} aria-hidden="true" />Exit full screen</button>
-        : <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter} aria-label="Full screen"><Maximize2 size={16} aria-hidden="true" /><span className="mf-open-text">Full screen</span></button>}
-    </div>
-  );
   if (!full) {
     return (
       <div className="mf">
         <style>{presentCss}</style>
-        {bar}
+        <div className="mf-bar">
+          {quick}
+          {tools}
+          <button type="button" className="hz-btn hz-btn-outline mf-open" onClick={enter} aria-label="Full screen"><Maximize2 size={16} aria-hidden="true" /><span className="mf-open-text">Full screen</span></button>
+        </div>
         <div className="mf-content">{children}</div>
         {edgeLayer}
       </div>
     );
   }
+  const surahs = (pageSurahs || (page ? surahsOnPages(page, page).map((x) => x.number) : [])).map((n) => SURAHS[n - 1]);
+  const juz = page ? JUZ_START_PAGES.filter((p) => p <= page).length : 0;
   return [createPortal(
     <div className={`mf mf-full ${menu ? "mf-menu" : ""}`} role="dialog" aria-modal="true" aria-label="Mushaf, full screen">
       <style>{presentCss}</style>
-      {/* Slim tabs on the right edge, beside the page (never over the text). */}
-      <div className="mf-rail">
-        <button type="button" className="mf-burger" onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the controls" : "Show the controls"}>
-          {menu ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}
-        </button>
-        {quick && <div className="mf-quick">{quick}</div>}
+      <div className="mf-top">
+        {page && (
+          <div className="mf-head">
+            <span>Juz' {juz}</span>
+            <span className="mf-head-surahs">
+              {surahs.map((s, i) => (
+                <span key={s.number} className="mf-head-surah">{i > 0 && <span aria-hidden="true">·</span>}{s.name}
+                  <i className="mf-head-ar" lang="ar" aria-hidden="true">{String(s.number).padStart(3, "0")}</i></span>
+              ))}
+            </span>
+          </div>
+        )}
+        <div className="mf-tools" role="toolbar" aria-label="Mushaf controls">
+          <button type="button" className="mf-tool" onClick={exit} aria-label="Exit full screen"><Minimize2 size={18} aria-hidden="true" /><span>Exit</span></button>
+          {tools}
+          {quick}
+          <button type="button" className={`mf-tool ${menu ? "mf-tool-on" : ""}`} onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the page controls" : "Show the page controls"}>
+            {menu ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}<span>{menu ? "Less" : "More"}</span>
+          </button>
+        </div>
       </div>
-      {bar}
       <div className="mf-content">{children}</div>
       {/* Like a printed Mushaf: the next page is to the left. */}
       {onNext && <button type="button" className="mf-side mf-side-next" onClick={onNext} aria-label="Next page"><ChevronLeft size={30} aria-hidden="true" /></button>}
@@ -156,30 +303,49 @@ export function MushafPresent({ children, tools = null, onNext = null, onPrev = 
 }
 
 // Full screen fills the screen's width (a laptop scrolls down the page); very
-// wide monitors stop at 1600px so the text doesn't grow huge.
+// wide monitors stop at 1600px so the text doesn't grow huge. On a phone the
+// page fills the screen like the quran.com app: plain paper, no card.
 const presentCss = `
   .mf-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 8px; }
   .mf-content { display: flex; flex-direction: column; gap: 12px; }
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
   /* Next to a page picker on a phone: just the icon. */
   @media (max-width: 520px) { .mf-bar:has(.hz-go) .mf-open-text { display: none; } .mf-bar:has(.hz-go) .mf-open { width: 38px; padding: 0; justify-content: center; } }
-  .mf-full { position: fixed; inset: 0; z-index: 3000; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #EEF3F8; padding: 10px 16px 16px; box-sizing: border-box;
-    color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-  .mf-full .mf-bar, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; }
-  .mf-full { padding-top: max(12px, env(safe-area-inset-top)); }
-  .mf-full .mf-bar { box-sizing: border-box; min-height: 44px; align-items: center; padding-right: 40px; }
-  /* The ☰ and quick buttons: slim tabs on the right edge, in the gap beside the page. */
-  .mf-rail { position: fixed; right: 0; top: max(12px, env(safe-area-inset-top)); z-index: 8; display: flex; flex-direction: column; gap: 6px; }
-  .mf-quick { display: flex; flex-direction: column; gap: 6px; }
-  .mf-rail .mf-burger, .mf-quick > button { position: static; width: 36px; height: 44px; min-height: 0; padding: 0; border-radius: 12px 0 0 12px; border: 1px solid #C7DDF4; border-right: none;
-    background: #FFFFFF; color: #123B67; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: -4px 4px 14px rgba(18,59,103,0.12); }
-  .mf-quick > button span { display: none; }
+  .mpg { position: relative; overflow: hidden; touch-action: pan-y pinch-zoom; }
+  .mpg-strip { position: relative; will-change: transform; }
+  .mpg-slot { position: relative; }
+  .mpg-side { position: absolute; top: 0; left: 0; width: 100%; }
+  /* The pages are clipped at their edges as they turn, so no shadow to cut off. */
+  .mpg .mp-page { box-shadow: none; }
+  .mf-full { position: fixed; inset: 0; z-index: 3000; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #FCFCFA; box-sizing: border-box;
+    padding: max(8px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; animation: mf-in 220ms ease-out; }
+  @keyframes mf-in { from { opacity: 0; transform: scale(0.985); } }
+  @media (prefers-reduced-motion: reduce) { .mf-full { animation: none; } }
+  .mf-full .mf-top, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
+  .mf-full .mf-top { padding: 0 40px; }
+  /* The Juz and the page's surahs, as at the top of a printed page. */
+  .mf-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 34px; font-size: 15px; color: #2A3550; }
+  .mf-head-surahs { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+  .mf-head-surah { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .mf-head-ar { font-family: "QCF2_SurahNames", serif; font-style: normal; font-size: 22px; line-height: 1; color: #2A3550; }
+  /* One row of buttons between the title and the text. */
+  .mf-tools { display: flex; justify-content: center; gap: 8px; margin: 6px 0 4px; }
+  .mf-tools > * { flex: 1 1 0; min-width: 0; max-width: 180px; }
+  .mf-tools .hz-go { margin: 0; }
+  .mf-tool, .mf-tools .hz-btn { box-sizing: border-box; width: 100%; height: 42px; min-height: 0; padding: 0 10px; border-radius: 12px; border: 1px solid #D6E2EF; background: #FFFFFF; color: #123B67;
+    display: flex; align-items: center; justify-content: center; gap: 6px; font: 600 13px/1 Inter, ui-sans-serif, system-ui, sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(18,59,103,0.06);
+    -webkit-tap-highlight-color: transparent; transition: background 0.15s, transform 0.1s; }
+  .mf-tool span, .mf-tools .hz-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mf-tool:hover, .mf-tools .hz-btn:hover { background: #F1F6FC; }
+  .mf-tool:active, .mf-tools .hz-btn:active { transform: scale(0.97); }
+  .mf-tool-on { background: #E8F1FB; border-color: #9CC3EC; }
+  .mf-tool:focus-visible, .mf-side:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
   .mf-edge { position: fixed; top: 0; right: 0; width: 0; height: 0; z-index: 1500; }
   .mf-edge-full { z-index: 3001; }
-  /* Full screen: the controls over the page fold into the ☰ button. */
-  .mf-full:not(.mf-menu) :is(.mf-bar, .hz-tabs, .hz-reader-nav, .th-reader-nav, .lm-nav) { display: none !important; }
+  /* The page controls are folded away until More. */
+  .mf-full:not(.mf-menu) :is(.hz-tabs, .hz-reader-nav, .th-reader-nav, .lm-nav) { display: none !important; }
   .mf-full .mf-content > * { scroll-margin-top: 12px; }
-  .mf-burger:focus-visible, .mf-side:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
   /* See-through Next / Previous on the page's edges. */
   .mf-side { position: fixed; top: 50%; transform: translateY(-50%); z-index: 7; width: 44px; height: min(42vh, 320px); border: none; padding: 0; cursor: pointer;
     background: transparent; color: rgba(18,59,103,0.38); display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
@@ -187,10 +353,21 @@ const presentCss = `
   .mf-side-next { left: 0; border-radius: 0 16px 16px 0; }
   .mf-side-prev { right: 0; border-radius: 16px 0 0 16px; }
   /* The page sits between them, so a word at the edge is never under a button. */
-  .mf-full .mf-content { padding: 0 40px; box-sizing: border-box; }
-  @media (max-width: 640px) { .mf-full .mf-bar { padding-right: 24px; } .mf-rail .mf-burger, .mf-quick > button { width: 24px; height: 40px; } .mf-side { width: 26px; } .mf-full { padding-left: 4px; padding-right: 4px; } .mf-full .mf-content { padding: 0 24px; } }
-  .mf-full .mp-page { max-width: none; }
-  @media (max-width: 640px) { .mf-full .mp-page { padding: 4% 2.5% 2%; border-radius: 10px; } }
+  .mf-full .mf-content { padding: 0 40px; }
+  /* Plain paper in full screen, with a thin line between two pages as they turn. */
+  .mf-full .mp-page { max-width: none; background: transparent; border: none; box-shadow: none; border-radius: 0; }
+  .mf-full .mpg-slot::after { content: ""; position: absolute; top: 2%; bottom: 2%; left: calc(100% + ${PAGER_GAP / 2}px); width: 1px; background: #D9DEE6; }
+  /* A phone: the page fills the width (swipe to turn), like the quran.com app. */
+  @media (max-width: 640px) {
+    .mf-full { padding-left: 6px; padding-right: 6px; }
+    .mf-full .mf-top { padding: 0 4px; }
+    .mf-full .mf-content { padding: 0; }
+    .mf-full .mp-page { padding: 2% 1.5% 2%; }
+    .mf-tools { gap: 6px; }
+    .mf-tool, .mf-tools .hz-btn { height: 40px; padding: 0 6px; font-size: 12px; gap: 5px; }
+    .mf-head { font-size: 14px; }
+  }
+  @media (max-width: 640px) and (pointer: coarse) { .mf-side { display: none; } }
   .mf-is-full .mtb { display: none !important; }
 `;
 

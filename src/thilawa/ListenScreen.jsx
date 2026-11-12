@@ -16,7 +16,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CheckCircle2, Presentation } from "lucide-react";
-import MushafPage, { MushafPresent, useMushafSwipe } from "./MushafPage.jsx";
+import MushafPage, { MushafPresent, MushafPager } from "./MushafPage.jsx";
 import { TOTAL_PAGES, describePages, pageLabel } from "./engine.js";
 import { MistakePopup } from "./MistakeCategories.jsx";
 import LettersPanel, { LetterChips, LettersSide } from "./LettersPanel.jsx";
@@ -57,7 +57,7 @@ const CSS = `
   .lm-row .ls { display: none; }
   .lm-letters i { font: 500 17px/1 "Noto Naskh Arabic", "Geeza Pro", serif; font-style: normal; }
   .lm-letters b { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #E8650A; color: #FFFFFF; font: 700 11px/18px Inter, system-ui, sans-serif; text-align: center; }
-  @media (min-width: 761px) { .mf-full .lm-row .ls { display: block; } .mf-full .lm-letters { display: none; } }
+  @media (min-width: 761px) { .mf-full .lm-row .ls { display: block; } .mf-full .lm-letters, .mf-full .mf-tools .lm-letters { display: none; } }
   .lm-count { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #176FD1; color: #FFFFFF; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
   @media (max-width: 640px) {
     .lm-inner { padding: 10px 6px 20px; }
@@ -150,7 +150,6 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
     setGoto(null);
   };
   const inPortion = page >= a.fromPage && page <= a.toPage;
-  const swipe = useMushafSwipe(next, prev);
 
   // Another student of the class: nothing of the last one stays selected.
   useEffect(() => { setSelectedKey(null); setError(""); }, [student.id]);
@@ -204,7 +203,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
           {error && <div className="hz-error" role="alert">{error}</div>}
           {/* The letters table goes inside, so it shows in full screen too. */}
           {/* Letters and the whiteboard are one tap away, in full screen too (there the letters sit beside the page on a wide screen). */}
-          <MushafPresent onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}
+          <MushafPresent page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}
             quick={<>
               <button type="button" className="hz-btn hz-btn-outline lm-board lm-letters" onClick={() => { setSelectedKey(null); setLettersOpen(true); }} aria-expanded={lettersOpen}
                 aria-label={`Letters to improve${a.letters.length ? ` (${a.letters.length} chosen)` : ""}`} title="Letters to improve">
@@ -227,7 +226,9 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
             <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
           </div>
           <div className="lm-row">
-            <div className="lm-page" {...swipe}><MushafPage page={page} marks={marks} onWordTap={tapWord} selectedKey={selectedKey} showCorrected letters={a.letters} /></div>
+            <div className="lm-page"><MushafPager page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}>
+              {(p, current) => <MushafPage page={p} marks={marks} onWordTap={current ? tapWord : null} selectedKey={current ? selectedKey : null} showCorrected letters={a.letters} />}
+            </MushafPager></div>
             <LettersSide key={student.id} value={a.letters} studentName={student.name} busy={busy} onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />
           </div>
           {selected && (
