@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The public website's pages, for search engines. Staff portals are left out on purpose. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://aflaahqc.com/</loc></url>
+  <url><loc>https://aflaahqc.com/hifz</loc></url>
+  <url><loc>https://aflaahqc.com/store</loc></url>
+  <url><loc>https://aflaahqc.com/register</loc></url>
+  <url><loc>https://aflaahqc.com/hifz-test</loc></url>
+  <url><loc>https://aflaahqc.com/install</loc></url>
+  <url><loc>https://students.aflaahqc.com/</loc></url>
+</urlset>

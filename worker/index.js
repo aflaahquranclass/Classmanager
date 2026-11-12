@@ -1,5 +1,6 @@
 // The site's Cloudflare Worker. Static files (dist/) are served by the assets
-// binding; only /api/* runs this code (see run_worker_first in wrangler.jsonc).
+// binding; only /api/*, / and /login run this code (see run_worker_first in
+// wrangler.jsonc).
 //
 // POST /api/dhivehi — exam remarks in correct Dhivehi (see dhivehi.js).
 //
@@ -113,6 +114,22 @@ async function handleEmail(request, env, { sb }) {
   return json({ configured: true, sent: sentIds.length, failed, noEmail: noEmail.length });
 }
 
+// The staff portals (teachers.* / admin.*) are sign-in pages, not part of the
+// public website: tell search engines not to list them. The old /login
+// address on the main site moves for good to the Teachers Portal, so it
+// drops out of search results too. The Students Portal stays findable.
+const STAFF_HOSTS = ["teachers.aflaahqc.com", "admin.aflaahqc.com"];
+
+async function servePage(request, env) {
+  const { hostname, pathname } = new URL(request.url);
+  if (pathname === "/login" && hostname === "aflaahqc.com") return Response.redirect("https://teachers.aflaahqc.com/", 301);
+  const res = await env.ASSETS.fetch(request);
+  if (!STAFF_HOSTS.includes(hostname)) return res;
+  const out = new Response(res.body, res);
+  out.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return out;
+}
+
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
@@ -121,6 +138,6 @@ export default {
     if (pathname === "/api/dhivehi") return handleDhivehi(request, env);
     if (pathname === "/api/recitation") return handleRecitation(request, env);
     if (pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
-    return env.ASSETS.fetch(request);
+    return servePage(request, env);
   },
 };

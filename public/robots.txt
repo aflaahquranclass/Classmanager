@@ -1,0 +1,8 @@
+# Aflaah Quran Class. The staff portals (teachers.aflaahqc.com,
+# admin.aflaahqc.com) send a "noindex" tag so search engines drop them; they
+# are not blocked here, because a blocked page can't be read and its noindex
+# would never be seen.
+User-agent: *
+Allow: /
+
+Sitemap: https://aflaahqc.com/sitemap.xml

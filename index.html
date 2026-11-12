@@ -22,6 +22,10 @@
         if (sub === "teachers") p = "teachers";
         else if (sub === "admin") p = "admin";
         if (!p) return;
+        // Staff sign-in pages: keep them out of search results.
+        var robots = document.createElement("meta");
+        robots.name = "robots"; robots.content = "noindex, nofollow";
+        document.head.appendChild(robots);
         var name = p === "admin" ? "AQC Admin" : "AQC Teachers";
         document.title = name;
         document.querySelector('link[rel="manifest"]').href = "/manifest-" + p + ".webmanifest";

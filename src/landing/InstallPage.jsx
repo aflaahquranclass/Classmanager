@@ -16,14 +16,14 @@ const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platfor
 
 const STEPS = {
   android: (p) => [
-    { icon: ExternalLink, title: "Open the portal in Chrome", body: <>Open <a href={p.url}>{p.show}</a> in the <b>Chrome</b> app.</> },
+    { icon: ExternalLink, title: "Open the portal in Chrome", body: <>Open <a href={p.url} rel={p.key === "student" ? undefined : "nofollow"}>{p.show}</a> in the <b>Chrome</b> app.</> },
     { icon: MoreVertical, title: "Open Chrome's menu", body: <>Tap the <b>⋮</b> button at the top right of Chrome.</> },
     { icon: Download, title: "Install the app", body: <>Tap <b>Install app</b> (on some phones it says <b>Add to Home screen</b>), then <b>Install</b>. Chrome may also show an <b>Install</b> banner by itself — tapping that works too.</> },
     { icon: Smartphone, title: "Open it from your home screen", body: <>The <b>{p.app}</b> icon is now on your home screen and in your app list. Open it from there and sign in.</> },
     { icon: Bell, title: "Turn on notifications", body: <>Tap the <b>bell</b> at the top, then <b>Turn on</b>, and tap <b>Allow</b>. Messages from the class now appear in your notification bar, even when the app is closed.</> },
   ],
   ios: (p) => [
-    { icon: ExternalLink, title: "Open the portal in Safari", body: <>Open <a href={p.url}>{p.show}</a> in <b>Safari</b>. (iPhone needs iOS 16.4 or newer for notifications.)</> },
+    { icon: ExternalLink, title: "Open the portal in Safari", body: <>Open <a href={p.url} rel={p.key === "student" ? undefined : "nofollow"}>{p.show}</a> in <b>Safari</b>. (iPhone needs iOS 16.4 or newer for notifications.)</> },
     { icon: Share, title: "Tap Share", body: <>Tap the <b>Share</b> button — the square with an arrow pointing up, at the bottom of the screen (or next to the address bar). If you don't see it, tap <b>•••</b> first.</> },
     { icon: PlusSquare, title: "Add to Home Screen", body: <>Scroll down and tap <b>Add to Home Screen</b>. Leave <b>Open as Web App</b> switched on, then tap <b>Add</b>.</> },
     { icon: Smartphone, title: "Open it from your Home Screen", body: <>Close Safari and open the <b>{p.app}</b> icon on your Home Screen, then sign in. Notifications only work when the app is opened from this icon, not from Safari.</> },
@@ -74,7 +74,7 @@ export default function InstallPage() {
           </ol>
 
           <div className="ld-install-go">
-            <a className="ld-btn ld-btn-primary" href={portal.url}>Open {portal.label.toLowerCase()} portal</a>
+            <a className="ld-btn ld-btn-primary" href={portal.url} rel={portal.key === "student" ? undefined : "nofollow"}>Open {portal.label.toLowerCase()} portal</a>
           </div>
 
           <div className="ld-card ld-install-help">

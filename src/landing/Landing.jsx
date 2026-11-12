@@ -31,8 +31,9 @@ const PAGES = {
 const LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const LOGINS = [
   { label: "nav.studentPortal", href: LOCAL ? "/?portal=student" : "https://students.aflaahqc.com" },
-  { label: "nav.teachersPortal", href: LOCAL ? "/?portal=teacher" : "https://teachers.aflaahqc.com" },
-  { label: "nav.admin", href: LOCAL ? "/?portal=admin" : "https://admin.aflaahqc.com" },
+  // Staff portals: rel="nofollow" so search engines don't follow them in.
+  { label: "nav.teachersPortal", href: LOCAL ? "/?portal=teacher" : "https://teachers.aflaahqc.com", rel: "nofollow" },
+  { label: "nav.admin", href: LOCAL ? "/?portal=admin" : "https://admin.aflaahqc.com", rel: "nofollow" },
 ];
 
 // Each class's own registration form (/register/hifz …) is the register page.
@@ -95,7 +96,7 @@ function Site() {
     <Link to={to} navigate={navigate} className={to === path ? "on" : ""}>{label}</Link>
   );
 
-  const logins = LOGINS.map((l) => <a key={l.label} href={l.href}>{t(l.label)}</a>);
+  const logins = LOGINS.map((l) => <a key={l.label} href={l.href} rel={l.rel}>{t(l.label)}</a>);
   const brand = <span className="ld-brand-name">{t("brand.name")}<small>{t("brand.sub")}</small></span>;
 
   return (
