@@ -8,13 +8,13 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useBackLayer } from "../useBackNav.js";
-import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, Plus, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2, Download } from "lucide-react";
+import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2, Download } from "lucide-react";
 import { createPortal } from "react-dom";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
-import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, wholeJuz, describeRange, describeAmount } from "./quran.js";
-import { unitsOf, toSet, subtract, localDate } from "./engine.js";
+import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, juzStartUnit, wholeJuz, describeRange, describeAmount } from "./quran.js";
+import { unitsOf, toSet, localDate } from "./engine.js";
 import { downloadClassTasks } from "./taskImage.js";
 import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE, ayahNumber, ayahPortion, ayahMarksOf, nextClassDay } from "./tasks.js";
 import { ayahRef } from "./ayahs.js";
@@ -140,6 +140,15 @@ const teacherCss = `
   .ht-dot-new { background: #176FD1; }
   .ht-dot-short { background: #0A7F96; }
   .ht-dot-long { background: #5B4BB7; }
+  .ht-give { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 0 4px 0 10px; border-radius: 999px; border: 1px solid #DCEBF8; background: #F3F8FD; color: #1D5FA8; font: 600 12px/1 inherit; cursor: pointer; }
+  .ht-give i { position: relative; width: 34px; height: 20px; border-radius: 999px; background: #CBD5E1; transition: background 0.15s; }
+  .ht-give i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: left 0.15s; }
+  .ht-give[aria-checked="true"] i { background: #16A34A; }
+  .ht-give[aria-checked="true"] i::after { left: 16px; }
+  .ht-give[aria-checked="false"] { color: #6B7A90; background: #F6F8FB; border-color: #E2E8F0; }
+  .ht-give:disabled { cursor: default; opacity: 0.6; }
+  .ht-task-off { background: #F8FAFC; border-style: dashed; }
+  .ht-task-off .ht-task-tile, .ht-task-off .ht-task-top b, .ht-task-off .ht-task-portion { opacity: 0.55; }
   .ht-nextclass { background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 16px; overflow: hidden; }
   .ht-nextclass-head { padding: 12px 14px; font-weight: 700; color: #123B67; }
   .ht-nextclass-row { display: grid; grid-template-columns: 14px 132px minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 14px; border-top: 1px solid #EEF3F9; font-size: 14px; }
@@ -204,20 +213,13 @@ function PortionFields({ value, onChange }) {
 const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeAmount(r.end - r.start)} · ${describeAyahs(r)}`;
 
 // ---------- the student's Hifz plan ----------
-// What was memorised before (page to page or whole juz from the front or
-// back), where the student starts Hifz, and how
-// Short and Long Muraja'ah work. New, Short and Long portions are worked out
-// from this (tasks.js: suggestPortion). The target year is the student's own.
+// Just two things: how many juz the student has memorised (from the front or
+// the back of the Quran), and where Hifz starts. Everything else (how much
+// New Hifz a day, Short and Long Muraja'ah) keeps its default or saved value;
+// portions are worked out from the plan (tasks.js: suggestPortion). The target
+// year is the student's own.
 
-const NEW_AMOUNTS = [
-  { units: 10, label: "5 lines" },
-  { units: 15, label: "½ page" },
-  { units: 30, label: "1 page" },
-  { units: 45, label: "1½ pages" },
-  { units: 60, label: "2 pages" },
-];
-
-const JUZ_COUNTS = Array.from({ length: 30 }, (_, i) => i + 1);
+const JUZ_COUNTS = Array.from({ length: 31 }, (_, i) => i);
 
 // Which way New Hifz goes from the start, in words.
 function pathNote(plan) {
@@ -227,180 +229,77 @@ function pathNote(plan) {
   return `New Hifz goes to the end of Juz ${j}, then Juz ${j - 1}${j > 2 ? `, ${j - 2}` : ""}${j > 3 ? " …" : ""} towards the front.`;
 }
 
+const sameRanges = (a, b) => a.length === b.length && a.every((r, i) => r[0] === b[i][0] && r[1] === b[i][1]);
+const juzSet = (side, n) => (n > 0 ? [wholeJuz(side, n)] : []);
+
+// The juz a saved plan matches, or null when it was saved as other pages.
+function juzOf(memorized) {
+  if (memorized.length === 0) return { side: "first", count: 0 };
+  for (const side of ["first", "last"]) {
+    for (let n = 1; n <= 30; n++) if (sameRanges(memorized, juzSet(side, n))) return { side, count: n };
+  }
+  return null;
+}
+
 function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
   const start = planOf(profile);
   const [plan, setPlan] = useState(() => ({ ...start, memorized: toSet(start.memorized), startUnit: start.startUnit ?? PATH_STARTS[start.direction] }));
-  // The direction isn't asked: a saved plan keeps its own until the start or
-  // the pages memorised before change, then it follows from them (directionFor,
-  // with completed New Hifz counted too).
+  // The direction isn't asked: it follows from the start and what's memorised
+  // (directionFor, with completed New Hifz counted too).
   const set = (patch) => setPlan((p) => {
     const next = { ...p, ...patch };
     if ("startUnit" in patch || "memorized" in patch) next.direction = directionFor(next.startUnit, memorizedRanges({ memorized: next.memorized }, tasks));
     return next;
   });
-  const [juzSide, setJuzSide] = useState("first");
-  const [juzCount, setJuzCount] = useState(1);
-  const juzRange = wholeJuz(juzSide, juzCount);
-  const juzName = juzSide === "last" ? (juzCount === 1 ? "Juz 30" : `Juz ${31 - juzCount}–30`) : juzCount === 1 ? "Juz 1" : `Juz 1–${juzCount}`;
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [pagesError, setPagesError] = useState("");
-  const addPages = () => {
-    const a = Math.round(+from);
-    const b = Math.round(+(to || from));
-    if (!(a >= 1 && b >= a && b <= 604)) { setPagesError("Pages go from 1 to 604, and the last page can't be before the first."); return false; }
-    set({ memorized: toSet([...plan.memorized, [pageToUnit(a), pageToUnit(b + 1)]]) });
-    setFrom(""); setTo(""); setPagesError("");
-    return true;
+  const saved = juzOf(plan.memorized);
+  const [juzSide, setJuzSide] = useState(saved?.side ?? "first");
+  const [juzCount, setJuzCount] = useState(saved?.count ?? null);
+  // A new plan suggests the start right after the juz memorised, until the
+  // teacher picks a start themself.
+  const [startPicked, setStartPicked] = useState(!!profile && !profile.fromLegacy);
+  const chooseJuz = (side, count) => {
+    setJuzSide(side); setJuzCount(count);
+    if (count == null) return;
+    const patch = { memorized: juzSet(side, count) };
+    if (!startPicked && count < 30) patch.startUnit = side === "last" && count > 0 ? juzStartUnit(30 - count) : juzStartUnit(count + 1);
+    set(patch);
   };
   const longStart = plan.longStartUnit ?? plan.memorized[0]?.[0] ?? pageToUnit(1);
   const save = () => onSave({ ...plan, longStartUnit: longStart });
-
-  // One question at a time: the next appears once the one before is answered
-  // (Next), answered ones stay as a short summary to tap and change. A saved
-  // plan opens with every answer shown, so it's quick to change one thing.
-  const steps = [
-    {
-      title: "Pages memorised before",
-      summary: plan.memorized.length ? `${plan.memorized.map(describeRange).join(", ")} · ${describeAmount(unitsOf(plan.memorized))}` : "Nothing yet",
-      body: (
-        <>
-          <div className="hz-grid3">
-            <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="From page" aria-label="From page" value={from} onChange={(e) => setFrom(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
-            <input className="hz-input" type="number" min="1" max="604" inputMode="numeric" placeholder="To page" aria-label="To page" value={to} onChange={(e) => setTo(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addPages()} />
-            <button type="button" className="hz-btn hz-btn-outline" onClick={addPages} disabled={!from}><Plus size={16} aria-hidden="true" />Add pages</button>
-          </div>
-          {pagesError && <div className="hz-error" role="alert" style={{ marginTop: 8 }}>{pagesError}</div>}
-          <div className="ht-juz">
-            <span>Or whole juz</span>
-            <div className="hz-chips" role="group" aria-label="From the front or the back">
-              <button type="button" className="hz-chip" aria-pressed={juzSide === "first"} onClick={() => setJuzSide("first")}>First</button>
-              <button type="button" className="hz-chip" aria-pressed={juzSide === "last"} onClick={() => setJuzSide("last")}>Last</button>
-            </div>
-            <select className="hz-select" aria-label="How many juz" value={juzCount} onChange={(e) => setJuzCount(+e.target.value)}>
-              {JUZ_COUNTS.map((n) => <option key={n} value={n}>{n} juz</option>)}
-            </select>
-            <button type="button" className="hz-btn hz-btn-outline" onClick={() => set({ memorized: toSet([...plan.memorized, juzRange]) })}><Plus size={16} aria-hidden="true" />Add {juzName}</button>
-          </div>
-          <div className="ht-ranges" aria-label="Memorised before">
-            {plan.memorized.length === 0 && <span style={{ background: "#EEF0F3", color: "#5B6B79", paddingRight: 12 }}>Nothing yet</span>}
-            {plan.memorized.map((r) => (
-              <span key={r.join("-")}>{describeRange(r)}
-                <button type="button" aria-label={`Remove ${describeRange(r)}`} onClick={() => set({ memorized: subtract(plan.memorized, [r]) })}><X size={14} aria-hidden="true" /></button>
-              </span>
-            ))}
-          </div>
-          <p className="hz-muted" style={{ margin: "8px 0 0" }}>{describeAmount(unitsOf(plan.memorized))} memorised before. Completed New Hifz tasks are added automatically.</p>
-        </>
-      ),
-    },
-    {
-      title: "Where will the student start Hifz?",
-      summary: `${ayahName(ayahAtLine(plan.startUnit))} · p. ${unitToPage(plan.startUnit)} · ${plan.direction === "juz_reverse" ? "juz by juz towards the front" : "on to the end"}`,
-      body: (
-        <>
-          <PositionPicker label="Start" unit={plan.startUnit} allowLine={false} onChange={(u) => set({ startUnit: u })} />
-          <p className="hz-muted" style={{ margin: "8px 0 0" }}>{pathNote(plan)}</p>
-        </>
-      ),
-    },
-    {
-      title: "New Hifz: how much a day?",
-      summary: `${describeAmount(plan.newUnits)} a day`,
-      body: (
-        <>
-          <div className="hz-options" style={{ marginTop: 0 }}>
-            {NEW_AMOUNTS.map((o) => (
-              <button key={o.units} type="button" className="hz-option" aria-pressed={plan.newUnits === o.units} onClick={() => set({ newUnits: o.units })}>{o.label}</button>
-            ))}
-          </div>
-          <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each class day the next {describeAmount(plan.newUnits)} of the Hifz path is set.</p>
-        </>
-      ),
-    },
-    {
-      title: "Short Muraja'ah: how many pages a day?",
-      summary: `${plan.shortPages} page${plan.shortPages === 1 ? "" : "s"} a day`,
-      body: (
-        <>
-          <div className="hz-chips">
-            {[1, 2, 3, 4, 5, 6].map((n) => <button key={n} type="button" className="hz-chip" style={{ minWidth: 52 }} aria-pressed={plan.shortPages === n} onClick={() => set({ shortPages: n })}>{n}</button>)}
-            <input className="hz-input" style={{ width: 110 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Short Muraja'ah pages"
-              value={plan.shortPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ shortPages: Math.min(40, v) }); }} />
-          </div>
-          <p className="hz-muted" style={{ margin: "8px 0 0" }}>Each day it revises the {plan.shortPages} most recently memorised page{plan.shortPages === 1 ? "" : "s"} of the Hifz path.</p>
-        </>
-      ),
-    },
-    {
-      title: "Long Muraja'ah",
-      summary: `From p. ${unitToPage(longStart)} · ${plan.longMode === "pages" ? `${plan.longPages} page${plan.longPages === 1 ? "" : "s"} a day` : "to the end of the juz each day"}`,
-      body: (
-        <>
-          <PositionPicker label="Start from" unit={longStart} allowLine={false} onChange={(u) => set({ longStartUnit: u })} />
-          <div className="hz-field">
-            <span>How much a day?</span>
-            <div className="hz-options" style={{ marginTop: 0 }}>
-              <button type="button" className="hz-option" aria-pressed={plan.longMode === "juz"} onClick={() => set({ longMode: "juz" })}>To the end of the juz<small>One juz a day</small></button>
-              <button type="button" className="hz-option" aria-pressed={plan.longMode === "pages"} onClick={() => set({ longMode: "pages" })}>A number of pages<small>{plan.longPages} page{plan.longPages === 1 ? "" : "s"} a day</small></button>
-            </div>
-            {plan.longMode === "pages" && (
-              <input className="hz-input" style={{ maxWidth: 160 }} type="number" min="0.5" max="40" step="0.5" inputMode="decimal" aria-label="Long Muraja'ah pages a day"
-                value={plan.longPages} onChange={(e) => { const v = Math.round(+e.target.value * 2) / 2; if (v > 0) set({ longPages: Math.min(40, v) }); }} />
-            )}
-          </div>
-          <p className="hz-muted" style={{ margin: "8px 0 0" }}>Goes through the memorised pages from here, then starts again from the beginning.</p>
-        </>
-      ),
-    },
-  ];
-  const last = steps.length - 1;
-  const [open, setOpen] = useState(profile ? null : 0);
-  const [reached, setReached] = useState(profile ? last : 0);
-  const go = (i) => { setOpen(i); setReached((r) => Math.max(r, i)); };
-  // Pages typed but not added yet count when moving on.
-  const next = () => { if (open === 0 && from && !addPages()) return; go(open + 1); };
-  const openRef = useRef(null);
-  const moved = useRef(false);
-  useEffect(() => {
-    if (moved.current) openRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    moved.current = true;
-  }, [open]);
 
   return (
     <div className="ht-plan">
       {profile?.fromLegacy && <div className="hz-note" style={{ marginTop: 0, marginBottom: 0 }}><Target size={18} aria-hidden="true" /><span>Filled in from the plan the student made themself. Check it and save.</span></div>}
 
-      <div className="ht-wiz-head">
-        <span>{open != null ? `Step ${open + 1} of ${steps.length}` : "All answered · tap one to change it"}</span>
-        <div className="hz-wiz-steps" aria-hidden="true">{steps.map((st, i) => <span key={st.title} className={i <= reached ? "on" : ""} />)}</div>
+      <div className="ht-plan-step">
+        <h4>1. How many juz has the student memorised?</h4>
+        <div className="ht-juz" style={{ marginTop: 0 }}>
+          <select className="hz-select" aria-label="How many juz memorised" value={juzCount ?? ""} onChange={(e) => chooseJuz(juzSide, e.target.value === "" ? null : +e.target.value)}>
+            {juzCount == null && <option value="">{describeAmount(unitsOf(plan.memorized))} (as saved)</option>}
+            {JUZ_COUNTS.map((n) => <option key={n} value={n}>{n === 0 ? "None" : `${n} juz`}</option>)}
+          </select>
+          {juzCount > 0 && juzCount < 30 && (
+            <div className="hz-chips" role="group" aria-label="From the front or the back">
+              <button type="button" className="hz-chip" aria-pressed={juzSide === "first"} onClick={() => chooseJuz("first", juzCount)}>From Juz 1</button>
+              <button type="button" className="hz-chip" aria-pressed={juzSide === "last"} onClick={() => chooseJuz("last", juzCount)}>From Juz 30</button>
+            </div>
+          )}
+        </div>
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>
+          {plan.memorized.length ? `${plan.memorized.map(describeRange).join(", ")}. ` : ""}Completed New Hifz tasks are added automatically.
+        </p>
       </div>
 
-      {steps.slice(0, reached + 1).map((st, i) => (i === open ? (
-        <div key={st.title} ref={openRef} className="ht-plan-step ht-plan-step-open hz-wiz-body">
-          <h4>{i + 1}. {st.title}</h4>
-          {st.body}
-          <div className="hz-wiz-nav">
-            {i > 0 ? <button className="hz-btn hz-btn-outline" onClick={() => setOpen(i - 1)}><ChevronLeft size={16} aria-hidden="true" />Back</button> : <span />}
-            {i < last
-              ? <button className="hz-btn hz-btn-primary" onClick={next}>Next<ArrowRight size={16} aria-hidden="true" /></button>
-              : <button className="hz-btn hz-btn-primary" disabled={busy} onClick={save}>Save plan</button>}
-          </div>
-        </div>
-      ) : (
-        <button key={st.title} type="button" className="ht-wiz-sum" onClick={() => setOpen(i)} aria-label={`${i + 1}. ${st.title}: ${st.summary}. Change`}>
-          <span className="ht-wiz-check"><Check size={15} aria-hidden="true" /></span>
-          <div><small>{i + 1}. {st.title}</small><b>{st.summary}</b></div>
-          <span className="ht-wiz-change"><Pencil size={14} aria-hidden="true" />Change</span>
-        </button>
-      )))}
+      <div className="ht-plan-step">
+        <h4>2. Where does the Hifz start?</h4>
+        <PositionPicker label="Start" unit={plan.startUnit} allowLine={false} onChange={(u) => { setStartPicked(true); set({ startUnit: u }); }} />
+        <p className="hz-muted" style={{ margin: "8px 0 0" }}>{pathNote(plan)}</p>
+      </div>
 
-      {open !== last && (reached === last || onCancel) && (
-        <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 4 }}>
-          {onCancel && <button className="hz-btn hz-btn-outline" onClick={onCancel}>Cancel</button>}
-          {reached === last && <button className="hz-btn hz-btn-primary" disabled={busy} onClick={save}>Save plan</button>}
-        </div>
-      )}
+      <div className="hz-wiz-nav" style={{ justifyContent: "flex-end", marginTop: 4 }}>
+        {onCancel && <button className="hz-btn hz-btn-outline" onClick={onCancel}>Cancel</button>}
+        <button className="hz-btn hz-btn-primary" disabled={busy} onClick={save}>Save plan</button>
+      </div>
     </div>
   );
 }
@@ -495,6 +394,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const [nextOpen, setNextOpen] = useState(null); // task whose next task is being looked at
   const [ayahMenu, setAyahMenu] = useState(null); // { verseKey, page, el }: the ayah number just tapped
   const [pendingStart, setPendingStart] = useState(null); // { activity, ayah }: a start waiting for its end
+  const [pinnedDay, setPinnedDay] = useState(null); // the class day the teacher is choosing parts for (see classParts)
   useBackLayer(!!markingId, () => closeMarking(), "teacher-hifz-mushaf");
   const generating = useRef(false);
   // Marking is instant: a tapped word is highlighted (and its pop-up opens)
@@ -590,6 +490,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     return run(async () => {
       await queue.current.chain; // every mark saved first
       await repo.setTaskDone(t.id, true);
+      setPinnedDay(null);
       if (next && !stillOpen) {
         await repo.addTasks([{ activity: t.activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "",
           ...(next.startAyah ? { startAyah: next.startAyah, endAyah: next.endAyah } : {}) }]);
@@ -648,6 +549,27 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
       await write(real);
     });
     if (patch.removed || patch.correctedAt) savedIds.current.delete(key);
+  };
+  // Not every part is given every class. Each task card has a Given switch
+  // for the class day: switch it off to leave the part out (its task, the same
+  // portion, moves to the next class day, so the student carries on from
+  // there) or to give it after all (its task comes back to this day). The
+  // class day is the soonest day with something set (today when anything is
+  // late), kept while the teacher is choosing; approving moves on.
+  const openDays = tasks.filter((t) => !t.completedAt).map((t) => (t.taskDate < today ? today : t.taskDate)).sort();
+  const soonest = openDays[0] || nextClassDay(student.schedule, today, true);
+  const classDay = pinnedDay && pinnedDay >= today ? pinnedDay : soonest;
+  const laterDay = nextClassDay(student.schedule, classDay);
+  const classParts = ACTIVITIES.map((a) => {
+    const open = tasks.filter((t) => t.activity === a && !t.completedAt).sort((x, y) => (x.taskDate < y.taskDate ? -1 : 1))[0];
+    const doneToday = classDay === today && tasks.some((t) => t.activity === a && t.completedAt && localDate(new Date(t.completedAt), TIMEZONE) === today);
+    const given = !!open && open.taskDate <= classDay;
+    return { a, open, given, done: doneToday && !given };
+  });
+  const partOf = (t) => classParts.find((p) => p.open?.id === t.id) || null;
+  const togglePart = ({ open, given }) => {
+    setPinnedDay(classDay);
+    run(() => repo.updateTask(open.id, { taskDate: given ? laterDay : classDay }));
   };
   const remove = async (what, fn) => {
     if (await confirmDialog({ title: `Delete this ${what}?`, message: "This can't be undone.", confirmLabel: "Delete" })) run(fn);
@@ -778,6 +700,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     return run(async () => {
       await queue.current.chain; // every mark saved first
       for (const t of open) await repo.setTaskDone(t.id, true);
+      setPinnedDay(null);
       if (rows.length) await repo.addTasks(rows);
       setDrafts((d) => { const n = { ...d }; open.forEach((t) => delete n[t.activity]); return n; });
       closeMarking();
@@ -857,8 +780,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     }
     // The student has finished: highlighted, with a green Approve.
     const done = !!t.studentDoneAt;
+    const part = partOf(t);
+    const off = part && !part.given && !part.done && !done;
     return (
-      <li key={t.id} className={`ht-task ${done ? "ht-task-ready" : ""} ${markingId === t.id ? "ht-task-open" : ""}`}>
+      <li key={t.id} className={`ht-task ${done ? "ht-task-ready" : ""} ${off ? "ht-task-off" : ""} ${markingId === t.id ? "ht-task-open" : ""}`}>
         <span className={`ht-task-tile ht-tile-${t.activity}`}><Icon size={20} aria-hidden="true" /></span>
         <div className="ht-task-main">
           <div className="ht-task-top">
@@ -866,6 +791,14 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
             <span className="ht-task-tags">
               {count > 0 && <span className="hz-mistake-badge" title="Words marked"><Highlighter size={12} aria-hidden="true" />{count}</span>}
               {done && <span className="ht-ready-tag" title={`Finished ${fmtDate(t.studentDoneAt.slice(0, 10))}`}><CheckCheck size={14} aria-hidden="true" />Student finished</span>}
+              {part && !part.done && !done && (
+                <button type="button" role="switch" className="ht-give" aria-checked={part.given} disabled={busy}
+                  aria-label={`Give ${title} ${classDay === today ? "today" : `on ${fmtDay(classDay)}`}`}
+                  title={part.given ? `Switch off: moves to ${fmtDay(laterDay)}` : `Switch on: given ${classDay === today ? "today" : `on ${fmtDay(classDay)}`}`}
+                  onClick={() => togglePart(part)}>
+                  {part.given ? "Given" : "Not given"}<i aria-hidden="true" />
+                </button>
+              )}
             </span>
           </div>
           {portionLine(t)}
