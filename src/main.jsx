@@ -14,6 +14,18 @@ const Landing = lazy(() => import("./landing/Landing.jsx"));
 // and a teacher never loads the Students Portal.
 const App = lazy(() => import("./App.jsx"));
 const StudentPortal = lazy(() => import("./StudentPortal.jsx"));
+// students.aflaahqc.com/install: the link that puts the Students Portal on a
+// phone. The browser's install offer (Android) can come before the page has
+// loaded, so it's kept here for the page to use.
+const StudentInstall = lazy(() => import("./StudentInstall.jsx"));
+const studentInstall = PORTAL === "student" && /^\/install\/?$/.test(window.location.pathname);
+if (studentInstall) {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    window.__aqcInstallPrompt = e;
+    window.dispatchEvent(new Event("aqc-install-ready"));
+  });
+}
 const LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 const oldStaffLogin = !PORTAL && window.location.pathname === "/login";
 if (oldStaffLogin) window.location.replace(LOCAL ? "/?portal=teacher" : "https://teachers.aflaahqc.com");
@@ -30,7 +42,7 @@ const teacherDemo = LOCAL && PORTAL === "teacher" && new URLSearchParams(window.
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : workshopPage ? <Suspense fallback={null}><WorkshopPage /><SplashDone /></Suspense> : teacherDemo ? <Suspense fallback={null}><TeacherDemo /></Suspense> : oldStaffLogin ? null : PORTAL === "student" ? <Suspense fallback={null}><StudentPortal /></Suspense> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <Suspense fallback={null}><App /></Suspense>}
+    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : workshopPage ? <Suspense fallback={null}><WorkshopPage /><SplashDone /></Suspense> : teacherDemo ? <Suspense fallback={null}><TeacherDemo /></Suspense> : oldStaffLogin ? null : studentInstall ? <Suspense fallback={null}><StudentInstall /></Suspense> : PORTAL === "student" ? <Suspense fallback={null}><StudentPortal /></Suspense> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <Suspense fallback={null}><App /></Suspense>}
     <ConfirmHost />
   </React.StrictMode>
 );

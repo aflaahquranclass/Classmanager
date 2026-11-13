@@ -228,6 +228,10 @@ function StudentLogin({ error, onSignIn }) {
         <button className="login-submit" type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
       </form>
       <p className="auth-help">Forgot your password? Contact the class admin for a new one-time password.</p>
+      {/* Not yet opened as the installed app: point to the install page. */}
+      {!(window.matchMedia?.("(display-mode: standalone)").matches || navigator.standalone) && (
+        <p className="auth-help" style={{ marginTop: 10 }}><a href={["localhost", "127.0.0.1"].includes(window.location.hostname) ? "/install?portal=student" : "/install"} style={{ color: "#176FD1", fontWeight: 600 }}>Install the app on your phone</a></p>
+      )}
     </AuthShell>
   );
 }
