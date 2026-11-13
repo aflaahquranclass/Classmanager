@@ -17,11 +17,16 @@
   // Admin → Notifications emails, via Cloudflare Email Service. The sender
   // domain must be onboarded under Email Service → Email Sending.
   "send_email": [{ "name": "EMAIL" }],
-  // Check my Reading: Whisper speech-to-text (see worker/recitation.js).
+  // Check my Reading: Whisper speech-to-text, the backup when the class's
+  // Quran listener Space (QURAN_ASR_URL below) can't answer (see worker/recitation.js).
   "ai": { "binding": "AI" },
   "vars": {
     "EMAIL_FROM": "noreply@aflaahqc.com",
     "EMAIL_FROM_NAME": "Aflaah Quran Class",
+    // Check my Reading's listener (asr-server/ on a Hugging Face Space), e.g.
+    // "https://<user>-aflaah-quran-listener.hf.space". Empty: Whisper only.
+    // The Space's secret LISTENER_TOKEN goes here too: npx wrangler secret put LISTENER_TOKEN
+    "QURAN_ASR_URL": "",
     // The public (anon) key — the same one shipped in the app. The Worker
     // calls Supabase with the signed-in admin's own token.
     // Phone notifications (Web Push). The private half is the secret

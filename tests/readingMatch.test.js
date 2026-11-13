@@ -55,3 +55,25 @@ test("opening letters recited by their names count as right", () => {
   assert.deepEqual(status, ["ok", "ok", "ok", "ok", "ok", "ok"]);
   assert.equal(extra, 0);
 });
+
+test("matching word by word with a cache gives the same result as all at once", () => {
+  const heardAll = splitWords("عم يتساءلون عن الخبر العظيم هم فيه");
+  const cache = {};
+  let last;
+  for (let k = 0; k <= heardAll.length; k++) last = alignRecitation(heardAll.slice(0, k), EXPECTED, cache);
+  assert.deepEqual(last, alignRecitation(heardAll, EXPECTED));
+  // A changed last word (the live part re-heard) is matched again, not kept.
+  const changed = [...heardAll.slice(0, -1), "مختلفون"];
+  assert.deepEqual(alignRecitation(changed, EXPECTED, cache), alignRecitation(changed, EXPECTED));
+});
+
+test("a long passage is matched quickly and still finds each mistake", () => {
+  const words = splitWords("عم يتساءلون عن النبإ العظيم الذي هم فيه مختلفون كلا سيعلمون ثم");
+  const expected = Array.from({ length: 4000 }, (_, i) => words[i % words.length] + "ب".repeat(i % 3));
+  const heard = expected.map((w, i) => (i % 50 === 25 ? "خطا" : w));
+  const t0 = performance.now();
+  const { status } = alignRecitation(heard, expected);
+  assert.ok(performance.now() - t0 < 1500, "should take well under the old ~8 s");
+  assert.equal(status.filter((s) => s === "wrong").length, 80);
+  assert.equal(status.filter((s) => s === "ok").length, 3920);
+});

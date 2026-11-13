@@ -1,15 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "../supabaseClient.js";
+import { makeVad, frameRms } from "./vad.js";
 
 // Check my Reading: the listening engine. While the student recites, the
-// microphone is read at 16 kHz and every couple of seconds the recitation so
-// far is sent to the app's server (/api/recitation, Whisper on Cloudflare),
-// which sends back the words it heard. Nothing to download on the phone.
-// Long recitations are sent in parts, split at pauses.
+// microphone is read at 16 kHz and sent to the app's server (/api/recitation,
+// Whisper on Cloudflare), which sends back the words it heard. Nothing to
+// download on the phone.
+//
+// Kept fast by sending little audio: the recitation is cut into parts at the
+// student's own pauses (a breath, the end of an ayah), so each part is a few
+// seconds long. A finished part is sent once and kept; the part being recited
+// is sent about every second so the words show up while the student goes.
+// Silence is never sent, and a part waiting on the server doesn't hold up the next.
 
 const RATE = 16000;
-const EVERY_MS = 2000;
-const SEGMENT_S = 22; // Whisper hears up to 30 s at once
+const FRAME = 320; // 20 ms, for telling voice from quiet
+const TICK_MS = 200;
+const LIVE_MS = 900; // the part being recited, sent at most this often
+const PAUSE_S = 0.4; // this much quiet after speech ends a part (words in one breath are < 0.2 s apart)
+const MIN_VOICE_S = 1.0; // …once it has this much speech
+const MAX_PART_S = 8; // a part with no pause ends at its quietest moment after 4 s
+const PAD_S = 0.2; // quiet kept on each side of a part
 
 // 16 kHz mono samples → a WAV file (16-bit PCM).
 function toWav(samples) {
@@ -24,17 +35,27 @@ function toWav(samples) {
   return buf;
 }
 
-async function transcribe(samples) {
+async function authHeader() {
   const { data } = await supabase.auth.getSession();
   const token = data?.session?.access_token;
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function transcribe(samples) {
   const res = await fetch("/api/recitation", {
     method: "POST",
-    headers: { "Content-Type": "audio/wav", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { "Content-Type": "audio/wav", ...(await authHeader()) },
     body: toWav(samples),
   });
   const out = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(out.error || "Couldn't listen just now.");
   return out.text || "";
+}
+
+// Opens the connection and checks the sign-in before the first words, so the
+// first part isn't slowed by them.
+async function warmUp() {
+  try { await fetch("/api/recitation", { method: "GET", headers: await authHeader() }); } catch { /* the first part will try again */ }
 }
 
 // Linear resampling of mono audio to 16 kHz.
@@ -56,51 +77,133 @@ export function useRecitation() {
   const [error, setError] = useState("");
   const a = useRef(null);
 
-  const fresh = () => ({ chunks: [], length: 0, segStart: 0, committed: "", busy: false, ctx: null, stop: null, timer: null });
+  const fresh = () => ({
+    chunks: [], base: 0, length: 0, // audio from sample `base` on (16 kHz)
+    rest: new Float32Array(0), // samples not yet in a whole frame
+    voice: [], // per 20 ms frame: 1 voice, 0 quiet
+    rms: [], // per frame, for finding the quietest moment
+    isVoice: makeVad(),
+    partStart: 0, // first sample of the part being recited
+    parts: [], // finished parts in order: text, or null while on the server
+    live: null, // { part, seq, text }: what was heard of the part being recited
+    liveSeq: 0, liveBusy: false, liveAt: 0, liveSentTo: 0,
+    ctx: null, stop: null, timer: null,
+  });
   if (!a.current) a.current = fresh();
 
-  const audioFrom = (start) => {
-    const s = a.current;
-    const out = new Float32Array(s.length - start);
-    let pos = 0, at = 0;
+  const audio = (s, from, to) => {
+    const out = new Float32Array(Math.max(0, to - from));
+    let at = s.base;
     for (const c of s.chunks) {
-      const from = Math.max(0, start - at);
-      if (from < c.length) { out.set(c.subarray(from), pos); pos += c.length - from; }
-      at += c.length;
+      const end = at + c.length;
+      if (end > from && at < to) out.set(c.subarray(Math.max(0, from - at), Math.min(c.length, to - at)), Math.max(0, at - from));
+      if (end >= to) break;
+      at = end;
     }
     return out;
   };
 
+  // The finished parts that are back from the server, in order (stopping at
+  // one still on its way, so no words go missing in between), then the part
+  // being recited.
+  const show = (s) => {
+    if (a.current !== s) return;
+    const out = [];
+    for (const t of s.parts) { if (t == null) return; out.push(t); } // shown once it's back
+    if (s.live && s.live.part === s.parts.length) out.push(s.live.text);
+    setHeard(out.join(" ").replace(/\s+/g, " ").trim());
+  };
+
+  // New audio: frames marked as voice or quiet.
+  const take = (s, chunk) => {
+    s.chunks.push(chunk);
+    s.length += chunk.length;
+    const buf = new Float32Array(s.rest.length + chunk.length);
+    buf.set(s.rest); buf.set(chunk, s.rest.length);
+    let i = 0;
+    for (; i + FRAME <= buf.length; i += FRAME) {
+      const r = frameRms(buf, i, FRAME);
+      s.voice.push(s.isVoice(r) ? 1 : 0);
+      s.rms.push(r);
+    }
+    s.rest = buf.slice(i);
+  };
+
+  const frameOf = (sample) => Math.floor(sample / FRAME);
+  const voiceIn = (s, from, to) => { let n = 0; for (let f = frameOf(from); f < Math.min(s.voice.length, frameOf(to)); f++) n += s.voice[f]; return n * FRAME / RATE; };
+  const lastVoiceEnd = (s, from) => { for (let f = s.voice.length - 1; f >= frameOf(from); f--) if (s.voice[f]) return (f + 1) * FRAME; return -1; };
+
+  // A finished part: sent once (tried twice), its text kept in its place.
+  const finish = (s, from, to) => {
+    const idx = s.parts.length;
+    s.parts.push(null);
+    s.partStart = to;
+    s.live = null;
+    const samples = audio(s, from, to);
+    const send = (tries) => transcribe(samples).then((text) => {
+      if (a.current !== s) return;
+      s.parts[idx] = text;
+      setError("");
+      show(s);
+    }).catch((e) => {
+      if (a.current !== s) return;
+      if (tries > 1) return setTimeout(() => send(tries - 1), 400);
+      s.parts[idx] = "";
+      setError(e.message);
+      show(s);
+    });
+    send(2);
+  };
+
   const tick = (final) => {
     const s = a.current;
-    if (s.busy) return;
-    const len = s.length - s.segStart;
-    if (len < RATE * 0.5) return;
-    const closing = final || len > RATE * SEGMENT_S;
-    const all = audioFrom(s.segStart);
-    // A long part ends at the quietest 0.3 s from 16 s on, so no word is cut.
-    let cut = all.length;
-    if (closing && !final) {
-      const win = Math.round(RATE * 0.3);
-      let best = Infinity;
-      for (let i = RATE * 16; i + win <= all.length; i += Math.round(win / 3)) {
-        let e = 0;
-        for (let k = i; k < i + win; k += 4) e += all[k] * all[k];
-        if (e < best) { best = e; cut = i + Math.round(win / 2); }
-      }
+    // Audio more than a second before the part being recited isn't needed again.
+    while (s.chunks.length > 1 && s.base + s.chunks[0].length < s.partStart - RATE) s.base += s.chunks.shift().length;
+    const end = s.length;
+    let start = s.partStart;
+    const lastVoice = lastVoiceEnd(s, start);
+    // Nothing said yet in this part: drop the quiet before it.
+    if (lastVoice < 0) {
+      s.partStart = Math.max(start, end - Math.round(PAD_S * RATE));
+      return;
     }
-    s.busy = true;
-    const end = s.segStart + cut;
-    transcribe(all.slice(0, cut))
-      .then((text) => {
-        const cur = a.current;
-        if (cur !== s) return; // a new recitation started meanwhile
-        if (closing) { s.committed = `${s.committed} ${text}`.trim(); s.segStart = end; setHeard(s.committed); }
-        else setHeard(`${s.committed} ${text}`.trim());
-        setError("");
-      })
-      .catch((e) => { if (a.current === s) setError(e.message); })
-      .finally(() => { s.busy = false; });
+    // Start the part just before its first voice.
+    for (let f = frameOf(start); f < s.voice.length; f++) if (s.voice[f]) { start = Math.max(start, f * FRAME - Math.round(PAD_S * RATE)); break; }
+    s.partStart = start;
+    const voiced = voiceIn(s, start, end);
+    const quiet = (end - lastVoice) / RATE;
+
+    if (final) { if (voiced >= 0.15) finish(s, start, Math.min(end, lastVoice + Math.round(PAD_S * RATE))); return; }
+    // A pause after enough speech: the part ends in the pause.
+    if (voiced >= MIN_VOICE_S && quiet >= PAUSE_S) { finish(s, start, lastVoice + Math.round(PAD_S * RATE)); return; }
+    // A long part with no pause: end it at its quietest 0.3 s after 4 s, so no word is cut.
+    if (end - start > MAX_PART_S * RATE) {
+      const win = Math.round(0.3 * RATE / FRAME);
+      let best = Infinity, cutFrame = frameOf(end);
+      const from = frameOf(start + 4 * RATE), to = s.rms.length - win;
+      for (let f = from; f <= to; f++) {
+        let e = 0;
+        for (let k = f; k < f + win; k++) e += s.rms[k];
+        if (e < best) { best = e; cutFrame = f + Math.floor(win / 2); }
+      }
+      finish(s, start, cutFrame * FRAME);
+      return;
+    }
+    // The part being recited, about every second while there's new speech.
+    const now = performance.now();
+    if (!s.liveBusy && now - s.liveAt >= LIVE_MS && voiced >= 0.3 && lastVoice > s.liveSentTo) {
+      s.liveBusy = true; s.liveAt = now; s.liveSentTo = lastVoice;
+      const part = s.parts.length, seq = ++s.liveSeq;
+      transcribe(audio(s, start, end))
+        .then((text) => {
+          if (a.current !== s || s.parts.length !== part || (s.live && s.live.seq > seq)) return; // that part has ended
+          s.live = { part, seq, text };
+          setError("");
+          show(s);
+        })
+        .catch((e) => { if (a.current === s) setError(e.message); })
+        .finally(() => { s.liveBusy = false; });
+    }
   };
 
   useEffect(() => () => release(), []);
@@ -120,6 +223,7 @@ export function useRecitation() {
     release();
     a.current = fresh();
     setHeard("");
+    warmUp();
     try {
       const ctx = new AudioContext();
       let source, stream = null;
@@ -143,19 +247,15 @@ export function useRecitation() {
         stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true } });
         source = ctx.createMediaStreamSource(stream);
       }
-      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const proc = ctx.createScriptProcessor(2048, 1, 1);
       const mute = ctx.createGain();
       mute.gain.value = 0;
-      proc.onaudioprocess = (e) => {
-        const chunk = to16k(e.inputBuffer.getChannelData(0), ctx.sampleRate);
-        a.current.chunks.push(chunk);
-        a.current.length += chunk.length;
-      };
-      source.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
       const s = a.current;
+      proc.onaudioprocess = (e) => { if (a.current === s) take(s, to16k(e.inputBuffer.getChannelData(0), ctx.sampleRate)); };
+      source.connect(proc); proc.connect(mute); mute.connect(ctx.destination);
       s.ctx = ctx;
       s.stop = () => { try { source.stop?.(); } catch { /* ended */ } try { source.disconnect(); proc.disconnect(); } catch { /* done */ } stream?.getTracks().forEach((t) => t.stop()); };
-      s.timer = setInterval(() => tick(false), EVERY_MS);
+      s.timer = setInterval(() => tick(false), TICK_MS);
       setListening(true);
     } catch (e) {
       setError(e?.name === "NotAllowedError" ? "Allow the microphone for this app to check your reading." : "Couldn't start the microphone.");
@@ -167,8 +267,7 @@ export function useRecitation() {
     if (!a.current.timer && !a.current.stop) return;
     release();
     setListening(false);
-    const finish = () => (a.current.busy ? setTimeout(finish, 200) : tick(true));
-    finish();
+    tick(true);
   }
 
   return { heard, listening, error, start, stop };

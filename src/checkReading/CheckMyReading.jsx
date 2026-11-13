@@ -106,7 +106,11 @@ function Session({ task, studentId, demo, onBack }) {
   }, [task]);
 
   const words = useMemo(() => (passage || []).filter((w) => !w.end), [passage]);
-  const result = useMemo(() => alignRecitation(splitWords(heard), words.map((w) => w.plain)), [heard, words]);
+  // The matching keeps its work between updates (see alignRecitation), so
+  // each update only matches the newly heard words.
+  const plain = useMemo(() => words.map((w) => w.plain), [words]);
+  const matchCache = useRef({});
+  const result = useMemo(() => alignRecitation(splitWords(heard), plain, matchCache.current), [heard, plain]);
   const keys = useMemo(() => words.map((w) => w.key), [words]);
   const levels = useMemo(() => (started ? sessionLevels(base.current, keys, result.status) : loadLevels(studentId)), [started, keys, result, studentId]);
   const mistakes = result.status.filter((s) => s === "wrong" || s === "skipped").length;
@@ -138,7 +142,7 @@ function Session({ task, studentId, demo, onBack }) {
   // The page shown: where the student has reached (or the one they turned to).
   const pages = [];
   for (let p = task.first; p <= task.last; p++) pages.push(p);
-  const nextWord = words.find((w) => pendingKeys.includes(w.key));
+  const nextWord = words[result.status.indexOf("pending")];
   const page = manualPage ?? nextWord?.page ?? (words.length ? words[words.length - 1].page : task.first);
 
   const showHint = (whole) => setHints((h) => new Set([...h, ...hintKeys(passage, pendingKeys, h, whole)]));

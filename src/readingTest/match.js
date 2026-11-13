@@ -49,59 +49,107 @@ const SPELLED = {
 };
 
 // Short words must match closely; longer ones may differ by a letter or two.
-const isSame = (heard, expected) => similarity(heard, expected) >= (expected.length <= 3 ? 0.67 : 0.75);
+// Words whose lengths alone are too far apart are turned down without
+// comparing letters.
+function isSame(heard, expected) {
+  if (heard === expected) return true;
+  const need = expected.length <= 3 ? 0.67 : 0.75;
+  const longer = Math.max(heard.length, expected.length);
+  if (1 - Math.abs(heard.length - expected.length) / longer < need) return false;
+  return similarity(heard, expected) >= need;
+}
+
+// How far from where the student has reached the matching looks: back (a
+// word repeated) and ahead (words skipped). Keeping to this window makes each
+// update quick however long the passage is.
+const BACK = 40;
+const AHEAD = 120;
+const INF = 1e9;
+// Steps: 1 ok, 2 wrong, 3 skip, 4 extra, 10 + k: one word heard as k words.
+const OK = 1, WRONG = 2, SKIP = 3, EXTRA = 4;
 
 // Aligns the heard words with the start of the expected words (the student
 // recites from the beginning and may not have finished): the cheapest way to
 // explain what was heard, where the untouched end of the passage is free.
 // expected: plain-spelling words (see splitWords). Returns { status, extra, reached }.
-export function alignRecitation(heard, expected) {
+// cache (optional, any object kept between calls): while the student recites,
+// the words heard so far are only added to at the end, so the work for the
+// words already matched is kept and only the new ones are matched.
+export function alignRecitation(heard, expected, cache = null) {
   const n = heard.length, m = expected.length;
-  const INF = 1e9;
-  // cost[i][j]: first i heard words against first j expected words.
-  const cost = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(INF));
-  const step = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(""));
-  cost[0][0] = 0;
-  for (let j = 1; j <= m; j++) { cost[0][j] = j; step[0][j] = "skip"; }
-  for (let i = 1; i <= n; i++) {
-    cost[i][0] = i; step[i][0] = "extra";
-    for (let j = 1; j <= m; j++) {
-      const same = isSame(heard[i - 1], expected[j - 1]);
-      const options = [
-        [cost[i - 1][j - 1] + (same ? 0 : 1), same ? "ok" : "wrong"],
-        [cost[i][j - 1] + 1, "skip"],
-        [cost[i - 1][j] + 1, "extra"],
-      ];
-      // The model sometimes splits one word in two (لابثين → لا بسين).
+  // Row i (the first i heard words) is kept for expected words lo[i]..hi[i];
+  // outside that, and j = 0 (only extras), are worked out on the spot.
+  let rows = [], lo = [], hi = [], keep = 0;
+  if (cache && cache.expected === expected && cache.rows) {
+    const prev = cache.heard;
+    const max = Math.min(prev.length, n);
+    while (keep < max && prev[keep] === heard[keep]) keep++;
+    rows = cache.rows.slice(0, keep + 1); lo = cache.lo.slice(0, keep + 1); hi = cache.hi.slice(0, keep + 1);
+  } else {
+    const h0 = Math.min(m, AHEAD);
+    const r0 = { cost: new Float64Array(h0 + 1), step: new Uint8Array(h0 + 1) };
+    for (let j = 1; j <= h0; j++) { r0.cost[j] = j; r0.step[j] = SKIP; }
+    rows = [r0]; lo = [1]; hi = [h0];
+  }
+  const cost = (i, j) => (j === 0 ? i : j < lo[i] || j > hi[i] ? INF : rows[i].cost[j - lo[i] + (i === 0 ? 1 : 0)]);
+  const step = (i, j) => (j === 0 ? (i ? EXTRA : 0) : j < lo[i] || j > hi[i] ? 0 : rows[i].step[j - lo[i] + (i === 0 ? 1 : 0)]);
+
+  for (let i = rows.length; i <= n; i++) {
+    // Centre the window on where the student had reached one word earlier.
+    let centre = 0, best = cost(i - 1, 0);
+    for (let j = lo[i - 1]; j <= hi[i - 1]; j++) { const c = cost(i - 1, j); if (c <= best) { best = c; centre = j; } }
+    const a = Math.max(1, centre + 1 - BACK), b = Math.min(m, centre + 1 + AHEAD);
+    lo[i] = a; hi[i] = Math.max(a - 1, b);
+    const width = Math.max(0, hi[i] - a + 1);
+    const row = { cost: new Float64Array(width), step: new Uint8Array(width) };
+    rows[i] = row;
+    const h = heard[i - 1];
+    for (let j = a; j <= hi[i]; j++) {
+      const e = expected[j - 1];
+      const same = isSame(h, e);
+      let c = cost(i - 1, j - 1) + (same ? 0 : 1), s = same ? OK : WRONG;
+      const skip = (j - 1 >= a ? row.cost[j - 1 - a] : cost(i, j - 1)) + 1;
+      if (skip < c) { c = skip; s = SKIP; }
+      const extra = cost(i - 1, j) + 1;
+      if (extra < c) { c = extra; s = EXTRA; }
       // Opening letters said by their names: as many heard words as letters.
-      const spelled = SPELLED[expected[j - 1]];
+      const spelled = SPELLED[e];
       if (spelled) {
         const k = spelled.split(" ").length;
-        if (i >= k && similarity(heard.slice(i - k, i).join(""), spelled.replace(/ /g, "")) >= 0.8) options.push([cost[i - k][j - 1], `ok${k}`]);
+        if (i >= k) {
+          const ck = cost(i - k, j - 1);
+          if (ck < c && similarity(heard.slice(i - k, i).join(""), spelled.replace(/ /g, "")) >= 0.8) { c = ck; s = 10 + k; }
+        }
       }
-      // Only when the two parts together are about the word's length.
-      if (i >= 2) {
-        const joined = heard[i - 2] + heard[i - 1];
-        if (Math.abs(joined.length - expected[j - 1].length) <= 1 && isSame(joined, expected[j - 1])) options.push([cost[i - 2][j - 1], "ok2"]);
+      // The model sometimes splits one word in two (لابثين → لا بسين); only
+      // when the two parts together are about the word's length.
+      if (i >= 2 && Math.abs(heard[i - 2].length + h.length - e.length) <= 1) {
+        const c2 = cost(i - 2, j - 1);
+        if (c2 < c && isSame(heard[i - 2] + h, e)) { c = c2; s = 12; }
       }
-      const best = options.reduce((a, b) => (b[0] < a[0] ? b : a));
-      cost[i][j] = best[0]; step[i][j] = best[1];
+      row.cost[j - a] = c; row.step[j - a] = s;
     }
   }
+  if (cache) Object.assign(cache, { expected, heard, rows, lo, hi });
+
   // Where the student has reached: the cheapest end point for all heard words
   // (ties go to the furthest point that ends on a matched word).
   let reached = 0;
-  for (let j = 1; j <= m; j++) if (cost[n][j] < cost[n][reached] || (cost[n][j] === cost[n][reached] && /^ok\d?$/.test(step[n][j]))) reached = j;
+  for (let j = lo[n]; j <= hi[n]; j++) {
+    const c = cost(n, j), r = cost(n, reached);
+    if (c < r || (c === r && (step(n, j) === OK || step(n, j) > 10))) reached = j;
+  }
 
   const status = new Array(m).fill("pending");
   let extra = 0;
   let i = n, j = reached;
   while (i > 0 || j > 0) {
-    const s = step[i][j];
-    if (s === "ok" || s === "wrong") { status[j - 1] = s; i -= 1; j -= 1; }
-    else if (/^ok\d$/.test(s)) { status[j - 1] = "ok"; i -= +s.slice(2); j -= 1; }
-    else if (s === "skip") { status[j - 1] = "skipped"; j -= 1; }
-    else { extra += 1; i -= 1; }
+    const s = step(i, j);
+    if (s === OK || s === WRONG) { status[j - 1] = s === OK ? "ok" : "wrong"; i -= 1; j -= 1; }
+    else if (s > 10) { status[j - 1] = "ok"; i -= s - 10; j -= 1; }
+    else if (s === SKIP) { status[j - 1] = "skipped"; j -= 1; }
+    else if (s === EXTRA) { extra += 1; i -= 1; }
+    else break; // outside the window: can't happen on the cheapest path
   }
   return { status, extra, reached };
 }
