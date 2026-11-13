@@ -25,7 +25,6 @@
     "EMAIL_FROM_NAME": "Aflaah Quran Class",
     // Check my Reading's listener (asr-server/ on a Hugging Face Space), e.g.
     // "https://<user>-aflaah-quran-listener.hf.space". Empty: Whisper only.
-    // The Space's secret LISTENER_TOKEN goes here too: npx wrangler secret put LISTENER_TOKEN
     "QURAN_ASR_URL": "",
     // The public (anon) key — the same one shipped in the app. The Worker
     // calls Supabase with the signed-in admin's own token.

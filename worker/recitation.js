@@ -5,7 +5,7 @@
 //
 // Heard first by NVIDIA's Arabic FastConformer (CC-BY-4.0; trained partly on
 // Quran recitation) on the class's Hugging Face Space (asr-server/;
-// QURAN_ASR_URL, guarded by the LISTENER_TOKEN secret). When the Space is
+// QURAN_ASR_URL; it checks the student's own sign-in too). When the Space is
 // asleep, busy or not set up, Cloudflare Workers AI's Whisper hears it
 // instead, so listening never stops.
 //
@@ -51,12 +51,12 @@ let spaceDownUntil = 0;
 const spaceUrl = (env) => (env.QURAN_ASR_URL || "").replace(/\/$/, "");
 
 // The Space's text, or null when it can't answer now.
-async function fromSpace(env, audio) {
+async function fromSpace(env, audio, auth) {
   if (!spaceUrl(env) || Date.now() < spaceDownUntil) return null;
   try {
     const res = await fetch(`${spaceUrl(env)}/transcribe`, {
       method: "POST",
-      headers: { "Content-Type": "audio/wav", ...(env.LISTENER_TOKEN ? { "X-Listener-Token": env.LISTENER_TOKEN } : {}) },
+      headers: { "Content-Type": "audio/wav", ...(auth ? { Authorization: auth } : {}) },
       body: audio,
       signal: AbortSignal.timeout(SPACE_TIMEOUT_MS),
     });
@@ -88,7 +88,7 @@ export async function handleRecitation(request, env) {
   const audio = new Uint8Array(await request.arrayBuffer());
   if (!audio.length) return json({ text: "" });
   if (audio.length > MAX_BYTES) return json({ error: "Too long" }, 413);
-  const heard = await fromSpace(env, audio);
+  const heard = await fromSpace(env, audio, request.headers.get("Authorization"));
   if (heard != null) return json({ text: heard, engine: "nvidia-fastconformer" });
   try {
     const out = await env.AI.run(MODEL, { audio: toBase64(audio), task: "transcribe", language: "ar", vad_filter: false, beam_size: 1, condition_on_previous_text: false });

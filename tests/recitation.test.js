@@ -7,7 +7,7 @@ let n = 0;
 const load = () => import(`../worker/recitation.js?fresh=${n++}`);
 
 const wav = new Uint8Array(44 + 32000); // 1 s of silence
-const post = () => new Request("http://localhost/api/recitation", { method: "POST", body: wav });
+const post = () => new Request("http://localhost/api/recitation", { method: "POST", body: wav, headers: { Authorization: "Bearer student-sign-in" } });
 const whisper = (text = "من ويسبر") => ({ calls: 0, async run() { this.calls++; return { text }; } });
 
 function withFetch(fn) {
@@ -22,11 +22,11 @@ test("the Space's text is used when it answers", async () => {
   const f = withFetch(() => new Response(JSON.stringify({ text: " الذي خلق الموت " })));
   try {
     const AI = whisper();
-    const res = await handleRecitation(post(), { AI, QURAN_ASR_URL: "https://x.hf.space/", LISTENER_TOKEN: "secret" });
+    const res = await handleRecitation(post(), { AI, QURAN_ASR_URL: "https://x.hf.space/" });
     assert.deepEqual(await res.json(), { text: "الذي خلق الموت", engine: "nvidia-fastconformer" });
     assert.equal(AI.calls, 0);
     assert.equal(f.calls[0].url, "https://x.hf.space/transcribe");
-    assert.equal(f.calls[0].opts.headers["X-Listener-Token"], "secret");
+    assert.equal(f.calls[0].opts.headers.Authorization, "Bearer student-sign-in", "the student's sign-in is passed on");
   } finally { f.restore(); }
 });
 

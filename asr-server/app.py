@@ -4,6 +4,10 @@ NVIDIA's Arabic FastConformer (CTC, ONNX Runtime on the CPU).
 GET  /            → {"ready": bool, "error": str | null}
 POST /transcribe  → body: WAV (16 kHz mono 16-bit; other rates are resampled)
                     reply: {"text": "...", "ms": int}
+
+Only the app's signed-in users may transcribe: the app's Worker passes on the
+student's own sign-in (Authorization: Bearer …), which is checked with the
+app's Supabase, as the Worker itself does. So no secret is kept here.
 """
 
 import io
@@ -11,6 +15,7 @@ import json
 import os
 import threading
 import time
+import urllib.request
 import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -23,10 +28,39 @@ from features import Featurizer
 MODEL_DIR = os.environ.get("MODEL_DIR", os.path.join(os.path.dirname(os.path.abspath(__file__)), "model"))
 MODEL_FILE = os.environ.get("MODEL_FILE", "model.onnx")
 PORT = int(os.environ.get("PORT", "7860"))
-TOKEN = os.environ.get("LISTENER_TOKEN")  # when set, callers must send it as X-Listener-Token
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")  # unset: no sign-in check (local testing)
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 MAX_SECONDS = 40
 
 state = {"session": None, "feat": None, "tokens": None, "blank": None, "error": None}
+
+
+signed_in_until = {}  # sign-in token → time it was last confirmed + 5 minutes
+signed_in_lock = threading.Lock()
+
+
+def is_signed_in(header):
+    if not SUPABASE_URL:
+        return True
+    token = (header or "").replace("Bearer ", "", 1).strip()
+    if not token:
+        return False
+    now = time.time()
+    with signed_in_lock:
+        if signed_in_until.get(token, 0) > now:
+            return True
+    req = urllib.request.Request(f"{SUPABASE_URL}/auth/v1/user", headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req, timeout=5) as res:
+            ok = res.status == 200
+    except Exception:  # noqa: BLE001 — 401 or unreachable
+        ok = False
+    if ok:
+        with signed_in_lock:
+            if len(signed_in_until) > 2000:
+                signed_in_until.clear()
+            signed_in_until[token] = now + 300
+    return ok
 
 
 def read_tokens(path):
@@ -113,8 +147,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path.rstrip("/") != "/transcribe":
             return self.reply(404, {"error": "not found"})
-        if TOKEN and self.headers.get("X-Listener-Token") != TOKEN:
-            return self.reply(401, {"error": "not allowed"})
+        if not is_signed_in(self.headers.get("Authorization")):
+            return self.reply(401, {"error": "not signed in"})
         if state["session"] is None:
             return self.reply(503, {"error": state["error"] or "loading"})
         size = int(self.headers.get("Content-Length") or 0)
