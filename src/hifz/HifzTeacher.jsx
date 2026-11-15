@@ -382,8 +382,11 @@ function HistorySection({ tasks, mistakes, today, busy, onOpen, onUndo }) {
 
 // ---------- one student ----------
 
+const wordKey = (m) => `${m.verseKey}:${m.position}`;
+const RELOAD_PAUSE_MS = 1200; // after the last mark is saved
+
 export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked }) {
-  const { state: data, error, setError, refresh } = useHifz(repo, onChanged);
+  const { state: data, error, setError, refresh, holdLive } = useHifz(repo, onChanged);
   const [busy, setBusy] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -437,30 +440,48 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
   }, [markingId]);
 
+  // The saved mistakes with the changes not reloaded yet. Worked out again
+  // only when either changes, so the Mushaf page isn't redrawn for nothing.
+  const mistakes = useMemo(() => {
+    if (!data) return [];
+    let list = data.mistakes;
+    for (const o of overlay) {
+      if (o.add && !list.some((m) => !m.correctedAt && wordKey(m) === o.key)) list = [...list, o.add];
+      if (o.patch) list = list.map((m) => (!m.correctedAt && wordKey(m) === o.key ? { ...m, ...o.patch } : m));
+    }
+    return list.filter((m) => !m.removed);
+  }, [data, overlay]);
+
+  // Each task's next one from the plan, worked out once per load: the
+  // Mushaf screen asks for it several times on every tap.
+  const previews = useMemo(() => new Map(), [data, student.schedule]);
+
   if (!data) return <div className="ht">{error ? <div className="hz-error" role="alert">{error}</div> : <div className="hz-card hz-muted">Loading {student.name}…</div>}</div>;
 
   const { stats, streak, today, memorized, tasks } = data;
-  const wordKey = (m) => `${m.verseKey}:${m.position}`;
-  let mistakes = data.mistakes;
-  for (const o of overlay) {
-    if (o.add && !mistakes.some((m) => !m.correctedAt && wordKey(m) === o.key)) mistakes = [...mistakes, o.add];
-    if (o.patch) mistakes = mistakes.map((m) => (!m.correctedAt && wordKey(m) === o.key ? { ...m, ...o.patch } : m));
-  }
-  mistakes = mistakes.filter((m) => !m.removed);
   const openMistakes = mistakes.filter((m) => !m.correctedAt);
-  // Runs `op` after the earlier saves; once none are left, reloads and drops
-  // the overlay up to here. Returns op's result.
+  // Runs `op` after the earlier saves. Once none are left and the teacher
+  // has paused for a moment, reloads once (not after every word: each reload
+  // is the student's whole Hifz, slow on a phone) and drops the overlay up to
+  // there. Live changes wait for that reload. Returns op's result.
   const enqueue = (op) => {
     const q = queue.current;
     q.count += 1;
+    clearTimeout(q.timer);
+    holdLive(RELOAD_PAUSE_MS + 15000);
     const result = q.chain.then(op);
     result.catch((e) => setError(e.message));
-    q.chain = result.catch(() => {}).then(async () => {
+    q.chain = result.catch(() => {}).then(() => {
       q.count -= 1;
       if (q.count > 0) return;
-      const upto = seq.current;
-      await refresh();
-      setOverlay((o) => o.filter((x) => x.seq > upto));
+      clearTimeout(q.timer);
+      q.timer = setTimeout(async () => {
+        if (q.count > 0) return;
+        const upto = seq.current;
+        await refresh();
+        if (q.count === 0) holdLive(0);
+        setOverlay((o) => o.filter((x) => x.seq > upto));
+      }, RELOAD_PAUSE_MS);
     });
     return result;
   };
@@ -479,7 +500,11 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     const at = day.findIndex((x) => x.id === t.id);
     return [...day.slice(at + 1), ...day.slice(0, Math.max(0, at))].find((x) => x.id !== t.id && !x.completedAt) || null;
   };
-  const nextOf = (t) => drafts[t.activity] || previewNext(t, ctx);
+  const nextOf = (t) => {
+    if (drafts[t.activity]) return drafts[t.activity];
+    if (!previews.has(t.id)) previews.set(t.id, previewNext(t, ctx));
+    return previews.get(t.id);
+  };
   // Done: the next class day's task for the same activity is set (with the
   // teacher's confirmed changes, if any) and the student is notified.
   const markDone = (t, chosen = null) => {

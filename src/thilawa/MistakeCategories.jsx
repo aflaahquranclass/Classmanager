@@ -5,6 +5,7 @@
 import { useRef, useState, useLayoutEffect, useEffect } from "react";
 import { Check, X } from "lucide-react";
 import { MISTAKE_CATEGORIES, mistakeCategory, mistakeColors } from "./engine.js";
+import { useGlobalCss } from "../globalCss.js";
 
 // The plain mistake: no category, the usual "to correct" colour.
 export const PLAIN_MISTAKE = { id: null, ar: "خطأ", en: "Mistake", bg: "#FBD5CC", fg: "#9B1C0A", ring: "#F2A595" };
@@ -65,6 +66,8 @@ export function MistakeCategoryPicker({ value, onChange, disabled }) {
 export function AnchoredPopup({ anchor, label, onClose, deps = [], children }) {
   const ref = useRef(null);
   const [pos, setPos] = useState(null);
+  // In <head> once: a pop-up opens on every tap while marking.
+  useGlobalCss("mistake-categories-css", CSS);
   useLayoutEffect(() => {
     const place = () => {
       const box = ref.current;
@@ -92,7 +95,6 @@ export function AnchoredPopup({ anchor, label, onClose, deps = [], children }) {
   }, [onClose]);
   return (
     <div ref={ref} className={`mc-pop ${pos ? "" : "mc-pop-docked"}`} style={pos || undefined} role="dialog" aria-label={label}>
-      <style>{CSS}</style>
       {children}
     </div>
   );

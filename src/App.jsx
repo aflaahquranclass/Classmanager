@@ -1297,9 +1297,15 @@ export default function App() {
   // A teacher approving a Hifz task or marking a mistake means the student is
   // in class: mark them present today, if they have a class today and today's
   // attendance isn't marked yet (an existing Present / Absent / reschedule stays).
+  // Checked once per student a day: it runs for every word the teacher marks,
+  // and each check was a trip to the database while the teacher was tapping.
+  const hifzPresentChecked = useRef(new Set());
   const markPresentFromHifz = async (studentId) => {
     const dateStr = maldivesToday();
+    const checkKey = `${studentId}:${dateStr}`;
+    if (hifzPresentChecked.current.has(checkKey)) return;
     if (!getSessionsForDate(dateStr).some((r) => r.studentId === studentId)) return;
+    hifzPresentChecked.current.add(checkKey);
     try {
       const { data: row, error } = await supabase.from("attendance_records").select("*").eq("student_id", studentId).eq("record_date", dateStr).maybeSingle();
       if (error) throw error;
@@ -1310,6 +1316,7 @@ export default function App() {
       setAttendanceByDate((prev) => (prev[dateStr] ? { ...prev, [dateStr]: { ...prev[dateStr], [studentId]: rec } } : prev));
     } catch {
       // Attendance can still be marked by hand; the Hifz mark itself is saved.
+      hifzPresentChecked.current.delete(checkKey); // try again on the next mark
     }
   };
 

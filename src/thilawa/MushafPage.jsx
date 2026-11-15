@@ -17,12 +17,13 @@
 // Complex's Uthmanic Hafs font instead, fitted to the printed word's width,
 // with just those letters in orange.
 
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, memo } from "react";
 import { createPortal } from "react-dom";
 import { Maximize2, Minimize2, X, Menu, ChevronLeft, ChevronRight } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE, LINES_PER_PAGE, TOTAL_PAGES, JUZ_START_PAGES, SURAHS, surahsOnPages } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
+import { useGlobalCss } from "../globalCss.js";
 
 export { buildLines };
 
@@ -498,7 +499,26 @@ ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyf
 
 // `wordStyles` ({ "78:1:2": { background, opacity, … } }) styles single words,
 // e.g. Check my Reading colouring each word as it is recited.
-export default function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null, ayahMarks = null, onAyahTap = null, selectedAyah = null }) {
+// A page is drawn again only when something it shows changes (see samePage):
+// marking a word on a phone redraws that one page, not the pages beside it.
+export default memo(MushafPage, samePage);
+
+// Same values: lists and plain objects (marks, range, ayahMarks, …) are the
+// same when what's in them is, even if they were made again.
+const sameValue = (a, b) => {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  if (Array.isArray(a)) return Array.isArray(b) && a.length === b.length && a.every((x, i) => x === b[i]);
+  if (Array.isArray(b) || Object.getPrototypeOf(a) !== Object.prototype || Object.getPrototypeOf(b) !== Object.prototype) return false;
+  const ka = Object.keys(a);
+  return ka.length === Object.keys(b).length && ka.every((k) => sameValue(a[k], b[k]));
+};
+function samePage(a, b) {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => sameValue(a[k], b[k]));
+}
+
+function MushafPage({ page, range = null, marks = [], showCorrected = false, onWordTap = null, selectedKey = null, letters = [], wordStyles = null, ayahMarks = null, onAyahTap = null, selectedAyah = null }) {
   const [state, setState] = useState({ status: "loading", page, lines: [] });
   const [attempt, setAttempt] = useState(0);
   const bodyRef = useRef(null);
@@ -509,6 +529,7 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
   const [squeeze, setSqueeze] = useState(new Map()); // line → font scale, for a line wider than the page
   const [hafsReady, setHafsReady] = useState(false);
   const wantHafs = letters.length > 0;
+  useGlobalCss("mushaf-page-css", mushafCss);
 
   useEffect(() => {
     let live = true;
@@ -608,7 +629,6 @@ export default function MushafPage({ page, range = null, marks = [], showCorrect
   });
   return (
     <div className={`mp-page ${page <= 2 ? "mp-first" : ""}`} lang="ar" ref={pageRef}>
-      <style>{mushafCss}</style>
       {state.status === "error" ? (
         <div className="mp-status">
           Couldn't load this page (check the internet connection).{" "}

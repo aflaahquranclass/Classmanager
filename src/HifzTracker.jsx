@@ -6,7 +6,7 @@
 //
 // HIFZ_CSS and PositionPicker are shared with the teacher's screens.
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useBackLayer } from "./useBackNav.js";
 import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2, ArrowRight } from "lucide-react";
 import { TP } from "./shared.jsx";
@@ -353,6 +353,7 @@ export function PortionText({ task }) {
 // and end when it was marked by ayah.
 // `header` goes above the page (e.g. the day's tasks to switch between) and
 // `children` under it; both stay with it in full screen.
+const NO_MARKS = [];
 export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, header = null, children, fade = true, compact = false, ayahMarks = null, onAyahTap = null, selectedAyah = null }) {
   const pages = task ? taskPages(task) : [focus ?? 1];
   const first = pages[0];
@@ -376,6 +377,17 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
   const next = () => setPage(Math.min(TOTAL_PAGES, shown + 1));
   const prev = () => setPage(Math.max(1, shown - 1));
   const marks = ayahMarks || (task?.startAyah ? ayahMarksOf([task]) : null);
+  // Each page gets only its own mistakes, and taps go through one function
+  // that never changes, so marking a word redraws just the page it's on.
+  const marksByPage = useMemo(() => {
+    const by = new Map();
+    for (const m of mistakes) { if (!by.has(m.page)) by.set(m.page, []); by.get(m.page).push(m); }
+    return by;
+  }, [mistakes]);
+  const taps = useRef({});
+  taps.current = { onWordTap, onAyahTap };
+  const wordTap = useCallback((w) => taps.current.onWordTap?.(w), []);
+  const ayahTap = useCallback((w) => taps.current.onAyahTap?.(w), []);
   const [jumpOpen, setJumpOpen] = useState(false);
   const go = compact && (
     <div className="hz-go">
@@ -399,8 +411,8 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
         <button className="hz-btn hz-btn-outline" disabled={shown <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>)}
       <MushafPager page={shown} onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}>
-        {(p, current) => <MushafPage page={p} range={fade && task && p >= first && p <= last ? [task.start, task.end] : null} marks={mistakes} showCorrected={showCorrected} ayahMarks={marks}
-          onWordTap={current ? onWordTap : null} selectedKey={current ? selectedKey : null} onAyahTap={current ? onAyahTap : null} selectedAyah={current ? selectedAyah : null} />}
+        {(p, current) => <MushafPage page={p} range={fade && task && p >= first && p <= last ? [task.start, task.end] : null} marks={marksByPage.get(p) || NO_MARKS} showCorrected={showCorrected} ayahMarks={marks}
+          onWordTap={current && onWordTap ? wordTap : null} selectedKey={current ? selectedKey : null} onAyahTap={current && onAyahTap ? ayahTap : null} selectedAyah={current ? selectedAyah : null} />}
       </MushafPager>
       {children}
     </div></MushafPresent>
@@ -539,26 +551,66 @@ const STUDENT_CSS = `
 
 // Keeps a summary loaded and fresh: reloads on the teacher's changes (live)
 // and when the student comes back to the app.
+// One load at a time: asked again while loading, it loads once more after
+// (one load for everyone who asked meanwhile, so it has their changes), and
+// a slower, older load never replaces a newer one. Live changes come in a
+// burst for each mark (the word, then its kind of mistake) and the teacher's
+// own screen reloads after its saves too, so they're gathered for a moment
+// and skipped when a load that started after them already has them.
+// holdLive(ms): the screen is saving changes of its own and will reload when
+// it's done, so live changes wait until then, or ms (and are skipped if that
+// reload has them); holdLive(0) ends the wait.
+const LIVE_WAIT_MS = 700;
 export function useHifz(repo, onSummary) {
   const [state, setState] = useState(null);
   const [error, setError] = useState("");
-  const refresh = useCallback(async () => {
-    if (!repo) return;
-    try {
-      const s = await loadHifz(repo);
-      setState(s);
-      onSummary?.(s);
-      setError("");
-    } catch (e) { setError(e.message); }
-  }, [repo, onSummary]);
+  const loads = useRef(null);
+  if (!loads.current || loads.current.repo !== repo) loads.current = { repo, running: null, again: null, started: 0, shown: 0, lastStart: 0, holdUntil: 0 };
+  const summary = useRef(onSummary);
+  summary.current = onSummary;
+  const refresh = useCallback(() => {
+    const L = loads.current;
+    if (!repo || L.repo !== repo) return Promise.resolve();
+    const once = async () => {
+      const n = ++L.started;
+      L.lastStart = Date.now();
+      try {
+        const s = await loadHifz(repo);
+        if (loads.current !== L || n < L.shown) return;
+        L.shown = n;
+        setState(s);
+        summary.current?.(s);
+        setError("");
+      } catch (e) { if (loads.current === L) setError(e.message); }
+    };
+    const start = () => { L.running = once().finally(() => { L.running = null; }); return L.running; };
+    if (!L.running) return start();
+    if (!L.again) L.again = L.running.then(() => { L.again = null; return L.running || start(); });
+    return L.again;
+  }, [repo]);
   useEffect(() => {
     refresh();
-    const stop = repo?.subscribe?.(() => refresh());
+    let timer = 0;
+    let latest = 0; // when the last live change came
+    const check = () => {
+      const L = loads.current;
+      const held = L.holdUntil - Date.now();
+      if (held > 0) { timer = setTimeout(check, Math.min(held, 1000)); return; }
+      timer = 0;
+      if (L.lastStart <= latest) refresh();
+    };
+    const live = () => {
+      latest = Date.now();
+      clearTimeout(timer);
+      timer = setTimeout(check, LIVE_WAIT_MS);
+    };
+    const stop = repo?.subscribe?.(live);
     const onShow = () => { if (document.visibilityState === "visible") refresh(); };
     document.addEventListener("visibilitychange", onShow);
-    return () => { stop?.(); document.removeEventListener("visibilitychange", onShow); };
+    return () => { clearTimeout(timer); stop?.(); document.removeEventListener("visibilitychange", onShow); };
   }, [repo, refresh]);
-  return { state, error, setError, refresh };
+  const holdLive = useCallback((ms) => { loads.current.holdUntil = Date.now() + ms; }, []);
+  return { state, error, setError, refresh, holdLive };
 }
 
 // ---------- the student's target year ----------
