@@ -5,6 +5,7 @@ const VERSION = "v3";
 const SHELL_CACHE = `aflaah-shell-${VERSION}`;
 const ASSET_CACHE = `aflaah-assets-${VERSION}`;
 const SHELL_URLS = ["/", "/manifest.webmanifest", "/icons/icon-192.png"];
+const NAV_WAIT_MS = 6000;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -29,17 +30,38 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // Page loads: always try the network first so a new deploy shows up
-  // immediately; fall back to the cached shell when offline.
+  // immediately; fall back to the cached shell when offline. On a weak phone
+  // connection the network can take very long without failing, which left the
+  // app on a blank screen: after NAV_WAIT_MS the saved copy is shown instead
+  // (the network answer still updates the saved copy for next time).
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(SHELL_CACHE).then((cache) => cache.put("/", copy));
-          return response;
-        })
-        .catch(() => caches.match("/"))
-    );
+    const network = fetch(request).then((response) => {
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(SHELL_CACHE).then((cache) => cache.put("/", copy));
+      }
+      return response;
+    });
+    event.respondWith(new Promise((resolve, reject) => {
+      let done = false;
+      const useCache = () => caches.match("/").then((cached) => {
+        if (done) return;
+        if (cached) { done = true; resolve(cached); }
+      });
+      const timer = setTimeout(useCache, NAV_WAIT_MS);
+      network.then(
+        (response) => { clearTimeout(timer); if (!done) { done = true; resolve(response); } },
+        () => {
+          clearTimeout(timer);
+          caches.match("/").then((cached) => {
+            if (done) return;
+            done = true;
+            if (cached) resolve(cached); else reject(new Error("offline"));
+          });
+        },
+      );
+    }));
+    event.waitUntil(network.catch(() => {}));
     return;
   }
 
