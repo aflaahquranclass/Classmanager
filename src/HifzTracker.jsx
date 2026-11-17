@@ -352,9 +352,10 @@ export function PortionText({ task }) {
 // `ayahMarks`: the ayah numbers to colour; by default the task's own start
 // and end when it was marked by ayah.
 // `header` goes above the page (e.g. the day's tasks to switch between) and
-// `children` under it; both stay with it in full screen.
+// `children` under it; both stay with it in full screen. `who` (e.g. the
+// student's name) shows at the top in full screen.
 const NO_MARKS = [];
-export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, header = null, children, fade = true, compact = false, ayahMarks = null, onAyahTap = null, selectedAyah = null }) {
+export function TaskReader({ task, page: focus = null, mistakes, onWordTap, selectedKey, showCorrected = false, header = null, children, fade = true, compact = false, ayahMarks = null, onAyahTap = null, selectedAyah = null, who = null }) {
   const pages = task ? taskPages(task) : [focus ?? 1];
   const first = pages[0];
   const last = pages[pages.length - 1];
@@ -397,7 +398,7 @@ export function TaskReader({ task, page: focus = null, mistakes, onWordTap, sele
     </div>
   );
   return (
-    <MushafPresent page={shown} tools={go || null} onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}><div className="hz-reader" ref={topRef}>
+    <MushafPresent page={shown} who={who} tools={go || null} onNext={shown < TOTAL_PAGES ? next : null} onPrev={shown > 1 ? prev : null}><div className="hz-reader" ref={topRef}>
       {header}
       {compact ? (jumpOpen && <PageJump page={shown} onGo={(p) => { setPage(p); setJumpOpen(false); }} />) : (
       <div className="hz-reader-nav">

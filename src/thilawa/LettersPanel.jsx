@@ -1,7 +1,6 @@
 // The Arabic letters table: in Listen & mark the teacher taps the letters a
 // student needs to work on. LettersPanel opens from the Letters button (a
-// sheet from the bottom on a phone); in full screen on a wide screen
-// LettersSide sits beside the Mushaf page instead. The letters are
+// sheet from the bottom on a phone), in full screen too. The letters are
 // saved with the reading or lesson once the teacher stops tapping (or the
 // table closes), and the student sees them with it (LetterChips).
 
@@ -31,19 +30,6 @@ const CSS = `
     .lp-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
     .lp-letter { font-size: 22px; min-height: 44px; }
   }
-  .ls { width: 172px; flex-shrink: 0; box-sizing: border-box; position: sticky; top: 8px; align-self: flex-start; background: #FFFFFF; border: 1px solid #DCEBF8; border-radius: 14px; padding: 10px;
-    color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-  .mf-full .ls { top: 12px; }
-  .ls-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 14px; }
-  .ls-head span { min-width: 22px; height: 22px; padding: 0 6px; box-sizing: border-box; border-radius: 999px; background: #FDEBD7; color: #9A4A06; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
-  .ls-head span:empty { visibility: hidden; }
-  .ls-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; direction: rtl; }
-  .ls-letter { aspect-ratio: 1; min-height: 34px; padding: 0; border-radius: 9px; border: 1px solid #C7DDF4; background: #F7FAFD; color: #123B67; cursor: pointer;
-    font: 500 21px/1 "Noto Naskh Arabic", "Geeza Pro", "Arabic Typesetting", serif; }
-  .ls-letter:hover { border-color: #176FD1; }
-  .ls-letter:focus-visible, .ls-clear:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
-  .ls-letter[aria-pressed="true"] { background: #E8650A; border-color: #E8650A; color: #FFFFFF; }
-  .ls-clear { width: 100%; margin-top: 8px; min-height: 34px; border-radius: 9px; border: 1px solid #C7DDF4; background: #FFFFFF; color: #567493; font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; }
   .lc { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #567493; }
   .lc b { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 32px; padding: 0 6px; box-sizing: border-box; border-radius: 8px;
     background: #EAF3FD; color: #1452A8; font: 500 20px/1 "Noto Naskh Arabic", "Geeza Pro", serif; }
@@ -69,24 +55,6 @@ function useLetterPicks(value, onChange) {
   };
   const toggle = (l) => { const c = latest.current; set(sortLetters(c.includes(l) ? c.filter((x) => x !== l) : [...c, l])); };
   return { chosen, set, toggle };
-}
-
-// The letters beside the Mushaf page, in full screen on a wide screen (it
-// stays put as the page scrolls). Elsewhere LettersPanel opens from a button.
-export function LettersSide({ value, studentName, busy, onChange }) {
-  const { chosen, set, toggle } = useLetterPicks(value, onChange);
-  return (
-    <aside className="ls" aria-label={`Letters ${studentName} needs to work on`}>
-      <style>{CSS}</style>
-      <div className="ls-head"><b>Letters</b><span aria-live="polite">{busy ? "Saving…" : chosen.length || ""}</span></div>
-      <div className="ls-grid" lang="ar">
-        {ARABIC_LETTERS.map((l) => (
-          <button key={l} type="button" className="ls-letter" aria-pressed={chosen.includes(l)} onClick={() => toggle(l)}>{l}</button>
-        ))}
-      </div>
-      {chosen.length > 0 && <button type="button" className="ls-clear" onClick={() => set([])}>Clear</button>}
-    </aside>
-  );
 }
 
 // value: the letters chosen; onChange(letters) saves them.

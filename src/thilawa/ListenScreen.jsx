@@ -19,7 +19,7 @@ import { ChevronLeft, ChevronRight, CheckCircle2, Presentation } from "lucide-re
 import MushafPage, { MushafPresent, MushafPager } from "./MushafPage.jsx";
 import { TOTAL_PAGES, describePages, pageLabel } from "./engine.js";
 import { MistakePopup } from "./MistakeCategories.jsx";
-import LettersPanel, { LetterChips, LettersSide } from "./LettersPanel.jsx";
+import LettersPanel, { LetterChips } from "./LettersPanel.jsx";
 import Whiteboard from "./Whiteboard.jsx";
 
 const CSS = `
@@ -49,15 +49,16 @@ const CSS = `
   .lm-goto { width: 76px; min-height: 34px; margin-top: 4px; padding: 0 8px; border-radius: 9px; border: 1px solid #C7DDF4; background: #FFFFFF; color: #123B67; font: 600 14px/1 Inter, ui-sans-serif, system-ui, sans-serif; text-align: center; }
   .lm-goto:focus-visible { outline: 2px solid #176FD1; outline-offset: 1px; }
   .lm-out { color: #8A5A00 !important; font-weight: 600; }
-  .lm-row { display: flex; gap: 12px; align-items: flex-start; }
-  .lm-page { flex: 1; min-width: 0; }
   .lm-board { min-height: 38px; padding: 0 12px; font-size: 13px; gap: 6px; }
-  /* Letters: one button next to Whiteboard (a tab on the side in full
-     screen); in full screen on a wide screen the table sits beside the page. */
-  .lm-row .ls { display: none; }
+  /* Letters: one button next to Whiteboard, pinned at the top in full screen
+     too; the table opens from the side, so the page keeps the whole width. */
   .lm-letters i { font: 500 17px/1 "Noto Naskh Arabic", "Geeza Pro", serif; font-style: normal; }
   .lm-letters b { min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #E8650A; color: #FFFFFF; font: 700 11px/18px Inter, system-ui, sans-serif; text-align: center; }
-  @media (min-width: 761px) { .mf-full .lm-row .ls { display: block; } .mf-full .lm-letters, .mf-full .mf-tools .lm-letters { display: none; } }
+  /* The class dropdown in the full-screen title, on white. */
+  .mf-full .lm-who { margin: 0 auto; color: #123B67; border-color: #C7DDF4; background-color: #FFFFFF;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23123B67' stroke-width='2' fill='none'/%3E%3C/svg%3E"); }
+  .mf-full .lm-who:hover { background-color: #F1F6FC; }
+  .mf-full .lm-who:focus-visible { outline-color: #176FD1; }
   .lm-count { min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: #176FD1; color: #FFFFFF; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
   @media (max-width: 640px) {
     .lm-inner { padding: 10px 6px 20px; }
@@ -201,9 +202,13 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
           {a.instructions && <div className="hz-task-notes">{a.instructions}</div>}
           <LetterChips letters={a.letters} inMushaf />
           {error && <div className="hz-error" role="alert">{error}</div>}
-          {/* The letters table goes inside, so it shows in full screen too. */}
-          {/* Letters and the whiteboard are one tap away, in full screen too (there the letters sit beside the page on a wide screen). */}
+          {/* Letters and the whiteboard are one tap away, pinned at the top in full screen too, with the student's name. */}
           <MushafPresent page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}
+            who={classmates ? (
+              <select className="lm-who" value={student.id} disabled={busy} onChange={(e) => onStudent(e.target.value)} aria-label="Student reading">
+                {classmates.map((s) => <option key={s.id} value={s.id}>{s.name}{s.done ? " ✓" : ""}</option>)}
+              </select>
+            ) : student.name}
             quick={<>
               <button type="button" className="hz-btn hz-btn-outline lm-board lm-letters" onClick={() => { setSelectedKey(null); setLettersOpen(true); }} aria-expanded={lettersOpen}
                 aria-label={`Letters to improve${a.letters.length ? ` (${a.letters.length} chosen)` : ""}`} title="Letters to improve">
@@ -225,12 +230,9 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
             </div>
             <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
           </div>
-          <div className="lm-row">
-            <div className="lm-page"><MushafPager page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}>
-              {(p, current) => <MushafPage page={p} marks={marks} onWordTap={current ? tapWord : null} selectedKey={current ? selectedKey : null} showCorrected letters={a.letters} />}
-            </MushafPager></div>
-            <LettersSide key={student.id} value={a.letters} studentName={student.name} busy={busy} onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />
-          </div>
+          <MushafPager page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}>
+            {(p, current) => <MushafPage page={p} marks={marks} onWordTap={current ? tapWord : null} selectedKey={current ? selectedKey : null} showCorrected letters={a.letters} />}
+          </MushafPager>
           {selected && (
             <MistakePopup key={`${student.id}|${selectedKey}`} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
               onCategory={(c) => change(selected, { category: c || null }, (r, id) => r.setMistakeCategory(id, c))}

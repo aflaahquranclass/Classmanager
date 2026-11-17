@@ -755,7 +755,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 
         <div className="ht-full-body">
           <div className="ht-full-inner">
-            <TaskReader task={marking} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
+            <TaskReader task={marking} who={student.name} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
               fade={false} compact ayahMarks={nextMarks()} onAyahTap={tapAyah} selectedAyah={ayahMenu?.verseKey || null}
               header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
             {selected && (

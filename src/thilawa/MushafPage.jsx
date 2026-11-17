@@ -174,15 +174,17 @@ export function MushafPager({ page, onNext = null, onPrev = null, children }) {
 // lift, a stacking order — can clip it or catch its taps. Where the browser has
 // its own full screen (not on iPhone), the whole page goes full screen with it.
 // In full screen, like the quran.com app: the Juz on the left and the page's
-// surahs on the right at the top (`page`), then one row of buttons — Exit,
+// surahs on the right at the top (`page`), `who` (e.g. the student's name) in
+// the middle, then one row of buttons — Exit,
 // `tools`, `quick` (e.g. the whiteboard) and More, which shows the controls
 // otherwise folded away (the task tabs, the page title and its arrows).
+// The title and buttons stay pinned at the top as the page scrolls.
 // See-through Next / Previous buttons sit on the page's edges (onNext /
 // onPrev; null hides one) and ← / → turn the page; swiping turns it as before.
 // `edge`: things that sit on the screen's edge or slide over it (e.g. the
 // letters tab on a phone), put on the page body too, above full screen while
 // it's on.
-export function MushafPresent({ children, page = null, tools = null, onNext = null, onPrev = null, quick = null, edge = null, startFull = true }) {
+export function MushafPresent({ children, page = null, tools = null, onNext = null, onPrev = null, quick = null, edge = null, who = null, startFull = true }) {
   const [full, setFull] = useState(startFull);
   const [menu, setMenu] = useState(false);
   const native = useRef(false); // the browser's own full screen is on because of us
@@ -293,9 +295,10 @@ export function MushafPresent({ children, page = null, tools = null, onNext = nu
     <div ref={layerRef} className={`mf mf-full ${menu ? "mf-menu" : ""}`} role="dialog" aria-modal="true" aria-label="Mushaf, full screen">
       <style>{presentCss}</style>
       <div className="mf-top">
-        {page && (
+        {(page || who) && (
           <div className="mf-head">
-            <span>Juz' {juz}</span>
+            <span>{page ? `Juz' ${juz}` : ""}</span>
+            <span className="mf-who">{who}</span>
             <span className="mf-head-surahs">
               {surahs.map((s, i) => (
                 <span key={s.number} className="mf-head-surah">{i > 0 && <span aria-hidden="true">·</span>}{s.name}
@@ -338,16 +341,18 @@ const presentCss = `
   .mpg-side { position: absolute; top: 0; left: 0; width: 100%; }
   /* The pages are clipped at their edges as they turn, so no shadow to cut off. */
   .mpg .mp-page { box-shadow: none; }
-  .mf-full { position: fixed; inset: 0; z-index: 3000; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #FCFCFA; box-sizing: border-box;
-    padding: max(8px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  .mf-full { position: fixed; inset: 0; z-index: 3000; overflow: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; background: #FFFFFF; box-sizing: border-box;
+    padding: 0 16px max(16px, env(safe-area-inset-bottom));
     color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; animation: mf-in 220ms ease-out; }
   @keyframes mf-in { from { opacity: 0; transform: scale(0.985); } }
   @media (prefers-reduced-motion: reduce) { .mf-full { animation: none; } }
   .mf-full .mf-top, .mf-full .mf-content { width: 100%; max-width: 1600px; margin-left: auto; margin-right: auto; box-sizing: border-box; }
-  .mf-full .mf-top { padding: 0 40px; }
-  /* The Juz and the page's surahs, as at the top of a printed page. */
-  .mf-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 34px; font-size: 15px; color: #2A3550; }
-  .mf-head-surahs { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
+  /* Pinned at the top on plain white, so the buttons are always one tap away. */
+  .mf-full .mf-top { position: sticky; top: 0; z-index: 6; background: #FFFFFF; padding: max(8px, env(safe-area-inset-top)) 40px 2px; }
+  /* The Juz, the student and the page's surahs, as at the top of a printed page. */
+  .mf-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; min-height: 34px; font-size: 15px; color: #2A3550; }
+  .mf-who { min-width: 0; max-width: 46vw; text-align: center; font-weight: 700; font-size: 17px; color: #123B67; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mf-head-surahs { display: flex; align-items: center; gap: 6px; min-width: 0; flex-wrap: wrap; justify-content: flex-end; justify-self: end; }
   .mf-head-surah { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
   .mf-head-ar { font-family: "QCF2_SurahNames", serif; font-style: normal; font-size: 22px; line-height: 1; color: #2A3550; }
   /* One row of buttons between the title and the text. */
@@ -381,7 +386,11 @@ const presentCss = `
   /* A phone: the page fills the width (swipe to turn), like the quran.com app. */
   @media (max-width: 640px) {
     .mf-full { padding-left: 6px; padding-right: 6px; }
-    .mf-full .mf-top { padding: 0 4px; }
+    .mf-full .mf-top { padding: max(6px, env(safe-area-inset-top)) 4px 2px; }
+    /* The student's name on its own line above the Juz and surahs. */
+    .mf-head { grid-template-columns: auto 1fr; row-gap: 2px; }
+    .mf-who { grid-column: 1 / -1; grid-row: 1; max-width: none; font-size: 16px; }
+    .mf-who:empty { display: none; }
     .mf-full .mf-content { padding: 0; }
     .mf-full .mp-page { padding: 2% 1.5% 2%; }
     .mf-tools { gap: 6px; margin: 4px 0 2px; }
