@@ -8,13 +8,16 @@ import { RotateCw, Trash2, Copy, Link2, Lock, LockOpen } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
+import { WORKSHOPS } from "../workshops/workshops.js";
 import { RATINGS, RATED, NEXT_QUESTION, NEXT_CHOICES, COMMENT_LABEL, WORKSHOP_CHOICES, ratingOf, nextChoiceOf } from "../workshops/workshopReview.js";
 
 const FORM_PATH = "/workshop-review";
 const formUrl = (key) => {
   const { hostname, origin } = window.location;
   const base = ["localhost", "127.0.0.1"].includes(hostname) ? origin : "https://aflaahqc.com";
-  return `${base}${FORM_PATH}?k=${key}`;
+  // A key that is a workshop's own name gets the short address, e.g.
+  // aflaahqc.com/workshop/namaadhu/review.
+  return WORKSHOPS[key] ? `${base}/workshop/${key}/review` : `${base}${FORM_PATH}?k=${key}`;
 };
 const newKey = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });

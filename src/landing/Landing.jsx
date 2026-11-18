@@ -41,7 +41,10 @@ const LOGINS = [
 ];
 
 // Every registration address (/register/hifz/school …) is the register page.
-const pageOf = (pathname) => (registerPathOf(pathname) ? "/register" : PAGES[pathname] ? pathname : "/");
+// A workshop's review form also has a short address: /workshop/<slug>/review
+// (e.g. /workshop/namaadhu/review), where the slug is the form's key.
+const WORKSHOP_REVIEW_PATH = /^\/workshop\/[a-z0-9-]+\/review\/?$/;
+const pageOf = (pathname) => (registerPathOf(pathname) ? "/register" : WORKSHOP_REVIEW_PATH.test(pathname) ? "/workshop-review" : PAGES[pathname] ? pathname : "/");
 // The forms are in Dhivehi only and stand on their own, without the site's
 // top bar and footer.
 const FORM_PAGES = ["/register", "/update", "/review", "/workshop-review", "/hifz-test"];

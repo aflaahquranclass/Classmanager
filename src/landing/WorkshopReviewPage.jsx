@@ -107,7 +107,9 @@ function FormUnavailable({ closed }) {
 }
 
 const LOCAL_PREVIEW = ["localhost", "127.0.0.1"].includes(window.location.hostname);
-const formKey = () => new URLSearchParams(window.location.search).get("k") || "";
+// The key from the short address (/workshop/namaadhu/review) or from ?k=….
+const formKey = () => window.location.pathname.match(/^\/workshop\/([a-z0-9-]+)\/review\/?$/)?.[1]
+  || new URLSearchParams(window.location.search).get("k") || "";
 
 export default function WorkshopReviewPage() {
   const [status, setStatus] = useState(null); // open | closed | invalid
