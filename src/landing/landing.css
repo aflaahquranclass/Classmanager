@@ -521,6 +521,78 @@
 .ld-rv-class:hover { border-color: var(--blue); }
 .ld-rv-class.on { border-color: var(--blue); background: #EAF3FC; box-shadow: 0 0 0 1px var(--blue) inset; }
 .ld-rv-class:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+.ld-wr-opts { display: flex; flex-direction: column; gap: 8px; }
+.ld-wr-opt { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; transition: border-color .15s, background .15s; }
+.ld-wr-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.ld-wr-opt .ld-dv { font-size: 16px; line-height: 1.7; }
+.ld-wr-tick { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #C7D6E6; background: #fff; display: grid; place-items: center; color: #fff; transition: background .15s, border-color .15s; }
+.ld-wr-opt:hover { border-color: var(--blue); }
+.ld-wr-opt.on { border-color: var(--blue); background: #EAF3FC; }
+.ld-wr-opt.on .ld-wr-tick { background: var(--blue); border-color: var(--blue); }
+.ld-wr-opt:has(input:focus-visible) { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* Workshop review form: the workshop's poster as its header (as on /workshop/<slug>). */
+.ld-wh { --wh-deep: #0D4F85; --wh-blue: #176FD1; --wh-teal: #0A94B1; --wh-cyan: #22D3E0; --wh-line: #C7DDF4; --wh-grad: linear-gradient(120deg, var(--wh-deep) 0%, var(--wh-blue) 55%, var(--wh-teal) 100%);
+  margin: calc(-1 * var(--rv-pad)) calc(-1 * var(--rv-pad)) 0; padding: clamp(18px, 3vw, 28px) var(--rv-pad) clamp(18px, 3vw, 26px); text-align: right; color: var(--navy);
+  background: url("/images/tp-pattern-main.png") right -180px top -160px / 720px no-repeat, linear-gradient(180deg, #FFFFFF 0%, #F3F8FC 100%); border-bottom: 1px solid var(--line); }
+.ld-wh-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ld-wh-logo { width: 64px; flex-shrink: 0; display: block; }
+.ld-wh-label { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px 8px; border-radius: 999px; background: var(--wh-grad); color: #fff; font: 15px/1.4 Aammu, Faruma, sans-serif; box-shadow: 0 8px 18px rgba(13,79,133,.2); }
+.ld-wh-label::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--wh-cyan); }
+.ld-wh-title { margin: 12px 0 0; font: 400 clamp(38px, 9vw, 56px)/1.25 Aammu, Faruma, sans-serif; }
+.ld-wh-title span { display: inline-block; padding: .2em .03em .3em; margin: -.2em -.03em -.3em; -webkit-background-clip: text; background-clip: text; color: transparent; }
+.ld-wh-title .t1 { background-image: var(--wh-grad); }
+.ld-wh-title .t2 { background-image: linear-gradient(120deg, var(--wh-teal), var(--wh-cyan)); }
+.ld-wh-title::after { content: ""; display: block; height: 4px; margin-top: 6px; border-radius: 999px; background: linear-gradient(270deg, var(--wh-deep), var(--wh-blue) 40%, var(--wh-cyan) 75%, rgba(34,211,224,0)); }
+.ld-wh-speaker { position: relative; display: flex; align-items: flex-end; gap: 14px; margin-top: 46px; min-height: 124px; padding: 14px 16px 14px 0; border-radius: 22px; background: var(--wh-grad); color: #fff; box-shadow: 0 16px 36px rgba(13,79,133,.25); }
+.ld-wh-speaker img { position: absolute; left: 10px; bottom: 0; height: 168px; width: auto; filter: drop-shadow(0 6px 8px rgba(6,30,60,.18)); }
+.ld-wh-speaker > div { flex: 1; margin-left: 150px; min-width: 0; align-self: center; }
+.ld-wh-name { font: 14px/1.3 Aammu, Faruma, sans-serif; opacity: .9; }
+.ld-wh-name b { display: block; font-weight: 400; font-size: clamp(18px, 5.4vw, 24px); line-height: 1.4; white-space: nowrap; opacity: 1; }
+.ld-wh-speaker ul { margin: 4px 0 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.ld-wh-speaker li::before { content: "• "; color: var(--wh-cyan); }
+.ld-wh-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 10px; }
+.ld-wh-fact { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 16px; background: #fff; border: 1px solid var(--wh-line); }
+.ld-wh-fact svg { flex-shrink: 0; width: 32px; height: 32px; padding: 7px; border-radius: 10px; background: var(--wh-grad); color: #fff; }
+.ld-wh-fact > div { min-width: 0; }
+.ld-wh-fact b { display: block; font: 400 15px/1.4 Aammu, Faruma, sans-serif; }
+.ld-wh-fact div > span { display: block; font-size: 11.5px; line-height: 1.4; color: var(--muted); }
+.ld-wh-num { font-family: Inter, sans-serif; font-weight: 700; unicode-bidi: isolate; white-space: nowrap; }
+.ld-wr-part { margin: 0; padding: clamp(16px, 3vw, 22px); border: 1px solid var(--line); border-radius: 16px; background: #FAFCFE; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.ld-wr-part-head { float: right; width: 100%; display: flex; align-items: center; gap: 10px; padding: 0 0 12px; margin: 0; border-bottom: 1px solid var(--line); color: var(--g2); }
+.ld-wr-part-head + * { clear: both; }
+.ld-wr-part-head .ld-wh-num { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(120deg, #0D4F85, #176FD1 55%, #0A94B1); color: #fff; font-size: 15px; }
+.ld-wr-part-head .ld-dv { font: 400 clamp(20px, 3vw, 24px)/1.5 Aammu, Faruma, sans-serif; }
+.ld-wr-part .ld-wr-opt { background: #fff; }
+.ld-wr-part .ld-wr-opt.on { background: #EAF3FC; }
+/* The form's parts as a timeline: an icon in a circle for each, joined by a line that fills in as they're done. */
+.ld-wr-steps { display: flex; margin: 0; padding: 6px 0 2px; list-style: none; scroll-margin-top: 16px; }
+.ld-wr-steps li { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; color: var(--muted); }
+.ld-wr-steps li:not(:first-child)::before { content: ""; position: absolute; top: 17px; inset-inline-start: calc(-50% + 24px); inset-inline-end: calc(50% + 24px); height: 3px; border-radius: 3px; background: var(--line); transition: background .3s; }
+.ld-wr-steps li.on::before, .ld-wr-steps li.done::before { background: linear-gradient(270deg, #176FD1, #0A94B1); }
+.ld-wr-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 2px solid var(--line); color: #8FA9C4; transition: background .25s, border-color .25s, color .25s, box-shadow .25s, transform .25s; }
+.ld-wr-steps li.done .ld-wr-dot { background: #E3F5EA; border-color: #1E9E62; color: #1E7A4C; }
+.ld-wr-steps li.on .ld-wr-dot { background: linear-gradient(135deg, #0D4F85, #176FD1 55%, #0A94B1); border-color: transparent; color: #fff; box-shadow: 0 0 0 4px rgba(23,111,209,.14), 0 6px 14px rgba(13,79,133,.25); }
+.ld-wr-steps li small { margin-top: 2px; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: #8FA9C4; }
+.ld-wr-steps li.on small { color: var(--blue); }
+.ld-wr-steps li b { font: 400 clamp(13px, 2.4vw, 15px)/1.6 Aammu, Faruma, sans-serif; padding: 0 4px; }
+.ld-wr-steps li.on b { color: var(--navy); }
+.ld-wr-steps li.done b { color: #1E7A4C; }
+.ld-wr-nav { display: flex; gap: 10px; }
+.ld-wr-nav .ld-rv-submit { flex: 1; width: auto; }
+.ld-wr-back { min-height: 52px; }
+.ld-wr-back span { font-family: Faruma, Inter, system-ui, sans-serif; }
+.ld-wh.compact { padding-top: clamp(14px, 2.4vw, 20px); padding-bottom: clamp(12px, 2vw, 16px); background-size: 520px auto, auto; }
+.ld-wh.compact .ld-wh-top { align-items: center; }
+.ld-wh.compact .ld-wh-title { margin: 0; font-size: clamp(24px, 6vw, 34px); }
+.ld-wh.compact .ld-wh-title::after { height: 3px; margin-top: 4px; }
+.ld-wh.compact .ld-wh-logo { width: 52px; }
+/* 1.5 line spacing (as in Word: 1.5 × the font's single spacing) for the
+   Dhivehi text, so a question or answer that runs onto two lines has room. */
+.ld-wr-form { --wr-lh: 2; }
+.ld-wr-form :is(.ld-f-label .ld-dv, .ld-wr-opt .ld-dv, .ld-input, textarea.ld-input, .ld-f-note, .ld-rv-error) { line-height: var(--wr-lh); }
+.ld-wr-form .ld-f-label { display: block; margin-bottom: 4px; }
+.ld-rv-head .ld-wh-ask { font-size: clamp(24px, 4vw, 32px); }
+.ld-rv-done .ld-wh { align-self: stretch; }
 .ld-rv-stars { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .ld-rv-stars button { background: none; border: 0; padding: 4px; cursor: pointer; color: #D5E2EE; border-radius: 8px; transition: transform .15s, color .15s; }
 .ld-rv-stars button.on { color: var(--gold); }

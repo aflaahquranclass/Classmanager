@@ -3,7 +3,8 @@
 // Approving one puts it on the website's home page with its stars, under a
 // masked name (first two letters); the full name, Viber number and private
 // request are only ever shown here. The Social media tab turns approved
-// reviews into Instagram posts (ReviewPosts.jsx).
+// reviews into Instagram posts (ReviewPosts.jsx). The Workshop reviews tab
+// holds the workshop review form's link and answers (WorkshopReviews.jsx).
 
 import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, XCircle, RotateCw, Star, Trash2, Hourglass, Copy, Link2, Lock, LockOpen } from "lucide-react";
@@ -15,9 +16,11 @@ import { confirmDialog } from "../ConfirmDialog.jsx";
 import { THAANA_FONT, loadThaanaFont } from "../exams/reportStrings.js";
 import { publicName } from "./reviewPost.js";
 import { ReviewPosts } from "./ReviewPosts.jsx";
+import { WorkshopReviews } from "./WorkshopReviews.jsx";
 
 const VIEWS = [
   { key: "reviews", label: "Reviews" },
+  { key: "workshop", label: "Workshop reviews" },
   { key: "social", label: "Social media" },
 ];
 const FILTERS = [
@@ -127,7 +130,7 @@ export function AdminReviews({ showToast, onCountChange }) {
           <button key={x.key} type="button" aria-pressed={view === x.key} className={`tp-segment-btn ${view === x.key ? "tp-segment-btn-active" : ""}`} onClick={() => setView(x.key)}>{x.label}</button>
         ))}
       </div>
-      {view === "social" ? <ReviewPosts showToast={showToast} /> : <>
+      {view === "social" ? <ReviewPosts showToast={showToast} /> : view === "workshop" ? <WorkshopReviews showToast={showToast} /> : <>
       <div className="tp-card rv-link">
         <div className="rv-link-head">
           <div className="rv-link-title"><Link2 size={18} aria-hidden="true" /> Review form</div>

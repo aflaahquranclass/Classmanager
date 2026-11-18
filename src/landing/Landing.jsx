@@ -8,6 +8,7 @@ import HifzPage from "./HifzPage.jsx";
 import StorePage from "./StorePage.jsx";
 import RulesPage from "./RulesPage.jsx";
 import ReviewPage from "./ReviewPage.jsx";
+import WorkshopReviewPage from "./WorkshopReviewPage.jsx";
 import InstallPage from "./InstallPage.jsx";
 import RegisterPage from "./RegisterPage.jsx";
 import UpdatePage from "./UpdatePage.jsx";
@@ -23,6 +24,7 @@ const PAGES = {
   "/hifz": "Hifz program · Aflaah Quran Class",
   "/store": "Book store · Aflaah Quran Class",
   "/review": "ކުލާހާމެދު ދެކޭގޮތް · Aflaah Quran Class",
+  "/workshop-review": "ވޯކްޝޮޕާމެދު ދެކޭގޮތް · Aflaah Quran Class",
   "/install": "Install the app · Aflaah Quran Class",
   "/register": "ކުލާހަށް ރަޖިސްޓަރީވުން · Aflaah Quran Class",
   "/update": "ދަރިވަރުގެ މަޢުލޫމާތު · Aflaah Quran Class",
@@ -42,7 +44,7 @@ const LOGINS = [
 const pageOf = (pathname) => (registerPathOf(pathname) ? "/register" : PAGES[pathname] ? pathname : "/");
 // The forms are in Dhivehi only and stand on their own, without the site's
 // top bar and footer.
-const FORM_PAGES = ["/register", "/update", "/review", "/hifz-test"];
+const FORM_PAGES = ["/register", "/update", "/review", "/workshop-review", "/hifz-test"];
 const pathOf = (loc) => pageOf(loc.pathname);
 
 export default function Landing() {
@@ -86,7 +88,7 @@ function Site() {
   }, [path, visit]);
   // Keep the private review and info update forms out of search engines.
   useEffect(() => {
-    if (path !== "/review" && path !== "/update") return undefined;
+    if (!["/review", "/workshop-review", "/update"].includes(path)) return undefined;
     const meta = Object.assign(document.createElement("meta"), { name: "robots", content: "noindex, nofollow" });
     document.head.appendChild(meta);
     return () => meta.remove();
@@ -148,6 +150,7 @@ function Site() {
         {path === "/store" && <StorePage />}
         {path === "/rules" && <RulesPage />}
         {path === "/review" && <ReviewPage />}
+        {path === "/workshop-review" && <WorkshopReviewPage />}
         {path === "/install" && <InstallPage />}
         {path === "/register" && <RegisterPage key={visit} navigate={navigate} />}
         {path === "/update" && <UpdatePage />}
