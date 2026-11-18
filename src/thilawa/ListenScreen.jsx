@@ -15,6 +15,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { lockScroll } from "../scrollLock.js";
 import { ChevronLeft, ChevronRight, CheckCircle2, Presentation } from "lucide-react";
 import MushafPage, { MushafPresent, MushafPager } from "./MushafPage.jsx";
 import { TOTAL_PAGES, describePages, pageLabel } from "./engine.js";
@@ -156,11 +157,10 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
   useEffect(() => { setSelectedKey(null); setError(""); }, [student.id]);
 
   useEffect(() => {
-    const before = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    return () => { document.body.style.overflow = before; window.removeEventListener("keydown", onKey); };
+    return () => { unlock(); window.removeEventListener("keydown", onKey); };
   }, [onClose]);
 
   const tapWord = (w) => {

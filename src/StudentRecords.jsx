@@ -9,7 +9,10 @@ import { BANK, SLIP_STATUS, SLIP_ACCEPT, SLIP_MAX_BYTES, slipUrl, submitSlip, is
 // (row-level security only returns their rows). Read-only — teachers record
 // attendance and the admin records payments; this view just reflects it.
 
-const REFRESH_MS = 60_000;
+// Attendance and fees change a few times a month: reloaded every 5 minutes
+// while the app is on screen, whenever it comes back on screen, and with the
+// Refresh button (each reload is three requests).
+const REFRESH_MS = 5 * 60_000;
 
 const pad = (n) => String(n).padStart(2, "0");
 const currentMonthKey = maldivesMonth;
@@ -74,7 +77,7 @@ function demoRecords() {
 // Slips "uploaded" in demo mode, kept for the session (nothing is saved).
 const demoSlips = [];
 
-// Loads both lists, then keeps them fresh: on window focus and every minute.
+// Loads the lists, then keeps them fresh (see REFRESH_MS).
 export function useStudentRecords(student, demo) {
   const [state, setState] = useState({ attendance: [], payments: [], slips: [], loading: true, error: "", updatedAt: null });
 
@@ -99,7 +102,13 @@ export function useStudentRecords(student, demo) {
 
   useEffect(() => {
     refresh();
-    const onFocus = () => { if (document.visibilityState === "visible") refresh(); };
+    // Coming back to the app fires both "focus" and "visibilitychange": one reload.
+    let last = Date.now();
+    const onFocus = () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < 10_000) return;
+      last = Date.now();
+      refresh();
+    };
     const timer = setInterval(onFocus, REFRESH_MS);
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onFocus);

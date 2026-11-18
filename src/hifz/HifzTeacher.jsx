@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useBackLayer } from "../useBackNav.js";
 import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2, Download } from "lucide-react";
 import { createPortal } from "react-dom";
+import { lockScroll } from "../scrollLock.js";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
@@ -433,11 +434,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 
   useEffect(() => {
     if (!markingId) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     const onKey = (e) => { if (e.key === "Escape") closeMarking(); };
     window.addEventListener("keydown", onKey);
-    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+    return () => { unlock(); window.removeEventListener("keydown", onKey); };
   }, [markingId]);
 
   // The saved mistakes with the changes not reloaded yet. Worked out again

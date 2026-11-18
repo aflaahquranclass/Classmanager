@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { lockScroll } from "../scrollLock.js";
 import { X, Eraser, Undo2, Trash2, Pen } from "lucide-react";
 
 const COLORS = [
@@ -98,12 +99,11 @@ export default function Whiteboard({ onClose }) {
   }, [paint]);
 
   useEffect(() => {
-    const before = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     // Caught first, so Esc closes the board and not the screen behind it.
     const onKey = (e) => { if (e.key === "Escape") { e.stopPropagation(); onClose(); } };
     window.addEventListener("keydown", onKey, true);
-    return () => { document.body.style.overflow = before; window.removeEventListener("keydown", onKey, true); };
+    return () => { unlock(); window.removeEventListener("keydown", onKey, true); };
   }, [onClose]);
 
   const at = (e) => { const r = canvas.current.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };

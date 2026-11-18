@@ -38,6 +38,24 @@ const mistakeFromDb = (r) => ({
 const assessmentFromDb = (r) => ({ id: r.id, teacherId: r.teacher_id, tajweed: r.tajweed, fluency: r.fluency, comment: r.comment || "", assessedOn: r.assessed_on, createdAt: r.created_at });
 const noteFromDb = (r) => ({ id: r.id, teacherId: r.teacher_id, body: r.body, visibleToStudent: r.visible_to_student, createdAt: r.created_at, updatedAt: r.updated_at });
 
+// Two screens open on the same data (the student's dashboard and Hifz page)
+// each reload it after the same live change, a few milliseconds apart. A read
+// (with no arguments) asked for again while the same read is still on its way
+// and started under TOGETHER_MS ago gets a copy of that answer instead of
+// making a second request.
+const TOGETHER_MS = 150;
+export function together(read) {
+  let last = null;
+  return () => {
+    if (last && Date.now() - last.at < TOGETHER_MS) return last.p.then((v) => structuredClone(v));
+    // Forgotten as soon as it's answered, before the caller sees the answer.
+    const mine = { at: Date.now() };
+    mine.p = read().finally(() => { if (last === mine) last = null; });
+    last = mine;
+    return mine.p;
+  };
+}
+
 // Every row of a query, fetched 1000 at a time (Supabase's limit per request).
 // makeQuery() must return a fresh, ordered select each time.
 export async function selectAll(makeQuery) {
@@ -244,10 +262,10 @@ export function createSupabaseClassRepo(supabase, classId, teacherId = null) {
   };
   return {
     classId,
-    async getReading() {
+    getReading: together(async () => {
       const r = check(await supabase.from("thilawa_class_readings").select("*").eq("class_id", classId).is("ended_at", null).maybeSingle());
       return r ? classReadingFromDb(r) : null;
-    },
+    }),
     async listReadings() {
       return check(await supabase.from("thilawa_class_readings").select("*").eq("class_id", classId).order("created_at", { ascending: false }).limit(50)).map(classReadingFromDb);
     },
@@ -262,9 +280,8 @@ export function createSupabaseClassRepo(supabase, classId, teacherId = null) {
     async setReadingPage(id, page) {
       check(await supabase.from("thilawa_class_readings").update({ page, updated_at: new Date().toISOString() }).eq("id", id).eq("class_id", classId));
     },
-    async listTopics() {
-      return check(await supabase.from("thilawa_class_topics").select("*").eq("class_id", classId).order("taught_on", { ascending: false }).order("created_at", { ascending: false })).map(classTopicFromDb);
-    },
+    listTopics: together(async () => check(await supabase.from("thilawa_class_topics").select("*").eq("class_id", classId)
+      .order("taught_on", { ascending: false }).order("created_at", { ascending: false })).map(classTopicFromDb)),
     async addTopic(t) {
       check(await supabase.from("thilawa_class_topics").insert({
         class_id: classId, teacher_id: teacherId, topic: t.topic.trim(), note: t.note?.trim() || null, ...(t.taughtOn ? { taught_on: t.taughtOn } : {}),

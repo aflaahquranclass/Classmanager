@@ -18,7 +18,7 @@
 //   subscribe(onChange) → unsubscribe       (live updates)
 
 import { createSupabaseRepo } from "./repos.js";
-import { selectAll } from "../thilawa/repos.js";
+import { selectAll, together } from "../thilawa/repos.js";
 
 const taskFromDb = (r) => ({
   id: r.id, teacherId: r.teacher_id, taskDate: r.task_date, activity: r.activity, start: r.start_unit, end: r.end_unit,
@@ -57,20 +57,21 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
   };
   const own = (table) => supabase.from(table).select("*").eq("student_id", studentId);
   return {
-    async getProfile() {
+    // Reads shared by the dashboard and the Hifz page when they reload together (see together()).
+    getProfile: together(async () => {
       const r = check(await own("hifz_profiles").maybeSingle());
       return r && profileFromDb(r);
-    },
+    }),
     async saveProfile(p) {
       check(await supabase.from("hifz_profiles").upsert(
         { student_id: studentId, ...profileToDb(p), updated_by: teacherId, updated_at: new Date().toISOString() },
         { onConflict: "student_id" },
       ));
     },
-    async getGoal() {
+    getGoal: together(async () => {
       const r = check(await own("hifz_goals").maybeSingle());
       return r ? r.goal_year : null;
-    },
+    }),
     async saveGoal(goalYear) {
       check(await supabase.from("hifz_goals").upsert({ student_id: studentId, goal_year: goalYear, updated_at: new Date().toISOString() }, { onConflict: "student_id" }));
     },
@@ -79,7 +80,7 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
       const settings = await old.getSettings().catch(() => null);
       return settings ? { settings, rows: await old.listAssignments().catch(() => []) } : null;
     },
-    listTasks: async () => (await selectAll(() => own("hifz_tasks").order("task_date").order("created_at").order("id"))).map(taskFromDb),
+    listTasks: together(async () => (await selectAll(() => own("hifz_tasks").order("task_date").order("created_at").order("id"))).map(taskFromDb)),
     async addTasks(rows) {
       // One insert, so the student gets one notification for the whole set.
       check(await supabase.from("hifz_tasks").insert(rows.map((t) => ({ student_id: studentId, teacher_id: teacherId, ...taskPatchToDb(t) }))));
@@ -92,7 +93,7 @@ export function createSupabaseHifzRepo(supabase, studentId, teacherId = null) {
     async setTaskDone(id, done) {
       check(await supabase.from("hifz_tasks").update({ completed_at: done ? new Date().toISOString() : null }).eq("id", id).eq("student_id", studentId));
     },
-    listMistakes: async () => (await selectAll(() => own("hifz_mistakes").order("created_at").order("id"))).map(mistakeFromDb),
+    listMistakes: together(async () => (await selectAll(() => own("hifz_mistakes").order("created_at").order("id"))).map(mistakeFromDb)),
     async addMistake(m) {
       return mistakeFromDb(check(await supabase.from("hifz_mistakes").insert({
         student_id: studentId, teacher_id: teacherId, task_id: m.taskId || null, page: m.page,

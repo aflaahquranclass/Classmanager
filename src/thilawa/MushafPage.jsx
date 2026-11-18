@@ -24,6 +24,7 @@ import { pageToUnit, UNITS_PER_LINE, LINES_PER_PAGE, TOTAL_PAGES, JUZ_START_PAGE
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
 import { useGlobalCss } from "../globalCss.js";
+import { lockScroll } from "../scrollLock.js";
 
 export { buildLines };
 
@@ -146,10 +147,13 @@ export function MushafPager({ page, onNext = null, onPrev = null, children }) {
   };
   // A drag that ends over a word isn't a tap on it.
   const onClickCapture = (e) => { if (Date.now() < noClickUntil.current) { e.preventDefault(); e.stopPropagation(); } };
+  // Older phones without overflow: clip: if the box was scrolled sideways
+  // anyway, put it straight back (pages move with the strip, never by scrolling).
+  const onScroll = (e) => { if (e.currentTarget.scrollLeft) e.currentTarget.scrollLeft = 0; };
 
   const pages = [page - 1, page, page + 1].filter((p) => p >= 1 && p <= TOTAL_PAGES);
   return (
-    <div className="mpg" ref={wrapRef} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd} onClickCapture={onClickCapture}>
+    <div className="mpg" ref={wrapRef} onScroll={onScroll} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} onTouchCancel={onTouchEnd} onClickCapture={onClickCapture}>
       <div className="mpg-strip" ref={stripRef}>
         {pages.map((p) => {
           const d = p - page; // the next page (+1) is to the left
@@ -224,8 +228,7 @@ export function MushafPresent({ children, page = null, tools = null, onNext = nu
   turn.current = { onNext, onPrev };
   useEffect(() => {
     if (!full) return undefined;
-    const before = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
     // The page's own bars (e.g. the phone tab bar) are hidden while the Mushaf fills the screen.
     document.body.classList.add("mf-is-full");
     // Caught first, so Esc leaves full screen without also closing a screen behind it.
@@ -244,7 +247,7 @@ export function MushafPresent({ children, page = null, tools = null, onNext = nu
     document.addEventListener("fullscreenchange", onChange);
     document.addEventListener("webkitfullscreenchange", onChange);
     return () => {
-      document.body.style.overflow = before;
+      unlock();
       document.body.classList.remove("mf-is-full");
       window.removeEventListener("keydown", onKey, true);
       document.removeEventListener("fullscreenchange", onChange);
@@ -335,7 +338,10 @@ const presentCss = `
   .mf-open { min-height: 38px; padding: 0 12px; font-size: 13px; }
   /* Next to a page picker on a phone: just the icon. */
   @media (max-width: 520px) { .mf-bar:has(.hz-go) .mf-open-text { display: none; } .mf-bar:has(.hz-go) .mf-open { width: 38px; padding: 0; justify-content: center; } }
-  .mpg { position: relative; overflow: hidden; touch-action: pan-y pinch-zoom; }
+  /* clip, not just hidden: a hidden box can still be scrolled sideways (the
+     browser does it to show something given focus), which left the page
+     stuck half off the screen with swiping unable to bring it back. */
+  .mpg { position: relative; overflow: hidden; overflow: clip; touch-action: pan-y pinch-zoom; }
   .mpg-strip { position: relative; will-change: transform; }
   .mpg-slot { position: relative; }
   .mpg-side { position: absolute; top: 0; left: 0; width: 100%; }
@@ -427,12 +433,22 @@ const BASMALA_GLYPHS = "ﱁ ﱂ ﱃ ﱄ";
 // Mushaf); the page is sized a little wider so no line ever overflows.
 const EM_PER_LINE = 16.6;
 
+// Page text and fonts come from quran.com's servers. On a phone a request can
+// be left hanging with no answer (the app went to the background, the Wi-Fi
+// changed), and the browser never ends it: the page stayed on "Loading page…"
+// for good, and as the hanging request was kept, opening the page again did
+// too, until the app was closed. Each request now gives up after a while and
+// is forgotten, so the next try asks again.
+const DATA_TIMEOUT_MS = 15_000;
+const FONT_TIMEOUT_MS = 20_000;
+const timedOut = (ms) => new Promise((_, reject) => { setTimeout(() => reject(new Error("The page took too long to load.")), ms); });
+
 const fontCache = new Map(); // family → Promise
 function loadFont(family, url) {
   if (!fontCache.has(family)) {
     const face = new FontFace(family, `url(${url}) format("woff2")`, { display: "block" });
-    const p = face.load().then((f) => { document.fonts.add(f); });
-    p.catch(() => fontCache.delete(family));
+    const p = Promise.race([face.load(), timedOut(FONT_TIMEOUT_MS)]).then((f) => { document.fonts.add(f); });
+    p.catch(() => { if (fontCache.get(family) === p) fontCache.delete(family); });
     fontCache.set(family, p);
   }
   return fontCache.get(family);
@@ -443,14 +459,26 @@ const loadPageFont = (page) => loadFont(pageFont(page), `${FONT_BASE}/p${page}.w
 const dataCache = new Map(); // page → Promise<lines>
 function loadPageLines(page) {
   if (!dataCache.has(page)) {
-    const p = fetch(`${API}/${page}?words=true&per_page=all&mushaf=1&word_fields=code_v2,line_number,text_uthmani,text_qpc_hafs,page_number`)
+    const p = fetch(`${API}/${page}?words=true&per_page=all&mushaf=1&word_fields=code_v2,line_number,text_uthmani,text_qpc_hafs,page_number`,
+      typeof AbortSignal.timeout === "function" ? { signal: AbortSignal.timeout(DATA_TIMEOUT_MS) } : {})
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((body) => buildLines(page, body.verses || []));
-    p.catch(() => dataCache.delete(page));
-    dataCache.set(page, p);
+    const timed = Promise.race([p, timedOut(DATA_TIMEOUT_MS + 1000)]); // older phones without AbortSignal.timeout
+    timed.catch(() => { if (dataCache.get(page) === timed) dataCache.delete(page); });
+    dataCache.set(page, timed);
+    return timed;
   }
   return dataCache.get(page);
 }
+
+// A page's text and font asked for again on the next load (a Retry, or back
+// online), in case the earlier requests are still hanging.
+function forgetPage(page) {
+  dataCache.delete(page);
+  fontCache.delete(pageFont(page));
+}
+const SLOW_MS = 8000;
+const RETRY_EVENT = "mushaf-retry";
 
 export const mushafCss = `
   .mp-page { background: #FFFFFF; color: #1A1F36; border: 1px solid #E6E9EF; border-radius: 14px; box-shadow: 0 10px 30px rgba(18,59,103,0.07); padding: 4% 4.5% 2.5%; box-sizing: border-box; width: 100%; max-width: 760px; margin: 0 auto; }
@@ -540,16 +568,44 @@ function MushafPage({ page, range = null, marks = [], showCorrected = false, onW
   const wantHafs = letters.length > 0;
   useGlobalCss("mushaf-page-css", mushafCss);
 
+  const [slow, setSlow] = useState(false); // still loading after SLOW_MS: offer Retry
   useEffect(() => {
     let live = true;
     setState((s) => ({ ...s, status: "loading", page }));
+    setSlow(false);
+    const slowTimer = setTimeout(() => live && setSlow(true), SLOW_MS);
     Promise.all([loadPageLines(page), loadPageFont(page), loadPageFont(1), loadFont("QCF2_SurahNames", SURAH_NAMES_FONT)])
       .then(([lines]) => live && setState({ status: "ready", page, lines }))
-      .catch(() => live && setState({ status: "error", page, lines: [] }));
+      .catch(() => {
+        if (!live) return;
+        // One quiet try again (a dropped connection often comes straight back),
+        // then the message with Retry.
+        if (attempt === 0 && navigator.onLine !== false) setTimeout(() => live && setAttempt((n) => n + 1), 1000);
+        else setState({ status: "error", page, lines: [] });
+      })
+      .finally(() => clearTimeout(slowTimer));
     // Get the next page ready so turning the page is instant.
     if (page < 604) { loadPageLines(page + 1).catch(() => {}); loadPageFont(page + 1).catch(() => {}); }
-    return () => { live = false; };
+    return () => { live = false; clearTimeout(slowTimer); };
   }, [page, attempt]);
+
+  // Back online, back in the app from another one, or Retry tapped on any
+  // page (the pages beside it are loaded too): a page that couldn't load (or
+  // still hasn't) tries again, with fresh requests.
+  const waiting = state.status !== "ready";
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const again = () => { if (document.visibilityState === "visible") { forgetPage(page); setAttempt((n) => n + 1); } };
+    window.addEventListener("online", again);
+    window.addEventListener(RETRY_EVENT, again);
+    document.addEventListener("visibilitychange", again);
+    return () => {
+      window.removeEventListener("online", again);
+      window.removeEventListener(RETRY_EVENT, again);
+      document.removeEventListener("visibilitychange", again);
+    };
+  }, [waiting, page]);
+  const retry = () => window.dispatchEvent(new Event(RETRY_EVENT));
 
   useEffect(() => {
     if (!wantHafs) return undefined;
@@ -639,14 +695,19 @@ function MushafPage({ page, range = null, marks = [], showCorrected = false, onW
   return (
     <div className={`mp-page ${page <= 2 ? "mp-first" : ""}`} lang="ar" ref={pageRef}>
       {state.status === "error" ? (
-        <div className="mp-status">
+        <div className="mp-status" dir="ltr" lang="en">
           Couldn't load this page (check the internet connection).{" "}
-          <button type="button" className="hz-btn hz-btn-outline" onClick={() => setAttempt((n) => n + 1)}>Retry</button>
+          <button type="button" className="hz-btn hz-btn-outline" onClick={retry}>Retry</button>
         </div>
       ) : (
         <div className="mp-body" ref={bodyRef} style={{ fontSize: fontSize ? `${fontSize}px` : undefined, "--mp-lh": lineHeight ? `${lineHeight}px` : undefined, visibility: state.status === "ready" ? "visible" : "hidden" }}
           aria-busy={state.status !== "ready"}>
-          {state.status !== "ready" && <div className="mp-status" style={{ visibility: "visible" }}>Loading page {page}…</div>}
+          {state.status !== "ready" && (
+            <div className="mp-status" dir="ltr" lang="en" style={{ visibility: "visible" }}>
+              Loading page {page}…
+              {slow && <> Taking long? <button type="button" className="hz-btn hz-btn-outline" onClick={retry}>Retry</button></>}
+            </div>
+          )}
           {state.status === "ready" && state.lines.map((line, i) => {
             const out = lineIn[i] ? "" : "mp-out";
             if (line.kind === "surah") {

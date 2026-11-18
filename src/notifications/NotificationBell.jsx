@@ -3,7 +3,7 @@
 // the switch for getting them as phone notifications (push.js).
 // Row-level security only returns the signed-in user's own rows.
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Bell, X, Smartphone } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../shared.jsx";
@@ -21,6 +21,56 @@ const PUSH_TEXT = {
 
 const REFRESH_MS = 2 * 60 * 1000;
 
+// One inbox for the page. A portal can show the bell twice (the sidebar on
+// a computer, the bottom bar on a phone); both read this, so the inbox is
+// fetched once per refresh, not once per bell. It is refreshed every
+// REFRESH_MS while the app is on screen, and when it comes back on screen.
+const inbox = { items: [], listeners: new Set(), running: null, timer: 0 };
+const setInbox = (next) => {
+  inbox.items = typeof next === "function" ? next(inbox.items) : next;
+  for (const fn of inbox.listeners) fn(inbox.items);
+};
+function fetchInbox() {
+  if (inbox.running) return inbox.running;
+  inbox.running = (async () => {
+    // The signed-in user from this device's saved session: no request to the
+    // sign-in server (getUser() would ask it every time).
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return;
+    const { data, error } = await supabase
+      .from("notification_recipients")
+      .select("id, body, read_at, created_at, notifications!inner(title, body, send_in_app)")
+      .eq("user_id", userId)
+      .eq("notifications.send_in_app", true)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (!error) setInbox(data || []);
+  })().catch(() => {}).finally(() => { inbox.running = null; });
+  return inbox.running;
+}
+const onScreen = () => { if (document.visibilityState === "visible") fetchInbox(); };
+function useInbox() {
+  const [items, setItems] = useState(inbox.items);
+  useEffect(() => {
+    inbox.listeners.add(setItems);
+    if (inbox.listeners.size === 1) {
+      fetchInbox();
+      inbox.timer = window.setInterval(onScreen, REFRESH_MS);
+      document.addEventListener("visibilitychange", onScreen);
+    }
+    return () => {
+      inbox.listeners.delete(setItems);
+      if (!inbox.listeners.size) {
+        window.clearInterval(inbox.timer);
+        document.removeEventListener("visibilitychange", onScreen);
+        inbox.items = []; // signed out: don't show the last user's inbox to the next
+      }
+    };
+  }, []);
+  return [items, setInbox, fetchInbox];
+}
+
 function fmtWhen(iso) {
   const d = new Date(iso);
   const mins = Math.round((Date.now() - d) / 60000);
@@ -35,24 +85,11 @@ function fmtWhen(iso) {
 // draws it as a tab of the phone's bottom bar ("Alerts"), with the inbox
 // opening above it.
 export function NotificationBell({ className = "", onDark = false, tab = false }) {
-  const [items, setItems] = useState([]);
+  const [items, setItems, load] = useInbox();
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState(null); // panel's { top, left }, under the bell
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
-
-  const load = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-    const { data } = await supabase
-      .from("notification_recipients")
-      .select("id, body, read_at, created_at, notifications!inner(title, body, send_in_app)")
-      .eq("user_id", user.id)
-      .eq("notifications.send_in_app", true)
-      .order("created_at", { ascending: false })
-      .limit(50);
-    setItems(data || []);
-  }, []);
 
   const [push, setPush] = useState(null); // see PUSH_TEXT; null while checking
   const [pushBusy, setPushBusy] = useState(false);
@@ -71,14 +108,7 @@ export function NotificationBell({ className = "", onDark = false, tab = false }
     setPushBusy(false);
   };
 
-  useEffect(() => {
-    loadThaanaFont();
-    load();
-    const t = window.setInterval(load, REFRESH_MS);
-    const onFocus = () => load();
-    window.addEventListener("focus", onFocus);
-    return () => { window.clearInterval(t); window.removeEventListener("focus", onFocus); };
-  }, [load]);
+  useEffect(() => { loadThaanaFont(); }, []);
 
   useEffect(() => {
     if (!open) return undefined;

@@ -282,9 +282,15 @@ function SetPassword({ studentName, onDone, onCancel }) {
   );
 }
 
-// Signed-in student → their students row (row-level security only returns their own).
+// Signed-in student → their own record, through my_student() (only the parts
+// the portal shows; students can't read the students table itself). Until
+// migration 20261125_student_portal_launch.sql is applied that function
+// doesn't exist yet, and the older way (their own row) is used.
 async function loadStudentForUser(userId) {
-  const { data, error } = await supabase.from("students").select("id, name, student_code, class_id, class_name, fee, joined_month, programs").eq("user_id", userId).maybeSingle();
+  let { data, error } = await supabase.rpc("my_student").maybeSingle();
+  if (error?.code === "PGRST202") {
+    ({ data, error } = await supabase.from("students").select("id, name, student_code, class_id, class_name, fee, joined_month, programs").eq("user_id", userId).maybeSingle());
+  }
   if (error) throw new Error(error.message);
   // A class named for Hifz or Thilawa decides the section, as it does for the
   // teacher (inProgramSection): a "Thilawa Class" student saved as Hifz still
@@ -321,6 +327,9 @@ function thisWeek(today, calendar) {
     return { date, letter, name, state };
   });
 }
+
+// After a live change from the teacher, how long to wait for more before reloading.
+const LIVE_WAIT_MS = 1000;
 
 // Remembers which dashboard (Hifz or Thilawa) a student enrolled in both last looked at.
 const DASH_KEY = "aqc_student_dashboard";
@@ -412,10 +421,13 @@ export default function StudentPortal() {
 
   useEffect(() => {
     refreshThilawa();
-    const stop = thilawaRepo?.subscribe?.(() => refreshThilawa());
+    // A teacher marking words sends one live change per word: wait until they
+    // pause, then load once (each load is six requests).
+    let timer = 0;
+    const stop = thilawaRepo?.subscribe?.(() => { clearTimeout(timer); timer = setTimeout(refreshThilawa, LIVE_WAIT_MS); });
     const onShow = () => { if (document.visibilityState === "visible") refreshThilawa(); };
     document.addEventListener("visibilitychange", onShow);
-    return () => { stop?.(); document.removeEventListener("visibilitychange", onShow); };
+    return () => { clearTimeout(timer); stop?.(); document.removeEventListener("visibilitychange", onShow); };
   }, [refreshThilawa, thilawaRepo]);
 
   // Dashboard shown: the only program, or the one picked (both enrolled).

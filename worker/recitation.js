@@ -14,7 +14,8 @@
 //
 // The phone sends a few seconds at a time while the student recites and
 // compares the text with the Mushaf itself; nothing is stored here. The
-// caller must be signed in to the app (any student, teacher or admin).
+// caller must be signed in to the app (any student, teacher or admin), and
+// each person gets at most RECITATION_LIMIT requests a minute (wrangler.jsonc).
 //
 // Whisper: greedy decoding (one guess per word, not five): several times
 // quicker, and the parts are short and clear enough not to need more.
@@ -26,20 +27,23 @@ const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 
 // Recently checked sign-ins, so each few-second request isn't a round trip to Supabase.
-const signedIn = new Map(); // token → expiry (ms)
+const signedIn = new Map(); // token → { until (ms), userId }
 
-async function isSignedIn(request, env) {
+// The caller's user id, or null when not signed in.
+async function signedInUser(request, env) {
   const url = new URL(request.url);
-  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return true; // `wrangler dev` (demo mode)
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return "local"; // `wrangler dev` (demo mode)
   const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!token) return false;
-  const until = signedIn.get(token);
-  if (until && until > Date.now()) return true;
+  if (!token) return null;
+  const known = signedIn.get(token);
+  if (known && known.until > Date.now()) return known.userId;
   const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, { headers: { apikey: env.SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` } });
-  if (!res.ok) return false;
+  if (!res.ok) return null;
+  const user = await res.json().catch(() => null);
+  if (!user?.id) return null;
   if (signedIn.size > 2000) signedIn.clear();
-  signedIn.set(token, Date.now() + 5 * 60 * 1000);
-  return true;
+  signedIn.set(token, { until: Date.now() + 5 * 60 * 1000, userId: user.id });
+  return user.id;
 }
 
 // The Space: how long to wait, and after a failure how long to use Whisper
@@ -83,7 +87,14 @@ function toBase64(bytes) {
 export async function handleRecitation(request, env) {
   if (request.method !== "POST" && request.method !== "GET") return json({ error: "POST only" }, 405);
   if (!env.AI) return json({ error: "Listening isn't set up on the server." }, 503);
-  if (!(await isSignedIn(request, env))) return json({ error: "Not signed in" }, 401);
+  const userId = await signedInUser(request, env);
+  if (!userId) return json({ error: "Not signed in" }, 401);
+  // Per person: a student reciting sends a part about once a second, so this
+  // only stops a login being used to run the listener (and its cost) nonstop.
+  if (env.RECITATION_LIMIT) {
+    const { success } = await env.RECITATION_LIMIT.limit({ key: userId }).catch(() => ({ success: true }));
+    if (!success) return json({ error: "Too many tries at once. Wait a minute and try again." }, 429);
+  }
   if (request.method === "GET") { await wakeSpace(env); return new Response(null, { status: 204 }); }
   const audio = new Uint8Array(await request.arrayBuffer());
   if (!audio.length) return json({ text: "" });
