@@ -177,8 +177,8 @@ export default function WorkshopPage() {
         ) : !open ? (
           <section className="wk-card wk-done">
             <Lock size={44} aria-hidden="true" />
-            <h2>{ERRORS.closed}</h2>
-            <p>ސުވާލެއް އޮތިއްޔާ ވައިބަރ <Num>{w.viber}</Num> އަށް މެސެޖް ކުރައްވާ.</p>
+            <h2>ރަޖިސްޓްރޭޝަން ވަނީ ބަންދުކުރެވިފަ !</h2>
+            <p>ސުވާލެއް އޮތްނަމަ <Num>{w.viber}</Num> އަށް ވައިބާ އިން މެސެޖް ކުރައްވާ !</p>
           </section>
         ) : step === 0 ? (
           <>
