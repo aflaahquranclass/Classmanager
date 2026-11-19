@@ -1,15 +1,18 @@
-// Admin → Reviews → Workshop reviews: the workshop review form's private link
-// (aflaahqc.com/workshop-review?k=…) and the answers sent through it, with a
-// count of each answer at the top. Answers are private feedback and never
-// show on the website. Questions live in workshops/workshopReview.js.
+// Admin → Reviews → Workshop reviews: the workshop review form's link
+// (aflaahqc.com/workshop/<name>/review) and the answers sent through it, in
+// three views — Summary (how many chose each answer, with percentages),
+// Topics & comments, and Each answer — and a PDF of the results to download.
+// Each new answer also alerts the admins (20261128_workshop_review_alerts.sql).
+// Answers are private feedback and never show on the website. Questions live
+// in workshops/reviewQuestions.js.
 
-import { useState, useEffect, useCallback } from "react";
-import { RotateCw, Trash2, Copy, Link2, Lock, LockOpen } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { RotateCw, Trash2, Copy, Link2, Lock, LockOpen, FileDown } from "lucide-react";
 import { supabase } from "../supabaseClient.js";
 import { TP } from "../shared.jsx";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { WORKSHOPS } from "../workshops/workshops.js";
-import { RATINGS, RATED, NEXT_QUESTION, NEXT_CHOICES, COMMENT_LABEL, WORKSHOP_CHOICES, ratingOf, nextChoiceOf } from "../workshops/workshopReview.js";
+import { RATED, NEXT_TOPIC_LABEL, COMMENT_LABEL, WORKSHOP_CHOICES, ratingOf, nextChoiceOf, summarizeReviews, workshopByKey } from "../workshops/workshopReview.js";
 
 const FORM_PATH = "/workshop-review";
 const formUrl = (key) => {
@@ -23,23 +26,45 @@ const newKey = () => crypto.randomUUID().replace(/-/g, "").slice(0, 12);
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 const workshopName = (key) => WORKSHOP_CHOICES.find((w) => w.key === key)?.name || key;
 
-// One question's answers as a stacked bar with the counts under it.
-function Tally({ label, choices, rows, field }) {
-  const counts = choices.map((c) => ({ ...c, n: rows.filter((r) => r[field] === c.value).length }));
-  const total = counts.reduce((a, c) => a + c.n, 0);
-  const palette = ["#1E7A4C", "#176FD1", "#9C6B12"];
+const VIEWS = [
+  { key: "summary", label: "Summary" },
+  { key: "written", label: "Topics & comments" },
+  { key: "each", label: "Each answer" },
+];
+const NEXT_COLORS = ["#1E7A4C", "#176FD1", "#9C6B12"];
+
+// One question: a bar split by answer, then each answer with its count and percent.
+function Tally({ q }) {
+  const sum = q.counts.reduce((a, c) => a + c.n, 0);
   return (
     <div className="wr-tally">
-      <div className="wr-tally-label" dir="auto">{label}</div>
+      <div className="wr-tally-head">
+        <span className="wr-tally-en">{q.en}</span>
+        <span className="wr-tally-label" dir="rtl">{q.dv}</span>
+      </div>
       <div className="wr-bar" aria-hidden="true">
-        {counts.map((c, i) => c.n > 0 && <span key={c.value} style={{ width: `${(c.n / total) * 100}%`, background: c.color || palette[i] }} />)}
+        {q.counts.map((c, i) => c.n > 0 && <span key={c.value} style={{ width: `${(c.n / sum) * 100}%`, background: c.color || NEXT_COLORS[i] }} />)}
       </div>
       <div className="wr-counts">
-        {counts.map((c, i) => (
-          <span key={c.value}><i style={{ background: c.color || palette[i] }} />{c.en} <b>{c.n}</b></span>
+        {q.counts.map((c, i) => (
+          <span key={c.value}><i style={{ background: c.color || NEXT_COLORS[i] }} />{c.en} <b>{c.n}</b> <em>{c.pct}%</em></span>
         ))}
       </div>
     </div>
+  );
+}
+
+// Numbered list of what people wrote, newest first.
+function Written({ title, items, empty }) {
+  return (
+    <section className="tp-card wr-written">
+      <h3 className="wr-h3"><span dir="rtl">{title.dv}</span><small>{title.en} · {items.length}</small></h3>
+      {items.length === 0 ? <p className="rv-link-help">{empty}</p> : (
+        <ol className="wr-list">
+          {items.map((it) => <li key={it.id}><p dir="auto">{it.text}</p><time>{fmtWhen(it.at)}</time></li>)}
+        </ol>
+      )}
+    </section>
   );
 }
 
@@ -48,6 +73,9 @@ export function WorkshopReviews({ showToast }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
+  const [view, setView] = useState("summary");
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const summary = useMemo(() => summarizeReviews(rows || []), [rows]);
 
   useEffect(() => {
     supabase.from("workshop_review_form_settings").select("workshop, form_key, is_open").eq("id", 1).maybeSingle()
@@ -86,6 +114,23 @@ export function WorkshopReviews({ showToast }) {
     const url = formUrl(settings.form_key);
     try { await navigator.clipboard.writeText(url); showToast("Workshop review link copied."); }
     catch { showToast(url); }
+  };
+
+  const downloadPdf = async () => {
+    setPdfBusy(true);
+    try {
+      const { buildWorkshopReviewPdf } = await import("./workshopReviewReport.js");
+      const blob = await buildWorkshopReviewPdf(summary, workshopByKey(settings.workshop));
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Workshop review - ${settings.workshop} - ${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) { showToast(`Couldn’t make the PDF: ${e.message}`); }
+    setPdfBusy(false);
   };
 
   const remove = async (r) => {
@@ -133,7 +178,10 @@ export function WorkshopReviews({ showToast }) {
 
       <div className="rv-bar">
         <div className="wr-total">{rows ? `${rows.length} ${rows.length === 1 ? "answer" : "answers"}` : ""}</div>
-        <button type="button" className="tp-btn-outline" onClick={load}><RotateCw size={16} aria-hidden="true" /> Refresh</button>
+        <div className="rv-link-actions">
+          <button type="button" className="tp-btn-gradient" onClick={downloadPdf} disabled={!rows || pdfBusy}><FileDown size={16} aria-hidden="true" /> {pdfBusy ? "Making PDF…" : "Download PDF"}</button>
+          <button type="button" className="tp-btn-outline" onClick={load}><RotateCw size={16} aria-hidden="true" /> Refresh</button>
+        </div>
       </div>
 
       {error && <div className="tp-card rv-error" role="alert">Couldn’t load answers: {error}</div>}
@@ -141,46 +189,76 @@ export function WorkshopReviews({ showToast }) {
       {rows && rows.length === 0 && !error && <div className="tp-card rv-empty">No answers yet. Share the link above in the workshop group.</div>}
 
       {rows && rows.length > 0 && (
-        <div className="tp-card wr-summary">
-          {RATED.map((q) => <Tally key={q.key} label={q.dv} choices={RATINGS} rows={rows} field={q.key} />)}
-          <Tally label={NEXT_QUESTION.dv} choices={NEXT_CHOICES} rows={rows} field="next_workshop" />
-        </div>
-      )}
+        <>
+          <div className="tp-segment" role="group" aria-label="Workshop review view" style={{ marginBottom: 0, alignSelf: "flex-start" }}>
+            {VIEWS.map((x) => (
+              <button key={x.key} type="button" aria-pressed={view === x.key} className={`tp-segment-btn ${view === x.key ? "tp-segment-btn-active" : ""}`} onClick={() => setView(x.key)}>{x.label}</button>
+            ))}
+          </div>
 
-      <div className="rv-grid">
-        {(rows || []).map((r) => {
-          const next = nextChoiceOf(r.next_workshop);
-          return (
-            <article key={r.id} className="tp-card rv-card">
-              <div className="rv-top">
-                <div style={{ minWidth: 0 }}>
-                  <div className="rv-name">{fmtWhen(r.created_at)}</div>
-                </div>
-                <button type="button" className="tp-btn-outline rv-delete" disabled={busyId === r.id} onClick={() => remove(r)} aria-label="Delete answers"><Trash2 size={17} aria-hidden="true" /></button>
+          {view === "summary" && (
+            <>
+              <div className="wr-stats">
+                <div className="tp-card wr-stat"><span>Answers</span><b>{summary.total}</b></div>
+                <div className="tp-card wr-stat"><span>Very good or good</span><b>{summary.positivePct}%</b><small>of all session ratings</small></div>
+                <div className="tp-card wr-stat"><span>Last answer</span><b className="wr-stat-when">{summary.lastAt ? fmtWhen(summary.lastAt) : "—"}</b></div>
               </div>
-              <dl className="wr-answers">
-                {RATED.map((q) => {
-                  const a = ratingOf(r[q.key]);
-                  return (
-                    <div key={q.key}>
-                      <dt dir="auto">{q.dv}</dt>
-                      <dd><span className="rv-badge" style={{ color: a?.color, background: a?.bg }}>{a?.en}</span></dd>
+              <section className="tp-card wr-section">
+                <h3 className="wr-h3"><span dir="rtl">ސެޝަނާ ބެހޭ ގޮތުން</span><small>Session ratings</small></h3>
+                <div className="wr-summary">{summary.rated.map((q) => <Tally key={q.key} q={q} />)}</div>
+              </section>
+              <section className="tp-card wr-section">
+                <h3 className="wr-h3"><span dir="rtl">އިތުރު ވޯކްޝޮޕްތައް</span><small>Next workshop</small></h3>
+                <div className="wr-summary"><Tally q={summary.next} /></div>
+              </section>
+            </>
+          )}
+
+          {view === "written" && (
+            <div className="wr-two">
+              <Written title={NEXT_TOPIC_LABEL} items={summary.topics} empty="No topics suggested yet." />
+              <Written title={COMMENT_LABEL} items={summary.comments} empty="No comments yet." />
+            </div>
+          )}
+
+          {view === "each" && (
+            <div className="rv-grid">
+              {rows.map((r) => {
+                const next = nextChoiceOf(r.next_workshop);
+                return (
+                  <article key={r.id} className="tp-card rv-card">
+                    <div className="rv-top">
+                      <div style={{ minWidth: 0 }}>
+                        <div className="rv-name">{fmtWhen(r.created_at)}</div>
+                      </div>
+                      <button type="button" className="tp-btn-outline rv-delete" disabled={busyId === r.id} onClick={() => remove(r)} aria-label="Delete answers"><Trash2 size={17} aria-hidden="true" /></button>
                     </div>
-                  );
-                })}
-              </dl>
-              <dl className="rv-facts">
-                <dt>Holiday workshop</dt><dd>{next?.en}</dd>
-                {r.next_topic && <><dt>Next topic</dt><dd dir="auto">{r.next_topic}</dd></>}
-              </dl>
-              <div>
-                <div className="wr-q" dir="auto">{COMMENT_LABEL.dv}</div>
-                <p className="rv-text" dir="auto">{r.comment}</p>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+                    <dl className="wr-answers">
+                      {RATED.map((q) => {
+                        const a = ratingOf(r[q.key]);
+                        return (
+                          <div key={q.key}>
+                            <dt dir="auto">{q.dv}</dt>
+                            <dd><span className="rv-badge" style={{ color: a?.color, background: a?.bg }}>{a?.en}</span></dd>
+                          </div>
+                        );
+                      })}
+                    </dl>
+                    <dl className="rv-facts">
+                      <dt>Holiday workshop</dt><dd>{next?.en}</dd>
+                      {r.next_topic && <><dt>Next topic</dt><dd dir="auto">{r.next_topic}</dd></>}
+                    </dl>
+                    <div>
+                      <div className="wr-q" dir="auto">{COMMENT_LABEL.dv}</div>
+                      <p className="rv-text" dir="auto">{r.comment}</p>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 }
@@ -189,9 +267,29 @@ const wrCss = () => `
   .wr-workshop { font-weight: 600; color: ${TP.navy}; }
   .wr-pick { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: ${TP.secondaryText}; }
   .wr-total { font-weight: 700; color: ${TP.navy}; }
-  .wr-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 18px 24px; }
+  .wr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+  .wr-stat { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; }
+  .wr-stat span { font-size: 13px; color: ${TP.secondaryText}; font-weight: 600; }
+  .wr-stat b { font-size: 26px; color: ${TP.navy}; }
+  .wr-stat b.wr-stat-when { font-size: 16px; }
+  .wr-stat small { font-size: 12px; color: ${TP.secondaryText}; }
+  .wr-section { display: flex; flex-direction: column; gap: 14px; }
+  .wr-h3 { margin: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-direction: row-reverse; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid ${TP.border}; }
+  .wr-h3 span { font-size: 19px; font-weight: 400; color: ${TP.navy}; }
+  .wr-h3 small { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: ${TP.secondaryText}; }
+  .wr-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 20px 28px; }
   .wr-tally { display: flex; flex-direction: column; gap: 8px; }
-  .wr-tally-label { font-size: 15px; color: ${TP.navy}; text-align: right; }
+  .wr-tally-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-direction: row-reverse; }
+  .wr-tally-label { font-size: 15px; color: ${TP.navy}; text-align: right; line-height: 1.8; }
+  .wr-tally-en { font-size: 12px; color: ${TP.secondaryText}; }
+  .wr-counts em { font-style: normal; color: ${TP.secondaryText}; }
+  .wr-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; }
+  .wr-written { display: flex; flex-direction: column; gap: 12px; }
+  .wr-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; counter-reset: w; }
+  .wr-list li { counter-increment: w; position: relative; padding: 10px 14px 8px 40px; border-radius: 10px; background: #F6FAFD; }
+  .wr-list li::before { content: counter(w); position: absolute; left: 12px; top: 11px; font-size: 12px; font-weight: 700; color: ${TP.blue}; }
+  .wr-list p { margin: 0; font-size: 15px; line-height: 1.8; color: ${TP.navy}; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .wr-list time { display: block; margin-top: 2px; font-size: 11px; color: ${TP.secondaryText}; }
   .wr-bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #EEF3F8; }
   .wr-bar span { display: block; height: 100%; }
   .wr-counts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: ${TP.secondaryText}; }
