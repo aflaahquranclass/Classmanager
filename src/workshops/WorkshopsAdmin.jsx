@@ -205,7 +205,7 @@ export function AdminWorkshops({ showToast, onCountChange }) {
           </select>
         )}
         <div className="wa-title" dir="rtl">{w.label}</div>
-        <div className="wa-meta"><bdi dir="rtl">{w.date.join(" ")}</bdi> · <bdi dir="ltr">{w.time}</bdi> · MVR {w.fee} per student · sign-up until {w.lastDay}</div>
+        <div className="wa-meta"><bdi dir="rtl">{w.date.join(" ")}</bdi> · <bdi dir="ltr">{w.time}</bdi> · MVR {w.fee} per student · {w.closed ? "sign-up closed" : `sign-up until ${w.lastDay}`}</div>
         <a className="wa-url" href={pageUrl(slug)} target="_blank" rel="noreferrer">{pageUrl(slug)}</a>
         <div className="wa-link-actions">
           <button type="button" className="tp-btn-gradient" onClick={copyLink}><Copy size={16} aria-hidden="true" /> Copy link</button>

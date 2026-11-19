@@ -14,6 +14,7 @@ export const WORKSHOPS = {
     minAge: 10,
     maxAge: 16,
     lastDay: "2026-11-19", // sign-up closes after this day (Maldives time)
+    closed: true, // sign-up closed early by the admin (also closed in the database: 20261127_close_namaadhu_signup.sql)
     label: "ފުރާވަރު ދަރިވަރުންގެ ޚާއްސަ ނަމާދު ސެޝަން",
     title: ["ނަމާދަށް އަހުލުވެރި", "ދަރިވަރު"],
     speaker: {
@@ -43,9 +44,9 @@ export const workshopSlugOf = (pathname = window.location.pathname) => {
   return m && WORKSHOPS[m[1]] ? m[1] : "";
 };
 
-// Still taking sign-ups (Maldives date).
+// Still taking sign-ups: not closed, and not past the last day (Maldives date).
 export const isWorkshopOpen = (w) =>
-  new Date().toLocaleDateString("en-CA", { timeZone: "Indian/Maldives" }) <= w.lastDay;
+  !w.closed && new Date().toLocaleDateString("en-CA", { timeZone: "Indian/Maldives" }) <= w.lastDay;
 
 // Same private bucket and rules as class registration slips.
 const BUCKET = "registration-slips";
