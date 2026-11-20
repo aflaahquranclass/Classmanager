@@ -16,7 +16,6 @@ export const PRODUCTS = {
     // On the store page (English and Dhivehi, see siteStrings.js) and the order page.
     name: { en: "Letter card set (PDF)", dv: "އަކުރު ކާޑު ސެޓް" },
     format: "PDF",
-    title: ["އަކުރު ކާޑު", "ސެޓް"], // the order page heading
     points: [
       "އަކުރުގެ ބައްޓަން: ކަލިމައިގެ ފެށޭއިރު، މެދުތެރޭގައި، ނިމޭއިރު",
       "ފިލި ޖަހައިގެން ކިޔުން",
@@ -40,7 +39,7 @@ export const productSlugOf = (pathname = window.location.pathname) => {
   return m && PRODUCTS[m[1]] ? m[1] : "";
 };
 
-// order: { buyerName, studentName, studentAge, address, viber }. Uploads the
+// order: { buyerName, address, viber }. Uploads the
 // slip under new/, then files the order. The visitor can't read either back;
 // only admins can.
 export async function submitStoreOrder({ product, order, agreed, file: picked }) {
@@ -54,8 +53,6 @@ export async function submitStoreOrder({ product, order, agreed, file: picked })
     p_product: product,
     p_order: {
       buyer_name: order.buyerName.trim(),
-      student_name: order.studentName.trim(),
-      student_age: Number(order.studentAge),
       address: order.address.trim(),
       viber: order.viber.trim(),
     },

@@ -1,6 +1,6 @@
 // Admin → Store: orders sent through the store's order pages (/store/<slug>,
-// e.g. the Huroof letter card set PDF). Each order has the buyer, the student's
-// name and age, address, Viber number, when they agreed not to share the PDF,
+// e.g. the Huroof letter card set PDF). Each order has the buyer's name,
+// address, Viber number, when they agreed not to share the PDF,
 // and the transfer slip, which the admin opens here to check. Accepting only
 // records the decision; the admin then sends the PDF on Viber (the Viber
 // button opens the chat) and can send the product's message by SMS. Saved in
@@ -131,7 +131,7 @@ export function AdminStoreOrders({ showToast, onCountChange }) {
 
   const term = search.trim().toLowerCase();
   const shown = rows.filter((r) => (filter === "all" || r.status === filter) && (!term ||
-    [r.buyer_name, r.student_name, r.address, r.viber].some((x) => String(x || "").toLowerCase().includes(term))));
+    [r.buyer_name, r.address, r.viber].some((x) => String(x || "").toLowerCase().includes(term))));
 
   const copyNumbers = async () => {
     const nums = [...new Set(rows.filter((r) => r.status === "accepted").map((r) => r.viber))];
@@ -143,10 +143,10 @@ export function AdminStoreOrders({ showToast, onCountChange }) {
 
   const downloadList = () => {
     const cell = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const head = ["Status", "Buyer", "Student", "Age", "Address", "Viber", "Price (MVR)", "Agreed not to share", "Ordered", "SMS"];
+    const head = ["Status", "Buyer", "Address", "Viber", "Price (MVR)", "Agreed not to share", "Ordered", "SMS"];
     const when = (iso) => new Date(iso).toLocaleString("en-GB", { timeZone: "Indian/Maldives" });
     const lines = rows.map((r) => [
-      STATUS[r.status].label, r.buyer_name, r.student_name, r.student_age, r.address, r.viber, r.price,
+      STATUS[r.status].label, r.buyer_name, r.address, r.viber, r.price,
       when(r.agreed_at), when(r.created_at), sentAt[msgTag(r.id)]?.status || "",
     ].map(cell).join(","));
     const blob = new Blob(["﻿" + [head.map(cell).join(","), ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
@@ -243,11 +243,13 @@ export function AdminStoreOrders({ showToast, onCountChange }) {
                     <a href={viberLink(r.viber)}>Viber {r.viber}</a>
                   </div>
                 </li>
-                <li>
-                  <div className="so-who">Student</div>
-                  <div className="wa-name" dir="auto">{r.student_name}</div>
-                  <div className="wa-facts"><span>Age {r.student_age}</span></div>
-                </li>
+                {r.student_name && (
+                  <li>
+                    <div className="so-who">Student</div>
+                    <div className="wa-name" dir="auto">{r.student_name}</div>
+                    <div className="wa-facts"><span>Age {r.student_age}</span></div>
+                  </li>
+                )}
               </ol>
               <div className="so-agreed"><ShieldCheck size={15} aria-hidden="true" /> Agreed not to share the PDF · {fmtWhen(r.agreed_at)}</div>
               <div className="wa-sent">Ordered {fmtWhen(r.created_at)}{r.reviewed_at ? ` · checked ${fmtWhen(r.reviewed_at)}` : ""}</div>

@@ -1,8 +1,8 @@
 // A store product's order page (aflaahqc.com/store/<slug>, e.g. /store/huroof),
-// all in Dhivehi and styled like the workshop sign-up pages. Three steps: the
-// product with its poster and price, then the buyer's details (their name, the
-// student's name and age, permanent address, Viber number) and the promise not
-// to share the PDF, then the bank transfer and the slip. The admin checks the
+// all in Dhivehi and styled like the workshop sign-up pages.
+// Four steps: the product with its poster and price, the buyer's details
+// (name, permanent address, Viber number), the promise not to share the PDF,
+// then the bank transfer and the slip. The admin checks the
 // slip under Admin → Store and sends the PDF on Viber. Products are listed in
 // products.js.
 
@@ -13,7 +13,7 @@ import { SLIP_ACCEPT, SLIP_PICK_MAX_BYTES } from "../workshops/workshops.js";
 import { CSS as WK_CSS, CopyButton } from "../workshops/WorkshopPage.jsx";
 import { PRODUCTS, productSlugOf, submitStoreOrder } from "./products.js";
 
-const EMPTY = { buyerName: "", studentName: "", studentAge: "", address: "", viber: "" };
+const EMPTY = { buyerName: "", address: "", viber: "" };
 
 const ERRORS = {
   slip: "ސްލިޕް އަޕްލޯޑް ނުކުރެވުނު. ފައިލް ބައްލަވާފައި އަލުން މަސައްކަތް ކުރައްވާ.",
@@ -33,9 +33,6 @@ const AGREEMENT = "މި PDF ފައިލް ގަންނަނީ ހަމައެކަނި �
 function detailErrors(o) {
   const e = {};
   if (o.buyerName.trim().length < 2) e.buyerName = "ފުރިހަމަ ނަން ލިޔުއްވާ.";
-  if (o.studentName.trim().length < 2) e.studentName = "ދަރިވަރުގެ ނަން ލިޔުއްވާ.";
-  const age = Number(o.studentAge);
-  if (!/^\d{1,2}$/.test(String(o.studentAge).trim()) || age < 1 || age > 99) e.studentAge = "ދަރިވަރުގެ ޢުމުރު ލިޔުއްވާ.";
   if (o.address.trim().length < 2) e.address = "ދާއިމީ އެޑްރެސް ލިޔުއްވާ.";
   if (!/^[+0-9 -]{7,20}$/.test(o.viber.trim())) e.viber = "ވައިބަރ ނަންބަރު ރަނގަޅަށް ލިޔުއްވާ.";
   return e;
@@ -53,17 +50,10 @@ function Field({ label, error, children }) {
   );
 }
 
-function Hero({ p, compact }) {
-  return (
-    <header className={`wk-hero ${compact ? "compact" : ""}`}>
-      <div className="wk-top">
-        <div className="wk-label">ފިހާރަ · <span dir="ltr">{p.format}</span></div>
-        <img className="wk-logo" src="/images/logo-full-color.png" alt="Aflaah Quran Class" />
-      </div>
-      <h1 className="wk-title"><span className="t1">{p.title[0]}</span> <span className="t2">{p.title[1]}</span></h1>
-    </header>
-  );
-}
+// The form steps start with the logo only; the first step's poster has its own.
+const LogoBar = () => (
+  <header className="so-top"><img className="wk-logo" src="/images/logo-full-color.png" alt="Aflaah Quran Class" /></header>
+);
 
 export default function OrderPage() {
   const slug = productSlugOf();
@@ -75,12 +65,12 @@ export default function OrderPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
-  // 0 = the product, 1 = details and agreement, 2 = payment and slip
+  // 0 = the product, 1 = details, 2 = agreement, 3 = payment and slip
   const [step, setStep] = useState(0);
   const go = (n) => { setStep(n); setError(""); window.scrollTo({ top: 0 }); };
 
   if (!p) {
-    return <div className="wk" dir="rtl" lang="dv"><style>{WK_CSS + CSS}</style><main className="wk-wrap"><p className="wk-msg">މި ތަކެތި ނުފެނުނު.</p></main></div>;
+    return <div className="wk so" dir="rtl" lang="dv"><style>{WK_CSS + CSS}</style><main className="wk-wrap"><p className="wk-msg">މި ތަކެތި ނުފެނުނު.</p></main></div>;
   }
 
   const edit = (key, value) => {
@@ -95,14 +85,18 @@ export default function OrderPage() {
     setFile(f);
   };
 
-  const toPayment = (e) => {
+  const toAgreement = (e) => {
     e.preventDefault();
     const found = detailErrors(order);
     setErrors(found);
     const first = Object.keys(found)[0];
     if (first) { document.getElementById(`so-${first}`)?.focus(); return; }
-    if (!agreed) { setError(ERRORS.agree); return; }
     go(2);
+  };
+  const toPayment = (e) => {
+    e.preventDefault();
+    if (!agreed) { setError(ERRORS.agree); return; }
+    go(3);
   };
 
   const submit = async (e) => {
@@ -125,10 +119,10 @@ export default function OrderPage() {
   );
 
   return (
-    <div className="wk" dir="rtl" lang="dv">
+    <div className="wk so" dir="rtl" lang="dv">
       <style>{WK_CSS + CSS}</style>
       <main className="wk-wrap">
-        {!sent && <Hero p={p} compact={step > 0} />}
+        {!sent && step > 0 && <LogoBar />}
 
         {sent ? (
           <section className="wk-card wk-done wk-sent" aria-live="polite">
@@ -159,21 +153,24 @@ export default function OrderPage() {
         ) : (
           <>
             <ol className="wk-steps" aria-label="ބައިތައް">
-              <li className={step === 1 ? "on" : "done"}><span><Num>1</Num></span>މަޢުލޫމާތު</li>
-              <li className={step === 2 ? "on" : ""}><span><Num>2</Num></span>ފައިސާ ދެއްކުން</li>
+              {["މަޢުލޫމާތު", "އެއްބަސްވުން", "ފައިސާ ދެއްކުން"].map((label, i) => (
+                <li key={label} className={step === i + 1 ? "on" : step > i + 1 ? "done" : ""}><span><Num>{i + 1}</Num></span>{label}</li>
+              ))}
             </ol>
 
             {step === 1 ? (
-              <form className="wk-card" onSubmit={toPayment} noValidate>
+              <form className="wk-card" onSubmit={toAgreement} noValidate>
                 <h2 className="wk-h2">ގަންނަ ފަރާތުގެ މަޢުލޫމާތު</h2>
                 <Field label="ގަންނަ ފަރާތުގެ ފުރިހަމަ ނަން" error={errors.buyerName}>{input("buyerName", { maxLength: 80 })}</Field>
                 <Field label="ދާއިމީ އެޑްރެސް" error={errors.address}>{input("address", { maxLength: 120, placeholder: "ގޭގެ ނަން، ރަށް" })}</Field>
                 <Field label="ވައިބަރ ނަންބަރު (PDF ފޮނުވާނީ މި ނަންބަރަށް)" error={errors.viber}>{input("viber", { type: "tel", inputMode: "tel", dir: "ltr", maxLength: 20, placeholder: "7xxxxxx", autoComplete: "tel" })}</Field>
-
-                <h2 className="wk-h2">ދަރިވަރުގެ މަޢުލޫމާތު</h2>
-                <Field label="ދަރިވަރުގެ ފުރިހަމަ ނަން" error={errors.studentName}>{input("studentName", { maxLength: 80 })}</Field>
-                <Field label="ދަރިވަރުގެ ޢުމުރު" error={errors.studentAge}>{input("studentAge", { type: "number", inputMode: "numeric", dir: "ltr", min: 1, max: 99 })}</Field>
-
+                <div className="wk-nav">
+                  <button type="button" className="wk-back" onClick={() => go(0)}><ArrowRight size={18} aria-hidden="true" />ފަހަތަށް</button>
+                  <button type="submit" className="wk-submit">ކުރިއަށް <ArrowLeft size={18} aria-hidden="true" /></button>
+                </div>
+              </form>
+            ) : step === 2 ? (
+              <form className="wk-card" onSubmit={toPayment} noValidate>
                 <h2 className="wk-h2">އެއްބަސްވުން</h2>
                 <div className={`so-agree ${error === ERRORS.agree ? "bad" : ""}`}>
                   <p><ShieldCheck size={20} aria-hidden="true" />{AGREEMENT}</p>
@@ -185,7 +182,7 @@ export default function OrderPage() {
 
                 {error && <p className="wk-error" role="alert">{error}</p>}
                 <div className="wk-nav">
-                  <button type="button" className="wk-back" onClick={() => go(0)}><ArrowRight size={18} aria-hidden="true" />ފަހަތަށް</button>
+                  <button type="button" className="wk-back" onClick={() => go(1)}><ArrowRight size={18} aria-hidden="true" />ފަހަތަށް</button>
                   <button type="submit" className="wk-submit">ކުރިއަށް <ArrowLeft size={18} aria-hidden="true" /></button>
                 </div>
               </form>
@@ -217,7 +214,7 @@ export default function OrderPage() {
 
                 {error && <p className="wk-error" role="alert">{error}</p>}
                 <div className="wk-nav">
-                  <button type="button" className="wk-back" onClick={() => go(1)} disabled={busy}><ArrowRight size={18} aria-hidden="true" />ފަހަތަށް</button>
+                  <button type="button" className="wk-back" onClick={() => go(2)} disabled={busy}><ArrowRight size={18} aria-hidden="true" />ފަހަތަށް</button>
                   <button type="submit" className="wk-submit" disabled={busy}>
                     <Send size={18} aria-hidden="true" />{busy ? "ފޮނުވަނީ…" : "ފޮނުވާ"}
                   </button>
@@ -232,7 +229,11 @@ export default function OrderPage() {
 }
 
 const CSS = `
-  .so-poster { display: block; width: 100%; margin-top: 16px; border-radius: 22px; border: 1px solid var(--line); box-shadow: 0 14px 34px rgba(18,59,103,.14); }
+  /* Plain background, no pattern. */
+  .wk.so { background: linear-gradient(180deg, #FFFFFF 0%, #F3F8FC 100%); }
+  .so-top { display: flex; justify-content: flex-end; }
+  .so-top .wk-logo { width: 56px; }
+  .so-poster { display: block; width: 100%; margin-top: 2px; border-radius: 22px; border: 1px solid var(--line); box-shadow: 0 14px 34px rgba(18,59,103,.14); }
   .so-buy { margin-top: 16px; }
   .so-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
   .so-name { display: flex; align-items: center; gap: 8px; font: 400 22px/1.5 Aammu; color: var(--navy); }
