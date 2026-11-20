@@ -35,7 +35,7 @@ function studentError(s, w) {
 
 const Num = ({ children }) => <span className="wk-num" dir="ltr">{children}</span>;
 
-function CopyButton({ text }) {
+export function CopyButton({ text }) {
   const [done, setDone] = useState(false);
   const copy = async () => {
     try {
@@ -280,7 +280,7 @@ export default function WorkshopPage() {
   );
 }
 
-const CSS = `
+export const CSS = `
   @font-face { font-family: "Aammu"; src: url("/fonts/MV_AammuFK_Regular.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
   @font-face { font-family: "Faruma"; src: url("/fonts/Faruma.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
   .wk { --navy: #123B67; --deep: #0D4F85; --blue: #176FD1; --teal: #0A94B1; --cyan: #22D3E0; --soft: #EEF6FA; --line: #C7DDF4; --muted: #567493;

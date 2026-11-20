@@ -8,7 +8,7 @@
 // pages are still English only.
 
 import { supabase } from "../supabaseClient.js";
-import { WHY, BOOKS, BOOK_CATEGORIES, HERO, CONTACT } from "./content.js";
+import { WHY, HERO, CONTACT } from "./content.js";
 import { CATEGORIES } from "../registrations/registrations.js";
 
 // Dhivehi of the items listed in content.js and registrations.js, by their key.
@@ -22,15 +22,6 @@ const CLASS_DV = {
   hifz: "ދުވަހުގެ ޕްލޭނަކާއި މުރާޖަޢާއާއެކު ޤުރުއާން ހިފްޒުކުރައްވާ.",
   foundation: "އަކުރުތަކާއި ކަލިމަތަކުން ފަށައިގެން ކިޔެވުން ދަސްކުރައްވާ.",
 };
-const BOOK_DV = {
-  qaida: "ނޫރާނީ ޤާޢިދާ",
-  "tajweed-guide": "ތަޖްވީދު ގައިޑް",
-  "mushaf-hafs": "މުޞްޙަފު (ޙަފްޞް)",
-  "juz-amma": "ޖުޒު ޢައްމަ ވޯކްބުކް",
-  "pocket-mushaf": "ޖީބު މުޞްޙަފު",
-  "duas-kids": "ކުޑަކުދިންނަށް ދުވަހުގެ ދުޢާތައް",
-};
-const BOOK_CATEGORY_DV = { All: "ހުރިހާ", Qaida: "ޤާޢިދާ", Mushaf: "މުޞްޙަފު", Tajweed: "ތަޖްވީދު", Kids: "ކުޑަކުދިން" };
 
 // group: heading the phrase is listed under in Admin → Language → Website.
 const s = (group, key, en, dv) => ({ key, group, en, dv });
@@ -56,7 +47,7 @@ export const SITE_STRINGS = [
   s("Menu and footer", "foot.contact", "Contact", "ގުޅުއްވުމަށް"),
   s("Menu and footer", "foot.explore", "Explore", "ބައްލަވާ"),
   s("Menu and footer", "foot.registerClass", "Register for a class", "ކުލާހަކަށް ރަޖިސްޓަރީ ކުރައްވާ"),
-  s("Menu and footer", "foot.bookStore", "Book store", "ފޮތް ފިހާރަ"),
+  s("Menu and footer", "foot.bookStore", "Store", "ފިހާރަ"),
   s("Menu and footer", "foot.rules", "Rules and regulations", "ޤަވާޢިދުތައް"),
   s("Menu and footer", "foot.signIn", "Sign in", "ލޮގިން"),
   s("Menu and footer", "foot.install", "Install the app", "އެޕް އިންސްޓޯލް ކުރައްވާ"),
@@ -103,12 +94,14 @@ export const SITE_STRINGS = [
     s("Why Aflaah", `why.${w.icon}.text`, w.text, WHY_DV[w.icon]?.text || ""),
   ]),
 
-  s("Book store", "store.tag", "Book store", "ފޮތް ފިހާރަ"),
-  s("Book store", "store.title", "Books for every level", "ކޮންމެ ފެންވަރަކަށް ފޮތް"),
-  s("Book store", "store.lead", "The books we use in class, from the first letters to the full mushaf.", "ފުރަތަމަ އަކުރުތަކުން ފެށިގެން ފުރިހަމަ މުޞްޙަފާ ހަމައަށް، ކުލާހުގައި ބޭނުންކުރާ ފޮތްތައް."),
-  s("Book store", "store.viewAll", "View all books", "ހުރިހާ ފޮތެއް ބައްލަވާ"),
-  ...BOOKS.map((b) => s("Book store", `book.${b.id}`, b.title, BOOK_DV[b.id] || "")),
-  ...BOOK_CATEGORIES.map((c) => s("Book store", `bookCat.${c}`, c, BOOK_CATEGORY_DV[c] || "")),
+  s("Book store", "store.tag", "Store", "ފިހާރަ"),
+  s("Book store", "store.title", "Learn at home", "ގޭގައި ދަސްކުރުމަށް"),
+  s("Book store", "store.lead", "Made by our teachers. Pay online and we send it to you on Viber.", "އަހަރެމެންގެ މުދައްރިސުން ތައްޔާރުކުރި ތަކެތި. އޮންލައިންކޮށް ފައިސާ ދެއްކެވުމުން ވައިބަރ އިން ފޮނުވައިދެވޭނެ."),
+  s("Book store", "store.viewAll", "Visit the store", "ފިހާރައަށް ވަޑައިގަންނަވާ"),
+  s("Book store", "store.payNow", "Pay now", "ފައިސާ ދައްކާ"),
+  s("Book store", "product.huroof.name", "Letter card set (PDF)", "އަކުރު ކާޑު ސެޓް (PDF)"),
+  s("Book store", "product.huroof.text", "Printable cards for learning each letter's shape at the start, middle and end of a word, and reading it with harakaat.", "ކަލިމައިގެ ފެށޭއިރު، މެދުތެރޭގައި އަދި ނިމޭއިރު އަކުރުގެ ބައްޓަން، އަދި ފިލި ޖަހައިގެން ކިޔުން ދަސްކުރުމަށް ޕްރިންޓްކުރެވޭ ކާޑުތައް."),
+  s("Book store", "product.huroof.bonus", "Comes with a free special session on teaching the letters!", "އަކުރު ކާޑު ސެޓާއެކު އަކުރުގެ ދަސްކޮށްދިނުމާ ގުޅޭ ޚާއްސަ ސެޝަނެއް ހިލޭ!"),
 
   s("Sample portal screens", "show.label", "What students and parents get", "ދަރިވަރުންނާއި ބެލެނިވެރިންނަށް ލިބޭ ޚިދުމަތްތައް"),
   s("Sample portal screens", "show.dot", "Show {name}", "{name} ދައްކާ"),

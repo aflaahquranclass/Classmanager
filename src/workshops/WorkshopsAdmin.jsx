@@ -301,7 +301,7 @@ export function AdminWorkshops({ showToast, onCountChange }) {
   );
 }
 
-const waCss = () => `
+export const waCss = () => `
   .wa-wrap { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 16px; }
   .wa-wrap [dir="auto"], .wa-wrap [dir="rtl"] { font-family: ${THAANA_FONT}; }
   .wa-meta bdi[dir="ltr"] { font-family: inherit; }

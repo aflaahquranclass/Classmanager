@@ -22,6 +22,7 @@ function usePendingCount(table, enabled) {
 }
 
 export const usePendingWorkshopCount = (enabled) => usePendingCount("workshop_registrations", enabled);
+export const usePendingStoreOrderCount = (enabled) => usePendingCount("store_orders", enabled);
 export const usePendingHifzTestCount = (enabled) => usePendingCount("hifz_test_registrations", enabled);
 export const usePendingSlipCount = (enabled) => usePendingCount("payment_slips", enabled);
 export const usePendingReviewCount = (enabled) => usePendingCount("reviews", enabled);

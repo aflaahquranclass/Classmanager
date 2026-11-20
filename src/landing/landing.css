@@ -270,6 +270,24 @@
 .ld-book-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; }
 .ld-book-foot .ld-price { margin: 0; }
 .ld-price { color: var(--muted); font-size: 14px; margin-bottom: 12px; }
+/* Store products: the poster beside the details, a Pay now button. */
+.ld-products { display: grid; gap: 24px; margin: 32px auto 0; max-width: 980px; }
+.ld-product { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: center; padding: 18px; }
+.ld-product-img { display: block; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+.ld-product-img img { display: block; width: 100%; height: auto; }
+.ld-product-body h3 { margin: 0 0 10px; font-size: clamp(22px, 2.4vw, 30px); font-family: var(--serif); }
+.ld-card .ld-product-text { font-size: 16px; line-height: 1.7; }
+.ld-card .ld-product-bonus { display: flex; align-items: flex-start; gap: 8px; padding: 10px 14px; border-radius: 12px; background: #FFF6E5; border: 1px solid #F6D7A0; color: var(--navy); font-size: 15px; font-weight: 600; }
+.ld-product-bonus svg { flex-shrink: 0; margin-top: 2px; color: #C77700; }
+.ld-product-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+.ld-product-price { font: 800 clamp(26px, 2.6vw, 34px)/1 Inter, system-ui, sans-serif; color: var(--navy); }
+.ld-product-foot .ld-btn { min-height: 50px; padding: 0 26px; font-size: 16px; }
+@media (max-width: 760px) {
+  .ld-product { grid-template-columns: minmax(0, 1fr); gap: 16px; padding: 12px; }
+  .ld-product-foot .ld-btn { flex: 1; justify-content: center; }
+}
+.ld[lang="dv"] .ld-product-body h3 { font-family: Aammu, Faruma, serif; font-weight: 400; line-height: 1.5; }
+.ld[lang="dv"] .ld-product-text { line-height: 1.9; }
 
 
 /* Rules page */

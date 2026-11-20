@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
-import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus, Bell, Star, BookOpenCheck, Quote, Megaphone, CalendarCheck } from "lucide-react";
+import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus, Bell, Star, BookOpenCheck, Quote, Megaphone, CalendarCheck, ShoppingBag } from "lucide-react";
 import { supabase } from "./supabaseClient.js";
 import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL, TP_PATTERN_SIDEBAR_URL, TP_PATTERN_MAIN_URL, MONTH_NAMES, monthLabel, shiftMonth, fmtMoney, SearchableSelect } from "./shared.jsx";
 import { PORTAL } from "./portal.js";
@@ -12,7 +12,7 @@ import { dhivehiRemarks } from "./exams/dhivehiRemarks.js";
 import { useRemarkLanguage, RemarkLanguageSwitch, RemarkInput } from "./exams/DhivehiInput.jsx";
 import { REPORT_LANGUAGES, loadReportOverrides, reportTranslator } from "./exams/reportStrings.js";
 import { NotificationBell } from "./notifications/NotificationBell.jsx";
-import { usePendingWorkshopCount, usePendingHifzTestCount, usePendingSlipCount, usePendingReviewCount, usePendingRegistrationCount, usePendingInfoCount, useSalaryAdjustments, salaryExtrasTotal } from "./admin/adminData.js";
+import { usePendingWorkshopCount, usePendingStoreOrderCount, usePendingHifzTestCount, usePendingSlipCount, usePendingReviewCount, usePendingRegistrationCount, usePendingInfoCount, useSalaryAdjustments, salaryExtrasTotal } from "./admin/adminData.js";
 import { sendWelcomeOnAdd, sendPortalLogin } from "./notifications/smsSend.js";
 import { ProgramPicker, inProgramSection, classProgram } from "./thilawa/programs.jsx";
 import { hideSplash, LogoLoader } from "./splash.jsx";
@@ -37,6 +37,7 @@ const AdminLanguage = lazyTab(() => import("./LanguageAdmin.jsx"), "AdminLanguag
 const AdminMotivation = lazyTab(() => import("./MotivationAdmin.jsx"), "AdminMotivation");
 const AdminMarketing = lazyTab(() => import("./marketing/MarketingAdmin.jsx"), "AdminMarketing");
 const AdminWorkshops = lazyTab(() => import("./workshops/WorkshopsAdmin.jsx"), "AdminWorkshops");
+const AdminStoreOrders = lazyTab(() => import("./store/StoreOrdersAdmin.jsx"), "AdminStoreOrders");
 const AdminNotifications = lazyTab(() => import("./notifications/NotificationsAdmin.jsx"), "AdminNotifications");
 const AdminPaymentSlips = lazyTab(() => import("./payments/PaymentSlipsAdmin.jsx"), "AdminPaymentSlips");
 const SalarySheets = lazyTab(() => import("./payments/SalarySheets.jsx"), "SalarySheets");
@@ -1015,6 +1016,7 @@ export default function App() {
   const [pendingSlips, reloadPendingSlips] = usePendingSlipCount(authView === "app" && role === "admin");
   const [pendingReviews, reloadPendingReviews] = usePendingReviewCount(authView === "app" && role === "admin");
   const [pendingWorkshops, reloadPendingWorkshops] = usePendingWorkshopCount(authView === "app" && role === "admin");
+  const [pendingStoreOrders, reloadPendingStoreOrders] = usePendingStoreOrderCount(authView === "app" && role === "admin");
   const [pendingHifzTests, reloadPendingHifzTests] = usePendingHifzTestCount(authView === "app" && role === "admin");
   const [pendingRegistrations, reloadPendingRegistrations] = usePendingRegistrationCount(authView === "app" && role === "admin");
   const [pendingInfo, reloadPendingInfo] = usePendingInfoCount(authView === "app" && role === "admin");
@@ -4596,6 +4598,7 @@ export default function App() {
           { key: "registrations", label: pendingRegistrations + pendingInfo + pendingHifzTests > 0 ? `Registrations (${pendingRegistrations + pendingInfo + pendingHifzTests})` : "Registrations", icon: UserPlus, onClick: () => setSection("registrations") },
           { key: "reviews", label: pendingReviews > 0 ? `Reviews (${pendingReviews})` : "Reviews", icon: Star, onClick: () => setSection("reviews") },
           { key: "workshops", label: pendingWorkshops > 0 ? `Workshops (${pendingWorkshops})` : "Workshops", icon: CalendarCheck, onClick: () => setSection("workshops") },
+          { key: "store", label: pendingStoreOrders > 0 ? `Store (${pendingStoreOrders})` : "Store", icon: ShoppingBag, onClick: () => setSection("store") },
           { key: "language", label: "Language", icon: Languages, onClick: () => setSection("language") },
           { key: "motivation", label: "Motivation", icon: Quote, onClick: () => setSection("motivation") },
           { key: "marketing", label: "Social Media", icon: Megaphone, onClick: () => setSection("marketing") },
@@ -6449,6 +6452,7 @@ export default function App() {
               {section === "motivation" && role === "admin" && <AdminMotivation showToast={showToast} />}
               {section === "marketing" && role === "admin" && <AdminMarketing showToast={showToast} />}
               {section === "workshops" && role === "admin" && <AdminWorkshops showToast={showToast} onCountChange={reloadPendingWorkshops} />}
+              {section === "store" && role === "admin" && <AdminStoreOrders showToast={showToast} onCountChange={reloadPendingStoreOrders} />}
 
               {section === "notifications" && role === "admin" && <AdminNotifications key={notificationsTab} students={students} teachers={teachers} classes={classes} showToast={showToast} initialTab={notificationsTab} />}
 

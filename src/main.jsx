@@ -36,13 +36,16 @@ const readingTest = window.location.pathname === "/reading-test";
 // Workshop sign-up pages (/workshop/<slug>, e.g. /workshop/namaadhu): loaded only when opened.
 const WorkshopPage = lazy(() => import("./workshops/WorkshopPage.jsx"));
 const workshopPage = !PORTAL && /^\/workshop\/[a-z0-9-]+\/?$/.test(window.location.pathname);
+// Store order pages (/store/<product>, e.g. /store/huroof): loaded only when opened.
+const OrderPage = lazy(() => import("./store/OrderPage.jsx"));
+const orderPage = !PORTAL && /^\/store\/[a-z0-9-]+\/?$/.test(window.location.pathname);
 // Teachers Portal demo on localhost (?portal=teacher&demo=1): sample data, no sign-in.
 const TeacherDemo = lazy(() => import("./TeacherDemo.jsx"));
 const teacherDemo = LOCAL && PORTAL === "teacher" && new URLSearchParams(window.location.search).get("demo") === "1";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : workshopPage ? <Suspense fallback={null}><WorkshopPage /><SplashDone /></Suspense> : teacherDemo ? <Suspense fallback={null}><TeacherDemo /></Suspense> : oldStaffLogin ? null : studentInstall ? <Suspense fallback={null}><StudentInstall /></Suspense> : PORTAL === "student" ? <Suspense fallback={null}><StudentPortal /></Suspense> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <Suspense fallback={null}><App /></Suspense>}
+    {readingTest ? <Suspense fallback={null}><ReadingTest /><SplashDone /></Suspense> : workshopPage ? <Suspense fallback={null}><WorkshopPage /><SplashDone /></Suspense> : orderPage ? <Suspense fallback={null}><OrderPage /><SplashDone /></Suspense> : teacherDemo ? <Suspense fallback={null}><TeacherDemo /></Suspense> : oldStaffLogin ? null : studentInstall ? <Suspense fallback={null}><StudentInstall /></Suspense> : PORTAL === "student" ? <Suspense fallback={null}><StudentPortal /></Suspense> : showLanding ? <Suspense fallback={null}><Landing /><SplashDone /></Suspense> : <Suspense fallback={null}><App /></Suspense>}
     <ConfirmHost />
   </React.StrictMode>
 );

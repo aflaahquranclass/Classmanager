@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ArrowRight, Flame, ListChecks, FileText, UserRound } from "lucide-react";
-import { HERO, WHY, BOOKS, SHOW } from "./content.js";
+import { HERO, WHY, SHOW } from "./content.js";
+import { PRODUCT_LIST, ProductCard } from "./StorePage.jsx";
 import { usePublicReviews } from "./reviews.js";
 import Showcase from "./Showcase.jsx";
 import ClassesSection from "./ClassesSection.jsx";
@@ -190,26 +191,14 @@ function StorePreview({ navigate }) {
           <h2 className="ld-h2">{t("store.title")}</h2>
           <p className="ld-lead">{t("store.lead")}</p>
         </div>
-        <div className="ld-grid ld-grid-4 ld-books">
-          {BOOKS.slice(0, 4).map((b, i) => <BookCard key={b.id} book={b} delay={i} />)}
+        <div className="ld-products">
+          {PRODUCT_LIST.map((p, i) => <ProductCard key={p.slug} product={p} delay={i} />)}
         </div>
         <div className="ld-center ld-more">
           <Link to="/store" navigate={navigate} className="ld-btn ld-btn-outline">{t("store.viewAll")} <ArrowRight size={18} aria-hidden="true" /></Link>
         </div>
       </div>
     </section>
-  );
-}
-
-export function BookCard({ book, delay = 0 }) {
-  const { t } = useLang();
-  const title = t(`book.${book.id}`);
-  return (
-    <article className={`ld-card ld-book ld-reveal ld-d${delay % 4}`}>
-      <div className="ld-cover" style={{ background: book.color }}><span>{title}</span></div>
-      <h3>{title}</h3>
-      <div className="ld-book-foot">{SHOW.prices && <span className="ld-price">MVR {book.price}</span>}<span className="ld-pill">{t(`bookCat.${book.category}`)}</span></div>
-    </article>
   );
 }
 

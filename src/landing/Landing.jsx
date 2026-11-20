@@ -22,7 +22,7 @@ import { LangProvider, LangSwitch, useLang } from "./i18n.jsx";
 const PAGES = {
   "/": "Aflaah Quran Class",
   "/hifz": "Hifz program · Aflaah Quran Class",
-  "/store": "Book store · Aflaah Quran Class",
+  "/store": "Store · Aflaah Quran Class",
   "/review": "ކުލާހާމެދު ދެކޭގޮތް · Aflaah Quran Class",
   "/workshop-review": "ވޯކްޝޮޕާމެދު ދެކޭގޮތް · Aflaah Quran Class",
   "/install": "Install the app · Aflaah Quran Class",
