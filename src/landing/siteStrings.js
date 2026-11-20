@@ -101,7 +101,7 @@ export const SITE_STRINGS = [
   s("Book store", "store.payNow", "Pay now", "ފައިސާ ދައްކާ"),
   s("Book store", "product.huroof.name", "Letter card set (PDF)", "އަކުރު ކާޑު ސެޓް (PDF)"),
   s("Book store", "product.huroof.text", "Printable cards for learning each letter's shape at the start, middle and end of a word, and reading it with harakaat.", "ކަލިމައިގެ ފެށޭއިރު، މެދުތެރޭގައި އަދި ނިމޭއިރު އަކުރުގެ ބައްޓަން، އަދި ފިލި ޖަހައިގެން ކިޔުން ދަސްކުރުމަށް ޕްރިންޓްކުރެވޭ ކާޑުތައް."),
-  s("Book store", "product.huroof.bonus", "Comes with a free special session on teaching the letters!", "އަކުރު ކާޑު ސެޓާއެކު އަކުރުގެ ދަސްކޮށްދިނުމާ ގުޅޭ ޚާއްސަ ސެޝަނެއް ހިލޭ!"),
+  s("Book store", "product.huroof.bonus", "Comes with a free special session for parents on teaching the letters!", "އަކުރު ކާޑު ސެޓާއެކު އަކުރުގެ ދަސްކޮށްދިނުމާ ގުޅޭ، ބެލެނިވެރިންނަށް ޚާއްސަ ސެޝަނެއް ހިލޭ!"),
 
   s("Sample portal screens", "show.label", "What students and parents get", "ދަރިވަރުންނާއި ބެލެނިވެރިންނަށް ލިބޭ ޚިދުމަތްތައް"),
   s("Sample portal screens", "show.dot", "Show {name}", "{name} ދައްކާ"),
