@@ -10,12 +10,11 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useBackLayer } from "./useBackNav.js";
 import { BookOpenText, RotateCw, History, CalendarDays, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronDown, AlertTriangle, X, BookOpen, Highlighter, CalendarClock, Check, Undo2, ArrowRight } from "lucide-react";
 import { TP } from "./shared.jsx";
-import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, juzStartUnit, juzEndUnit, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
-import { unitsOf, intersect } from "./hifz/engine.js";
-import { nearestAyahs } from "./hifz/ayahs.js";
+import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, pageToUnit, unitToPage, surahsOnPages, describeRange, describeAmount } from "./hifz/quran.js";
 import { ACTIVITIES, ACTIVITY_TITLES, taskPages, mistakesForTask, mistakeInTask, ayahAtLine, unitOfAyah, describeAyahs, ayahMarksOf } from "./hifz/tasks.js";
-import { SURAH_AYAH_COUNTS } from "./hifz/ayahs.js";
+import { SURAH_AYAH_COUNTS, SURAH_FIRST_AYAH, PAGE_FIRST_AYAH, TOTAL_AYAHS, ayahsInRanges, nearestAyahs } from "./hifz/ayahs.js";
 import { loadHifz } from "./hifz/taskService.js";
+import SurahSelect from "./hifz/SurahSelect.jsx";
 import MushafPage, { MushafPresent, MushafPager } from "./thilawa/MushafPage.jsx";
 import { MistakeTag } from "./thilawa/MistakeCategories.jsx";
 import { mistakeColors } from "./thilawa/engine.js";
@@ -28,18 +27,19 @@ export const ACTIVITY_INFO = {
 
 export const fmtDate = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 export const fmtDay = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
-export const surahEndPage = (i) => (i + 1 < SURAHS.length ? Math.max(SURAHS[i].startPage, SURAHS[i + 1].startPage - 1) : TOTAL_PAGES);
 // Surahs in a range, from the ayah data (accurate even when a surah starts mid-page).
 export const surahNames = (range) => {
   const { first, last } = nearestAyahs(range);
   return SURAHS.slice(first.surah - 1, last.surah).map((x) => x.name).join(", ");
 };
 
-// Surahs / juz whose pages are all memorized (page-level approximation).
+// Surahs / juz with every ayah memorized (by each ayah's place on the
+// Mushaf's lines, so a surah that starts or ends mid-page counts too).
 export function completedCounts(memorizedRanges) {
-  const covered = (r) => unitsOf(intersect([r], memorizedRanges)) === r[1] - r[0];
-  const surahs = SURAHS.filter((s, i) => covered([pageToUnit(s.startPage), pageToUnit(surahEndPage(i) + 1)])).length;
-  const juz = JUZ_START_PAGES.filter((_, i) => covered([juzStartUnit(i + 1), juzEndUnit(i + 1)])).length;
+  const known = ayahsInRanges(memorizedRanges);
+  const all = (from, to) => { for (let n = from; n <= to; n++) if (!known[n - 1]) return false; return true; };
+  const surahs = SURAHS.filter((s, i) => all(SURAH_FIRST_AYAH[i], SURAH_FIRST_AYAH[i] + SURAH_AYAH_COUNTS[i] - 1)).length;
+  const juz = JUZ_START_PAGES.filter((p, i) => all(PAGE_FIRST_AYAH[p - 1], i < 29 ? PAGE_FIRST_AYAH[JUZ_START_PAGES[i + 1] - 1] - 1 : TOTAL_AYAHS)).length;
   return { surahs, juz };
 }
 
@@ -193,7 +193,8 @@ export const HIFZ_CSS = `
   .hz-reader-title { flex: 1; min-width: 0; text-align: center; font-weight: 700; color: ${TP.navy}; font-size: 15px; }
   .hz-reader-title small { display: block; font-weight: 400; color: ${TP.secondaryText}; font-size: 13px; }
   .hz-jump { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; color: ${TP.secondaryText}; }
-  .hz-jump .hz-select { flex: 0 1 220px; min-width: 0; min-height: 38px; }
+  .hz-jump .ss { flex: 0 1 240px; }
+  .hz-jump .ss .hz-input.ss-input { flex: none; width: 100%; min-height: 38px; }
   .hz-jump .hz-input { flex: 0 0 76px; width: 76px; min-height: 38px; }
   @media (max-width: 420px) { .hz-jump > span:first-child { display: none; } }
   .hz-go { display: flex; align-items: center; gap: 6px; margin-right: auto; min-width: 0; flex: 1; }
@@ -232,7 +233,7 @@ export const HIFZ_CSS = `
   .hz-pos { display: grid; grid-template-columns: 52px minmax(150px, 2.2fr) minmax(64px, 0.8fr) minmax(70px, 0.9fr) minmax(64px, 0.8fr) auto; align-items: end; gap: 8px; }
   .hz-pos-noline { grid-template-columns: 52px minmax(150px, 2.2fr) minmax(64px, 0.8fr) minmax(70px, 0.9fr) auto; }
   .hz-pos-label { align-self: center; padding-top: 16px; font-size: 13px; font-weight: 700; color: ${TP.secondaryText}; text-transform: uppercase; letter-spacing: 0.04em; }
-  .hz-pos > label { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 11px; font-weight: 600; color: ${TP.secondaryText}; }
+  .hz-pos > label, .hz-pos > .hz-pos-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: 11px; font-weight: 600; color: ${TP.secondaryText}; }
   .hz-pos .hz-input, .hz-pos .hz-select { min-height: 42px; font-size: 15px; font-weight: 600; padding: 0 8px; }
   .hz-pos-juz { align-self: center; padding-top: 16px; font-size: 12px; font-weight: 600; color: ${TP.secondaryText}; white-space: nowrap; }
   @media (max-width: 640px) {
@@ -287,12 +288,10 @@ export function PositionPicker({ label, unit, onChange, allowLine = true, minPag
   return (
     <div className={`hz-pos ${allowLine ? "" : "hz-pos-noline"}`}>
       <span className="hz-pos-label">{label}</span>
-      <label className="hz-pos-surah-pick">
-        <span>Surah</span>
-        <select className="hz-select" aria-label={`${label}: surah`} value={here.surah} onChange={(e) => toAyah(+e.target.value, 1)}>
-          {SURAHS.map((s) => <option key={s.number} value={s.number}>{s.number}. {s.name}</option>)}
-        </select>
-      </label>
+      <div className="hz-pos-field hz-pos-surah-pick">
+        <span aria-hidden="true">Surah</span>
+        <SurahSelect ariaLabel={`${label}: surah`} value={here.surah} onChange={(n) => toAyah(n, 1)} />
+      </div>
       <label className="hz-pos-ayah">
         <span>Ayah</span>
         <select className="hz-select" aria-label={`${label}: ayah`} value={here.ayah} onChange={(e) => toAyah(here.surah, +e.target.value)}>
@@ -429,9 +428,7 @@ function PageJump({ page, onGo }) {
   return (
     <div className="hz-jump">
       <span>Go to</span>
-      <select className="hz-select" aria-label="Surah" value={surah?.number || 1} onChange={(e) => onGo(SURAHS[+e.target.value - 1].startPage)}>
-        {SURAHS.map((x) => <option key={x.number} value={x.number}>{x.number}. {x.name}</option>)}
-      </select>
+      <SurahSelect ariaLabel="Surah" value={surah?.number || 1} onChange={(n) => onGo(SURAHS[n - 1].startPage)} />
       <span>page</span>
       <input className="hz-input" type="number" inputMode="numeric" min={1} max={TOTAL_PAGES} aria-label="Page" value={text}
         onChange={(e) => setText(e.target.value)} onBlur={(e) => go(e.target.value)}
@@ -440,7 +437,7 @@ function PageJump({ page, onGo }) {
   );
 }
 
-// The day's tasks in class order (Short Muraja'ah, New Hifz, Long
+// The day's tasks in class order (New Hifz, Short Muraja'ah, Long
 // Muraja'ah) as tabs over the Mushaf: one tap goes to the next task without
 // leaving the Mushaf. done(task) → shows a tick.
 const TAB_SHORT = { short: "Short", new: "Hifz", long: "Long" };
@@ -785,7 +782,7 @@ export default function HifzTracker({ repo, onSummary }) {
     return [...main.slice(at + 1), ...main.slice(0, Math.max(0, at))].find((x) => x.id !== t.id && !x.studentDoneAt && !x.completedAt) || null;
   };
   // Finishing in the Mushaf goes straight on to the next task, still in the
-  // Mushaf (Short Muraja'ah → New Hifz → Long Muraja'ah); after the last one it closes.
+  // Mushaf (New Hifz → Short Muraja'ah → Long Muraja'ah); after the last one it closes.
   const finishFromReader = async (t) => {
     const next = nextUnfinished(t);
     await toggle(t, true);

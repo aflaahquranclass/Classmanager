@@ -81,16 +81,8 @@ export function ayahSpan(a, b = a) {
   return { first, last, fromPage: page(AYAH_START_LINE[first - 1]), toPage: page(AYAH_END_LINE[last - 1]), label };
 }
 
-// Surahs matching a search: by number prefix, or by name ignoring spaces,
-// hyphens and apostrophes ("Al-Mulk" → "almulk"; "Yaseen" and "Ya-Sin" both → "yasin").
-const searchKey = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/ee/g, "i").replace(/oo/g, "u").replace(/aa/g, "a");
-
-export function searchSurahs(query) {
-  const q = searchKey(query);
-  if (!q) return SURAHS;
-  if (/^\d+$/.test(q)) return SURAHS.filter((s) => String(s.number).startsWith(q));
-  return SURAHS.filter((s) => searchKey(s.name).includes(q));
-}
+// Surahs matching a search (kept with the surah list in hifz/quran.js).
+export { searchSurahs } from "../hifz/quran.js";
 
 // "Al-Baqarah · p. 2–5" style description of a page range.
 export function describePages(from, to) {

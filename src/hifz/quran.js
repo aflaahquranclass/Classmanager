@@ -38,6 +38,27 @@ export const SURAHS = [
   ["Al-Masad", 603], ["Al-Ikhlas", 604], ["Al-Falaq", 604], ["An-Nas", 604],
 ].map(([name, startPage], i) => ({ number: i + 1, name, startPage }));
 
+// Surahs matching a search: by number prefix, or by name ignoring spaces,
+// hyphens and apostrophes ("Al-Mulk" → "almulk"; "Yaseen" and "Ya-Sin" both
+// → "yasin"), so "mulk", "al mulk" and "67" all find Al-Mulk. The closest
+// names come first: the whole name ("nas" → An-Nas before An-Nasr), then
+// names that start with it, then the rest in Quran order.
+const searchKey = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "").replace(/ee/g, "i").replace(/oo/g, "u").replace(/aa/g, "a");
+const SURAH_KEYS = SURAHS.map((s) => [searchKey(s.name), searchKey(s.name.replace(/^[A-Za-z]{1,3}-/, ""))]);
+
+export function searchSurahs(query) {
+  const q = searchKey(query || "");
+  if (!q) return SURAHS;
+  if (/^\d+$/.test(q)) return SURAHS.filter((s) => String(s.number).startsWith(q));
+  const rank = (i) => {
+    const [full, core] = SURAH_KEYS[i];
+    if (full === q || core === q) return 0;
+    if (full.startsWith(q) || core.startsWith(q)) return 1;
+    return full.includes(q) ? 2 : -1;
+  };
+  return SURAHS.map((s, i) => [s, rank(i)]).filter(([, r]) => r >= 0).sort((a, b) => a[1] - b[1] || a[0].number - b[0].number).map(([s]) => s);
+}
+
 export const JUZ_START_PAGES = [
   1, 22, 42, 62, 82, 102, 121, 142, 162, 182, 201, 222, 242, 262, 282,
   302, 322, 342, 362, 382, 402, 422, 442, 462, 482, 502, 522, 542, 562, 582,

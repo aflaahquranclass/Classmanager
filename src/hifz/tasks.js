@@ -23,13 +23,14 @@
 
 import { TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, unitToPage, pageToUnit } from "./quran.js";
 import { unitsOf, union, intersect, subtract, toSet, computeStreak, localDate, addDays, memorizedAll, newHifzSequence, positionIn, takeFirst } from "./engine.js";
-import { juzOfPage, juzEndUnit, JUZ_START_PAGES } from "./quran.js";
+import { juzOfPage, juzEndUnit, JUZ_START_PAGES, wholeJuz } from "./quran.js";
 import { countAyahs, TOTAL_AYAHS, ayahRef, SURAH_AYAH_COUNTS } from "./ayahs.js";
 import { AYAH_START_LINE, AYAH_END_LINE, AYAH_START_POS, AYAH_END_POS } from "./ayahLines.js";
 import { SURAHS } from "./quran.js";
 
-// In class order: Short Muraja'ah first, then New Hifz, then Long Muraja'ah.
-export const ACTIVITIES = ["short", "new", "long"];
+// In class order: New Hifz first, then Short Muraja'ah, then Long Muraja'ah.
+// Every task list (teacher, student, the shared task list) follows it.
+export const ACTIVITIES = ["new", "short", "long"];
 export const ACTIVITY_TITLES = { new: "New Hifz", short: "Short Muraja'ah", long: "Long Muraja'ah" };
 export const TIMEZONE = "Indian/Maldives";
 
@@ -55,6 +56,58 @@ const SURAH_FIRST_AYAH = SURAH_AYAH_COUNTS.reduce((acc, n, i) => [...acc, acc[i]
 export function unitOfAyah(surah, ayah, edge = "start") {
   const n = SURAH_FIRST_AYAH[surah - 1] + Math.min(Math.max(1, ayah), SURAH_AYAH_COUNTS[surah - 1]) - 1;
   return (edge === "end" ? AYAH_END_LINE[n - 1] : AYAH_START_LINE[n - 1]) * UNITS_PER_LINE;
+}
+
+// ---------- whole surahs ----------
+
+// Where each surah is in the Mushaf, in half-line units: from the end of the
+// surah before it (so its heading lines count with it) to the end of its last
+// ayah. The 114 surahs tile the Mushaf with no gaps or overlaps, so
+// neighbouring surahs join into one range and a run of surahs that starts at
+// a juz (Al-Mulk, An-Naba…) is exactly those juz.
+const endOfAyah = (n) => Math.ceil(AYAH_END_POS[n - 1] * UNITS_PER_LINE - 1e-6);
+export const SURAH_START_UNIT = SURAH_FIRST_AYAH.slice(0, 114).map((first, i) => (i === 0 ? 0 : endOfAyah(first - 1)));
+export const surahRange = (n) => [SURAH_START_UNIT[n - 1], n < 114 ? SURAH_START_UNIT[n] : TOTAL_UNITS];
+// Surahs a to b (either order), both included.
+export const surahsRange = (a, b) => [surahRange(Math.min(a, b))[0], surahRange(Math.max(a, b))[1]];
+
+// Surah numbers → runs of neighbouring surahs: [67, 78, 79, 80] → [[67, 67], [78, 80]].
+export function surahRuns(numbers) {
+  const runs = [];
+  for (const n of [...new Set(numbers)].sort((a, b) => a - b)) {
+    const last = runs[runs.length - 1];
+    if (last && n === last[1] + 1) last[1] = n;
+    else runs.push([n, n]);
+  }
+  return runs;
+}
+// "Al-Mulk" / "An-Naba – An-Nas" for a run.
+export const describeSurahRun = ([a, b]) => (a === b ? SURAHS[a - 1].name : `${SURAHS[a - 1].name} – ${SURAHS[b - 1].name}`);
+
+const sameSet = (a, b) => a.length === b.length && a.every((r, i) => r[0] === b[i][0] && r[1] === b[i][1]);
+
+// What the memorised part of a plan is made of, for the plan editor: whole
+// juz from the front or the back of the Quran ({ side: "first" | "last",
+// count: 0–30 }) plus whole surahs outside them, as runs of neighbouring
+// surahs ([[67, 67], [78, 114]]). The most juz that fit are taken first.
+// null when it's made of something else (e.g. pages from an old plan).
+export function memorizedParts(memorized) {
+  const mem = toSet(memorized || []);
+  if (!mem.length) return { side: "first", count: 0, surahs: [] };
+  const inside = (r, set) => unitsOf(subtract([r], set)) === 0;
+  for (let count = 30; count >= 0; count--) {
+    for (const side of count > 0 && count < 30 ? ["first", "last"] : ["first"]) {
+      const juz = count ? [wholeJuz(side, count)] : [];
+      if (count && !inside(juz[0], mem)) continue;
+      const nums = [];
+      for (let n = 1; n <= 114; n++) {
+        const r = surahRange(n);
+        if (inside(r, mem) && !(count && inside(r, juz))) nums.push(n);
+      }
+      if (sameSet(union(juz, nums.map(surahRange)), mem)) return { side, count, surahs: surahRuns(nums) };
+    }
+  }
+  return null;
 }
 
 // ---------- portions marked on the Mushaf, by ayah ----------

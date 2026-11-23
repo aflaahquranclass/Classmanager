@@ -8,17 +8,18 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useBackLayer } from "../useBackNav.js";
-import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2, Download } from "lucide-react";
+import { BookOpenText, CalendarDays, ChevronLeft, Trash2, Pencil, CheckCircle2, CheckCheck, Highlighter, ArrowRight, Search, Flame, Target, X, Check, History, Undo2, Download, Plus } from "lucide-react";
 import { createPortal } from "react-dom";
 import { lockScroll } from "../scrollLock.js";
 import { supabase } from "../supabaseClient.js";
 import { confirmDialog } from "../ConfirmDialog.jsx";
 import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, useHifz, fmtDate, fmtDay } from "../HifzTracker.jsx";
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, juzStartUnit, wholeJuz, describeRange, describeAmount } from "./quran.js";
-import { unitsOf, toSet, localDate } from "./engine.js";
+import { unitsOf, toSet, union, subtract, localDate } from "./engine.js";
 import { downloadClassTasks } from "./taskImage.js";
-import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE, ayahNumber, ayahPortion, ayahMarksOf, nextClassDay } from "./tasks.js";
-import { ayahRef } from "./ayahs.js";
+import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE, ayahNumber, ayahPortion, ayahMarksOf, nextClassDay, memorizedParts, surahsRange, surahRuns, describeSurahRun } from "./tasks.js";
+import { ayahRef, countAyahs } from "./ayahs.js";
+import SurahSelect from "./SurahSelect.jsx";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
 import { loadHifz } from "./taskService.js";
 import { selectAll } from "../thilawa/repos.js";
@@ -195,6 +196,15 @@ const teacherCss = `
   .ht-juz .hz-chip { min-width: 64px; }
   .ht-juz .hz-select { width: auto; min-width: 96px; min-height: 40px; }
   .ht-juz .hz-btn { min-height: 40px; }
+  .ht-surahs { margin-top: 14px; padding-top: 12px; border-top: 1px dashed #DCEBF8; }
+  .ht-surahs h5 { margin: 0 0 10px; font-size: 14px; color: #123B67; }
+  .ht-surahs h5 .hz-muted { font-size: 13px; font-weight: 400; }
+  .ht-surah-add { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+  .ht-surah-add .hz-field { margin-top: 0; }
+  .ht-surah-add .hz-field > label .hz-muted { font-size: 12px; font-weight: 400; }
+  .ht-surah-add .hz-btn { min-height: 44px; }
+  .ht-surah-hint { margin: 8px 0 0; font-size: 13px; }
+  @media (max-width: 560px) { .ht-surah-add { grid-template-columns: minmax(0, 1fr); } }
   @media (max-width: 520px) { .ht-row-actions .hz-btn { flex: 1 1 auto; } }
 `;
 
@@ -214,11 +224,12 @@ function PortionFields({ value, onChange }) {
 const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeAmount(r.end - r.start)} · ${describeAyahs(r)}`;
 
 // ---------- the student's Hifz plan ----------
-// Just two things: how many juz the student has memorised (from the front or
-// the back of the Quran), and where Hifz starts. Everything else (how much
-// New Hifz a day, Short and Long Muraja'ah) keeps its default or saved value;
-// portions are worked out from the plan (tasks.js: suggestPortion). The target
-// year is the student's own.
+// Just two things: what the student has memorised — whole juz (from the
+// front or the back of the Quran) and/or whole surahs, one by one or as a
+// range — and where Hifz starts. Everything else (how much New Hifz a day,
+// Short and Long Muraja'ah) keeps its default or saved value; portions are
+// worked out from the plan (tasks.js: suggestPortion), and skip what's
+// memorised. The target year is the student's own.
 
 const JUZ_COUNTS = Array.from({ length: 31 }, (_, i) => i);
 
@@ -230,16 +241,37 @@ function pathNote(plan) {
   return `New Hifz goes to the end of Juz ${j}, then Juz ${j - 1}${j > 2 ? `, ${j - 2}` : ""}${j > 3 ? " …" : ""} towards the front.`;
 }
 
-const sameRanges = (a, b) => a.length === b.length && a.every((r, i) => r[0] === b[i][0] && r[1] === b[i][1]);
 const juzSet = (side, n) => (n > 0 ? [wholeJuz(side, n)] : []);
+const isInside = (r, set) => unitsOf(subtract([r], set)) === 0;
+const runRange = ([a, b]) => surahsRange(a, b);
+const surahCount = ([a, b]) => b - a + 1;
 
-// The juz a saved plan matches, or null when it was saved as other pages.
-function juzOf(memorized) {
-  if (memorized.length === 0) return { side: "first", count: 0 };
-  for (const side of ["first", "last"]) {
-    for (let n = 1; n <= 30; n++) if (sameRanges(memorized, juzSet(side, n))) return { side, count: n };
-  }
-  return null;
+// Pick one surah and Add, or a first and last surah for a range.
+function SurahAdder({ onAdd }) {
+  const [from, setFrom] = useState(null);
+  const [to, setTo] = useState(null);
+  const run = from ? [Math.min(from, to ?? from), Math.max(from, to ?? from)] : null;
+  const add = () => { onAdd(run); setFrom(null); setTo(null); };
+  return (
+    <>
+      <div className="ht-surah-add">
+        <div className="hz-field">
+          <label htmlFor="ht-surah-from">Surah</label>
+          <SurahSelect id="ht-surah-from" value={from} onChange={setFrom} placeholder="Search a surah" />
+        </div>
+        <div className="hz-field">
+          <label htmlFor="ht-surah-to">To surah <span className="hz-muted">(for a range)</span></label>
+          <SurahSelect id="ht-surah-to" value={to} onChange={setTo} placeholder="Optional" />
+        </div>
+        <button type="button" className="hz-btn hz-btn-outline" disabled={!run} onClick={add}><Plus size={16} aria-hidden="true" />Add</button>
+      </div>
+      <p className="hz-muted ht-surah-hint" aria-live="polite">
+        {run
+          ? `Adds ${describeSurahRun(run)}${surahCount(run) > 1 ? ` · ${surahCount(run)} surahs` : ""} · ${describeAmount(unitsOf([runRange(run)]))}`
+          : "For one surah, pick it and tap Add. For a range, pick the first and the last surah. Add as many as needed."}
+      </p>
+    </>
+  );
 }
 
 function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
@@ -252,19 +284,44 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
     if ("startUnit" in patch || "memorized" in patch) next.direction = directionFor(next.startUnit, memorizedRanges({ memorized: next.memorized }, tasks));
     return next;
   });
-  const saved = juzOf(plan.memorized);
-  const [juzSide, setJuzSide] = useState(saved?.side ?? "first");
-  const [juzCount, setJuzCount] = useState(saved?.count ?? null);
+  // The saved memorised part as juz + surahs. One saved as other pages (an
+  // old plan) stays as it was — juzCount null, "as saved" — with any surahs
+  // added on top, until a number of juz is chosen.
+  const [parts] = useState(() => memorizedParts(plan.memorized));
+  const [asSaved] = useState(() => (parts ? [] : plan.memorized));
+  const [juzSide, setJuzSide] = useState(parts?.side ?? "first");
+  const [juzCount, setJuzCount] = useState(parts?.count ?? null);
+  const [surahs, setSurahs] = useState(parts?.surahs ?? []); // runs: [[67, 67], [78, 114]]
+  const [surahNote, setSurahNote] = useState("");
+  const base = (side, count) => (count == null ? asSaved : juzSet(side, count));
+  // Surahs wholly inside the juz chosen are part of the juz, not listed.
+  const outside = (runs, side, count) => runs.filter((r) => !isInside(runRange(r), base(side, count)));
+  const update = (side, count, runs) => {
+    setSurahs(runs);
+    return { memorized: union(base(side, count), runs.map(runRange)) };
+  };
   // A new plan suggests the start right after the juz memorised, until the
   // teacher picks a start themself.
   const [startPicked, setStartPicked] = useState(!!profile && !profile.fromLegacy);
   const chooseJuz = (side, count) => {
-    setJuzSide(side); setJuzCount(count);
+    setJuzSide(side); setJuzCount(count); setSurahNote("");
     if (count == null) return;
-    const patch = { memorized: juzSet(side, count) };
+    const patch = update(side, count, outside(surahs, side, count));
     if (!startPicked && count < 30) patch.startUnit = side === "last" && count > 0 ? juzStartUnit(30 - count) : juzStartUnit(count + 1);
     set(patch);
   };
+  const addSurahs = ([a, b]) => {
+    const nums = [...surahs, [a, b]].flatMap(([x, y]) => Array.from({ length: y - x + 1 }, (_, i) => x + i));
+    if (isInside(surahsRange(a, b), base(juzSide, juzCount))) {
+      setSurahNote(`${describeSurahRun([a, b])} ${a === b ? "is" : "are"} already in ${juzCount == null ? "what's saved" : "the juz chosen"}.`);
+      return;
+    }
+    setSurahNote("");
+    set(update(juzSide, juzCount, outside(surahRuns(nums), juzSide, juzCount)));
+  };
+  const removeSurahs = (run) => { setSurahNote(""); set(update(juzSide, juzCount, surahs.filter((r) => r !== run))); };
+
+  const memorizedUnits = unitsOf(plan.memorized);
   const longStart = plan.longStartUnit ?? plan.memorized[0]?.[0] ?? pageToUnit(1);
   const save = () => onSave({ ...plan, longStartUnit: longStart });
 
@@ -273,10 +330,11 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
       {profile?.fromLegacy && <div className="hz-note" style={{ marginTop: 0, marginBottom: 0 }}><Target size={18} aria-hidden="true" /><span>Filled in from the plan the student made themself. Check it and save.</span></div>}
 
       <div className="ht-plan-step">
-        <h4>1. How many juz has the student memorised?</h4>
+        <h4>1. What has the student memorised?</h4>
         <div className="ht-juz" style={{ marginTop: 0 }}>
+          <span aria-hidden="true">Whole juz</span>
           <select className="hz-select" aria-label="How many juz memorised" value={juzCount ?? ""} onChange={(e) => chooseJuz(juzSide, e.target.value === "" ? null : +e.target.value)}>
-            {juzCount == null && <option value="">{describeAmount(unitsOf(plan.memorized))} (as saved)</option>}
+            {juzCount == null && <option value="">{describeAmount(unitsOf(asSaved))} (as saved)</option>}
             {JUZ_COUNTS.map((n) => <option key={n} value={n}>{n === 0 ? "None" : `${n} juz`}</option>)}
           </select>
           {juzCount > 0 && juzCount < 30 && (
@@ -286,8 +344,30 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
             </div>
           )}
         </div>
-        <p className="hz-muted" style={{ margin: "8px 0 0" }}>
-          {plan.memorized.length ? `${plan.memorized.map(describeRange).join(", ")}. ` : ""}Completed New Hifz tasks are added automatically.
+
+        {juzCount !== 30 && (
+          <div className="ht-surahs">
+            <h5>{juzCount === 0 ? "Surahs memorised" : "Other surahs memorised"}{" "}
+              <span className="hz-muted">{juzCount === 0 ? "— when it isn't whole juz" : juzCount == null ? "— besides what's saved" : "— besides the juz"}</span></h5>
+            {surahs.length > 0 && (
+              <div className="ht-ranges" style={{ marginTop: 0, marginBottom: 10 }}>
+                {surahs.map((r) => (
+                  <span key={r.join("-")}>{describeSurahRun(r)}{surahCount(r) > 1 ? ` · ${surahCount(r)} surahs` : ""}
+                    <button type="button" aria-label={`Remove ${describeSurahRun(r)}`} onClick={() => removeSurahs(r)}><X size={14} aria-hidden="true" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <SurahAdder onAdd={addSurahs} />
+            {surahNote && <p className="hz-muted ht-surah-hint" role="status">{surahNote}</p>}
+          </div>
+        )}
+
+        <p className="hz-muted" style={{ margin: "10px 0 0" }}>
+          {memorizedUnits
+            ? `Memorised: ${describeAmount(memorizedUnits)} · ${countAyahs(plan.memorized)} ayahs${plan.memorized.length <= 2 ? ` (${plan.memorized.map(describeRange).join(", ")})` : ""}. `
+            : "Nothing memorised yet. "}
+          Completed New Hifz tasks are added automatically.
         </p>
       </div>
 
@@ -492,8 +572,8 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const needsProfile = !data.hasProfile || data.profile?.fromLegacy;
 
   const ctx = { tasks, memorized, profile: data.profile, today, schedule: student.schedule };
-  // The tasks of the day being listened to, in class order (Short Muraja'ah,
-  // New Hifz, Long Muraja'ah): tabs over the Mushaf, and what comes next.
+  // The tasks of the day being listened to, in class order (New Hifz,
+  // Short Muraja'ah, Long Muraja'ah): tabs over the Mushaf, and what comes next.
   const dayOf = (t) => (t ? tasks.filter((x) => x.taskDate === t.taskDate).sort((a, b) => ACTIVITIES.indexOf(a.activity) - ACTIVITIES.indexOf(b.activity)) : []);
   const followingOf = (t) => {
     const day = dayOf(t);
@@ -887,7 +967,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
             ? <>Set from the Hifz plan · {student.schedule?.days?.length === 7 ? "every day" : student.schedule?.days?.length ? student.schedule.days.join(", ") : "class days"}</>
             : "Save the Hifz plan above to start."}
         </p>
-        {/* Short Muraja'ah, New Hifz, Long Muraja'ah always in that order; approved ones go to History and the next one takes their place. */}
+        {/* New Hifz, Short Muraja'ah, Long Muraja'ah always in that order; approved ones go to History and the next one takes their place. */}
         {ready > 0 && (
           <div className="ht-ready-note" role="status"><CheckCheck size={18} aria-hidden="true" /><span><b>{ready} task{ready === 1 ? "" : "s"} finished by the student.</b> Listen, then approve.</span></div>
         )}

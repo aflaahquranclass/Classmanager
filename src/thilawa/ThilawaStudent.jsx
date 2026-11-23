@@ -9,6 +9,7 @@ import { useBackLayer } from "../useBackNav.js";
 import { AudioLines, Gauge, StickyNote, ListChecks, BookMarked, CheckCircle2, ChevronLeft, ChevronRight, Trophy, ArrowRight, Circle, CalendarDays, Highlighter, BookOpen, Clock } from "lucide-react";
 import MushafPage, { MushafPresent, MushafPager } from "./MushafPage.jsx";
 import { SURAHS, JUZ_START_PAGES } from "../hifz/quran.js";
+import SurahSelect from "../hifz/SurahSelect.jsx";
 import { TOTAL_PAGES, describePages, pageLabel, pagesIn, levelLabel, pagesWithMarks, mistakeCategory, mistakeColors } from "./engine.js";
 import { LetterChips } from "./LettersPanel.jsx";
 import { markPageRead, unmarkPage, completeAssignment, reopenAssignment } from "./service.js";
@@ -329,11 +330,9 @@ export function FreeReading({ repo, data, refresh }) {
         <h2 className="hz-h2"><BookMarked size={22} aria-hidden="true" />Free Reading</h2>
         <p className="hz-muted" style={{ margin: 0 }}>Read anywhere you like, and tick each page you read.</p>
         <div className="th-pick">
-          <label className="hz-field" style={{ marginTop: 0 }}><span>Surah</span>
-            <select className="hz-select" value={surahIndex} onChange={(e) => setPage(SURAHS[+e.target.value].startPage)}>
-              {SURAHS.map((s, i) => <option key={s.number} value={i}>{s.number}. {s.name}</option>)}
-            </select>
-          </label>
+          <div className="hz-field" style={{ marginTop: 0 }}><label htmlFor="th-free-surah">Surah</label>
+            <SurahSelect id="th-free-surah" value={SURAHS[surahIndex].number} onChange={(n) => setPage(SURAHS[n - 1].startPage)} />
+          </div>
           <label className="hz-field" style={{ marginTop: 0 }}><span>Juz</span>
             <select className="hz-select" value={juz} onChange={(e) => setPage(JUZ_START_PAGES[+e.target.value - 1])}>
               {JUZ_START_PAGES.map((p, i) => <option key={i} value={i + 1}>Juz {i + 1}</option>)}

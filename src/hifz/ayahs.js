@@ -2,7 +2,8 @@
 // the page layout quran.com shows).
 // Ayahs are numbered 1–6236 straight through the Quran.
 
-import { SURAHS, UNITS_PER_PAGE, TOTAL_PAGES, unitToPage } from "./quran.js";
+import { SURAHS, UNITS_PER_PAGE, UNITS_PER_LINE, TOTAL_PAGES, unitToPage } from "./quran.js";
+import { AYAH_START_POS, AYAH_END_POS } from "./ayahLines.js";
 
 export const SURAH_AYAH_COUNTS = [7, 286, 200, 176, 120, 165, 206, 75, 129, 109, 123, 111, 43, 52, 99, 128, 111, 110, 98, 135, 112, 78, 118, 64, 77, 227, 93, 88, 69, 60, 34, 30, 73, 54, 45, 83, 182, 88, 75, 85, 54, 53, 89, 59, 37, 35, 38, 29, 18, 45, 60, 49, 62, 55, 78, 96, 29, 22, 24, 13, 14, 11, 11, 18, 12, 12, 30, 52, 52, 44, 28, 28, 20, 56, 40, 31, 50, 40, 46, 42, 29, 19, 36, 25, 22, 17, 19, 26, 30, 20, 15, 21, 11, 8, 8, 19, 5, 8, 8, 11, 11, 8, 3, 9, 5, 4, 7, 3, 6, 3, 5, 4, 5, 6];
 
@@ -79,8 +80,20 @@ export function describeAyahRange(range) {
 
 export { TOTAL_AYAHS };
 
-// How many ayahs a set of non-overlapping ranges covers (exact for whole
-// pages; partial pages use the same per-line estimate as nearestAyahs).
-export function countAyahs(ranges) {
-  return ranges.reduce((n, [s, e]) => n + Math.max(0, Math.round(ayahAt(e)) - Math.round(ayahAt(s))), 0);
+// How many ayahs a set of ranges covers: those whose middle is inside one,
+// from each ayah's place on the Mushaf's lines — exact for whole pages, juz
+// and surahs, and for parts of a page (e.g. An-Nas alone is 6 ayahs).
+let middles = null;
+const ayahMiddles = () => middles || (middles = AYAH_START_POS.map((s, i) => ((s + AYAH_END_POS[i]) / 2) * UNITS_PER_LINE));
+// inRanges[n - 1] is 1 when ayah n (1–6236) is inside the ranges.
+export function ayahsInRanges(ranges) {
+  const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
+  const inRanges = new Uint8Array(TOTAL_AYAHS);
+  let i = 0;
+  ayahMiddles().forEach((x, n) => {
+    while (i < sorted.length && sorted[i][1] <= x) i++;
+    if (i < sorted.length && sorted[i][0] <= x) inRanges[n] = 1;
+  });
+  return inRanges;
 }
+export const countAyahs = (ranges) => ayahsInRanges(ranges).reduce((n, x) => n + x, 0);
