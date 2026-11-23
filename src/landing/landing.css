@@ -293,14 +293,52 @@
 /* Rules page */
 .ld-page-head { background: var(--soft); padding: clamp(36px, 5vw, 72px) 0 clamp(24px, 3vw, 40px); }
 .ld-page-head p:last-child { margin: 0; max-width: 560px; font-size: clamp(15px, 1.2vw, 18px); line-height: 1.6; color: var(--muted); }
-.ld-grid.ld-rules { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 0; }
-.ld-rule-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
-.ld-rule-head h2 { margin: 0; font-size: 20px; font-weight: 600; }
-.ld-rule ol { margin: 0; padding-left: 20px; font-size: 15px; line-height: 1.65; color: var(--navy); }
-.ld-rule li + li { margin-top: 6px; }
+.ld-rules-page { padding-top: clamp(20px, 3vw, 32px); }
+.ld-rules-dates { margin: 28px 0 0; padding: clamp(20px, 2.4vw, 28px); border-radius: 18px; background: var(--grad-card); color: #fff; }
+.ld-rules-dates h2 { margin: 0 0 16px; font-size: 18px; font-weight: 600; }
+.ld-rules-dates ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.ld-rules-dates li { display: flex; align-items: flex-start; gap: 12px; padding: 14px; border-radius: 14px; background: rgba(255, 255, 255, .12); }
+.ld-rules-day { flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #fff; color: var(--g1); font: 800 20px/1 Inter, system-ui, sans-serif; }
+.ld-rules-dates b { display: block; font-size: 15px; margin-bottom: 4px; }
+.ld-rules-dates li span:not(.ld-rules-day) { display: block; font-size: 14px; line-height: 1.5; opacity: .92; }
+
+.ld-rules-official { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 4px; padding: 12px 16px; border-radius: 12px; background: #fff; border: 1px dashed var(--line); color: var(--muted); font-size: 14.5px; line-height: 1.5; }
+.ld-rules-official svg { flex-shrink: 0; color: var(--teal); }
+.ld-rules-official span { flex: 1; min-width: 220px; }
+.ld-rules-official button { border: 1px solid var(--blue); background: #fff; color: var(--blue); border-radius: 999px; padding: 7px 14px; font: 600 14px/1 Inter, system-ui, sans-serif; cursor: pointer; }
+.ld-rules-official button:hover { background: var(--blue); color: #fff; }
+
+.ld-rules-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.ld-rules-tabs button { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; border: 1.5px solid var(--line); background: #fff; color: var(--navy); text-align: start; font: inherit; cursor: pointer; transition: border-color .2s, box-shadow .2s, transform .2s; }
+.ld-rules-tabs button:hover { border-color: var(--blue); transform: translateY(-2px); }
+.ld-rules-tabs button.on { border-color: transparent; background: var(--grad-card); color: #fff; box-shadow: 0 10px 24px rgba(13, 79, 133, .22); }
+.ld-rules-tabs button.on .ld-icon { background: rgba(255, 255, 255, .18); color: #fff; }
+.ld-rules-tabs .ld-icon { flex-shrink: 0; width: 42px; height: 42px; }
+.ld-rules-tab-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ld-rules-tab-text b { font-size: 15.5px; font-weight: 600; line-height: 1.35; }
+.ld-rules-cat { margin-top: 16px; padding: clamp(20px, 2.6vw, 32px); border-radius: 20px; background: #fff; border: 1px solid var(--line); animation: ld-rules-in .35s ease; }
+.ld-rules-cat .ld-card { box-shadow: none; background: var(--soft); border-color: transparent; }
+@keyframes ld-rules-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.ld-rules-cat-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.ld-rules-cat-head h2 { display: flex; align-items: center; gap: 10px; margin: 0; font-family: var(--serif); font-size: clamp(22px, 2.2vw, 30px); font-weight: 600; }
+.ld-rules-num { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 26px; padding: 0 8px; border-radius: 8px; background: #E6F1FB; color: var(--blue); font: 700 13px/1 Inter, system-ui, sans-serif; }
+.ld-grid.ld-rules { grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 0; }
+.ld-rule-head { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 19px; font-weight: 600; line-height: 1.35; }
+.ld-rule-intro { margin: 0 0 10px; font-size: 15px; line-height: 1.65; color: var(--muted); }
+.ld-rule ol { margin: 0; padding-inline-start: 22px; font-size: 15px; line-height: 1.7; color: var(--navy); }
+.ld-rule li + li { margin-top: 8px; }
 .ld-rule li::marker { color: var(--teal); font-weight: 600; }
-.ld-rules-note { margin: 28px 0 0; text-align: center; color: var(--muted); font-size: 15px; }
-.ld-rules-note a { display: inline-flex; align-items: center; gap: 6px; color: var(--blue); font-weight: 600; }
+.ld-rule li b { font-weight: 700; }
+.ld-rules-note { margin: 40px 0 0; text-align: center; color: var(--muted); font-size: 15px; }
+.ld[lang="dv"] :is(.ld-rules-cat-head h2, .ld-rule-head, .ld-rules-dates h2) { font-family: Aammu, Faruma, Fraunces, Georgia, serif; font-weight: 400; }
+.ld[lang="dv"] :is(.ld-rule ol, .ld-rule-intro, .ld-rules-dates li span) { line-height: 1.95; }
+.ld[lang="dv"] .ld-rules-tab-text b { font-family: Aammu, Faruma, serif; font-weight: 400; line-height: 1.6; }
+.ld[lang="dv"] .ld-rule li b { font-weight: 400; color: var(--blue); }
+@media (prefers-reduced-motion: reduce) { .ld-rules-cat { animation: none; } }
+@media (max-width: 1024px) {
+  .ld-rules-dates ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ld-rules-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 /* Install guide (/install) */
 .ld-install { max-width: 760px; }
@@ -460,10 +498,16 @@
   .ld-price { font-size: 12.5px; margin-bottom: 8px; }
 
   /* Rules */
-  .ld-grid.ld-rules { grid-template-columns: 1fr; }
-  .ld-rule-head { margin-bottom: 10px; gap: 12px; }
-  .ld-rule-head h2 { font-size: 17px; }
-  .ld-rule ol { font-size: 14px; line-height: 1.55; }
+  .ld-rules-dates ul { grid-template-columns: 1fr; gap: 10px; }
+  .ld-rules-dates li { padding: 12px; }
+  .ld-rules-day { width: 40px; height: 40px; font-size: 18px; }
+  .ld-rules-tabs { gap: 8px; }
+  .ld-rules-tabs button { flex-direction: column; align-items: flex-start; gap: 8px; padding: 12px; }
+  .ld-rules-tabs .ld-icon { width: 36px; height: 36px; }
+  .ld-rules-tab-text b { font-size: 14px; }
+  .ld-rules-cat { padding: 14px; border-radius: 16px; }
+  .ld-rule-head { margin-bottom: 10px; font-size: 17px; }
+  .ld-rule ol { font-size: 14.5px; line-height: 1.6; }
   .ld-hero-actions .ld-btn:last-child { flex-basis: 100%; }
 
   /* Enrol + footer */

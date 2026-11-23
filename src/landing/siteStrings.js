@@ -4,8 +4,9 @@
 // in site_translations and win over these defaults). {name} placeholders are
 // filled in on the page.
 //
-// So far the home page, the menu and the footer are translated; the other
-// pages are still English only.
+// So far the home page, the rules page, the menu and the footer are
+// translated; the other pages are still English only. (The rules themselves
+// are in content.js, in the official document's own Dhivehi.)
 
 import { supabase } from "../supabaseClient.js";
 import { WHY, HERO, CONTACT } from "./content.js";
@@ -26,7 +27,7 @@ const CLASS_DV = {
 // group: heading the phrase is listed under in Admin → Language → Website.
 const s = (group, key, en, dv) => ({ key, group, en, dv });
 
-export const SITE_GROUPS = ["Menu and footer", "Top of the page", "Reviews", "Student portal", "Classes", "Why Aflaah", "Book store", "Sample portal screens", "Join us"];
+export const SITE_GROUPS = ["Menu and footer", "Top of the page", "Reviews", "Student portal", "Classes", "Why Aflaah", "Book store", "Sample portal screens", "Join us", "Rules page"];
 
 export const SITE_STRINGS = [
   s("Menu and footer", "brand.name", "Aflaah", "އަފްލާޙް"),
@@ -142,6 +143,23 @@ export const SITE_STRINGS = [
   s("Join us", "cta.email", "Email us", "އީމެއިލް ކުރައްވާ"),
   s("Join us", "cta.visit", "Visit us in {location}", "{location} ގައި ހުންނަ ކުލާހަށް ވަޑައިގަންނަވާ"),
   s("Join us", "cta.rules", "Read the class rules", "ކުލާހުގެ ޤަވާޢިދު ކިޔުއްވާ"),
+
+  s("Rules page", "rules.tag", "Rules and regulations", "އަފްލާޙް ޤުރްއާން ކުލާސް"),
+  s("Rules page", "rules.title", "Class rules and regulations", "އުސޫލުތަކާއި ޤަވާއިދުތައް"),
+  s("Rules page", "rules.lead", "These rules keep every part of Aflaah Quran Class running in good order, and keep a good relationship between the class, its students and their parents.", "މި އުސޫލަކީ އަފްލާޙް ޤުރްއާން ކުލާހުގެ އެންމެހައި ކަންކަން ހަރުދަނާ ނިޒާމަކުން ހިންގުމަށާއި، ކުލާހާއި ދަރިވަރުން އަދި ބެލެނިވެރިންގެ ދެމެދުގައި އޮންނަންޖެހޭ ގުޅުން ދެމެހެއްޓުމަށް އެކުލަވާލެވިފައިވާ އުސޫލެކެވެ."),
+  s("Rules page", "rules.jump", "Rule categories", "ޤަވާއިދުތަކުގެ ބައިތައް"),
+  s("Rules page", "rules.dates", "Dates to remember", "ހަނދާން ބަހައްޓަންވީ ތާރީޚުތައް"),
+  s("Rules page", "rules.date.leave.label", "Before the 5th", "5 ވަނަ ދުވަހުގެ ކުރިން"),
+  s("Rules page", "rules.date.leave.text", "Tell the office in writing if the student is leaving from next month.", "ކުރިއަށް އޮތް މަހުން ވަކިވާނަމަ، އެކަން ލިޔުމުން އިދާރާއަށް އަންގަންވާނެ."),
+  s("Rules page", "rules.date.due.label", "By the 15th", "15 ވަނަ ދުވަހުގެ ނިޔަލަށް"),
+  s("Rules page", "rules.date.due.text", "The month's fee is due.", "އެ މަހުގެ މަހުފީ ދައްކަންވާނެ."),
+  s("Rules page", "rules.date.late.label", "16th to 20th", "16 އިން 20 އަށް"),
+  s("Rules page", "rules.date.late.text", "Late payment with a MVR 100 fine. After the 20th the place may go to another student.", "-/100 ރުފިޔާގެ ޖޫރިމަނާއާއެކު ފީ ދެއްކޭނެ. 20 ފަހަނައަޅައިފިނަމަ ޖާގަ އެހެން ދަރިވަރަކަށް ދެވިދާނެ."),
+  s("Rules page", "rules.date.refund.label", "First 7 days", "ފުރަތަމަ 7 ދުވަސް"),
+  s("Rules page", "rules.date.refund.text", "A new student who leaves within 7 days of starting gets the monthly fee back.", "އަލަށް ފަށާ ދަރިވަރަކު 7 ދުވަހުގެ ތެރޭގައި ވަކިވެއްޖެނަމަ މަހުފީ ރީފަންޑް ކުރެވޭނެ."),
+  s("Rules page", "rules.official", "The rules are written in Dhivehi and this is an English translation. If the two differ, the Dhivehi text applies.", "ޤަވާއިދުތައް ލިޔެވިފައިވަނީ ދިވެހިބަހުންނެވެ. އިނގިރޭސި ތަރުޖަމާއާއި ދިވެހި ލިޔުމާ ތަފާތުވާނަމަ، ދިވެހި ލިޔުމަށް ބަލާނެއެވެ."),
+  s("Rules page", "rules.readDv", "Read in Dhivehi", "ދިވެހިން ކިޔުއްވާ"),
+  s("Rules page", "rules.note", "Questions about the rules? Contact the class office.", "ޤަވާއިދުތަކާ ބެހޭގޮތުން ސުވާލެއް ވާނަމަ، ކުލާހުގެ އިދާރާއާ ގުޅުއްވާ."),
 ];
 
 export const SITE_DEFAULTS = Object.fromEntries(SITE_STRINGS.map((x) => [x.key, x]));
