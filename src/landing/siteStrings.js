@@ -30,8 +30,6 @@ const s = (group, key, en, dv) => ({ key, group, en, dv });
 export const SITE_GROUPS = ["Menu and footer", "Top of the page", "Reviews", "Student portal", "Classes", "Why Aflaah", "Book store", "Sample portal screens", "Join us", "Rules page"];
 
 export const SITE_STRINGS = [
-  s("Menu and footer", "brand.name", "Aflaah", "އަފްލާޙް"),
-  s("Menu and footer", "brand.sub", "Quran Class", "ޤުރުއާން ކުލާސް"),
   s("Menu and footer", "nav.classes", "Classes", "ކުލާސްތައް"),
   s("Menu and footer", "nav.hifz", "Hifz program", "ހިފްޒު ޕްރޮގްރާމް"),
   s("Menu and footer", "nav.store", "Store", "ފިހާރަ"),

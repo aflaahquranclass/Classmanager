@@ -109,7 +109,8 @@ function Site() {
   );
 
   const logins = LOGINS.map((l) => <a key={l.label} href={l.href} rel={l.rel}>{t(l.label)}</a>);
-  const brand = <span className="ld-brand-name">{t("brand.name")}<small>{t("brand.sub")}</small></span>;
+  // The logo is always the English one, left to right, in both languages.
+  const brand = <span className="ld-brand-name" lang="en">Aflaah<small>Quran Class</small></span>;
   const formPage = FORM_PAGES.includes(path);
   const pageLang = formPage ? "dv" : lang;
 
@@ -117,7 +118,7 @@ function Site() {
     <div className={`ld ${formPage ? "ld-form-page" : ""}`} lang={pageLang} dir={pageLang === "dv" ? "rtl" : "ltr"}>
       {!formPage && <header className="ld-nav">
         <div className="ld-wrap ld-nav-in">
-          <Link to="/" navigate={navigate} className="ld-brand"><img src="/images/logo-icon-only.png" alt="" />{brand}</Link>
+          <Link to="/" navigate={navigate} className="ld-brand" dir="ltr"><img src="/images/logo-icon-only.png" alt="" />{brand}</Link>
           <nav className={`ld-links ${menuOpen ? "open" : ""}`} aria-label="Main">
             {navLink("/#classes", t("nav.classes"))}
             {navLink("/hifz", t("nav.hifz"))}
@@ -164,7 +165,7 @@ function Site() {
         <div className="ld-wrap">
           <div className="ld-foot-in">
             <div className="ld-foot-about">
-              <span className="ld-brand"><img src="/images/logo-icon-only.png" alt="" />{brand}</span>
+              <span className="ld-brand" dir="ltr"><img src="/images/logo-icon-only.png" alt="" />{brand}</span>
               <p>{t("foot.about")}</p>
             </div>
             <div className="ld-foot-col">

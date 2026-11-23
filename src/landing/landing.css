@@ -49,7 +49,7 @@
 /* Nav */
 .ld-nav { position: sticky; top: 0; z-index: 50; background: rgba(255, 255, 255, .92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--soft); }
 .ld-nav-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: var(--nav-h); }
-.ld-brand { display: flex; align-items: center; gap: clamp(8px, .9vw, 14px); }
+.ld-brand { display: inline-flex; align-items: center; gap: clamp(8px, .9vw, 14px); }
 .ld-brand img { width: clamp(34px, 3.3vw, 54px); height: auto; }
 .ld-brand-name { font-family: var(--serif); font-weight: 600; font-size: clamp(18px, 1.75vw, 28px); line-height: 1; letter-spacing: -.01em; }
 .ld-brand-name small { display: block; font-family: Inter, system-ui, sans-serif; font-size: clamp(9px, .75vw, 12px); font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); margin-top: .45em; }
@@ -377,6 +377,7 @@
 .ld-foot-in { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: clamp(24px, 3vw, 48px); }
 .ld-foot-about p { margin: 14px 0 18px; max-width: 320px; line-height: 1.65; }
 .ld-foot .ld-brand-name { color: #fff; }
+.ld-foot .ld-brand { justify-self: start; }
 .ld-foot .ld-brand img { filter: brightness(0) invert(1); }
 .ld-foot .ld-brand-name small { color: #8FC4E8; }
 .ld-foot-col { display: flex; flex-direction: column; gap: 10px; }
@@ -749,10 +750,9 @@ select.ld-input { appearance: auto; }
 .ld-lang:hover { border-color: var(--blue); color: var(--blue); }
 .ld-lang[lang="en"] { font-size: 13px; }
 .ld[lang="dv"] { --serif: Faruma, Fraunces, Georgia, serif; }
-.ld[lang="dv"] :is(.ld-btn, .ld-brand-name small, .ld-filter, .ld-seg button, .ld-wz-pick) { font-family: Faruma, Inter, system-ui, sans-serif; }
-.ld[lang="dv"] :is(.ld-h2, .ld-hero h1, .ld-brand-name) { font-family: Aammu, Faruma, Fraunces, Georgia, serif; font-weight: 400; letter-spacing: 0; }
+.ld[lang="dv"] :is(.ld-btn, .ld-filter, .ld-seg button, .ld-wz-pick) { font-family: Faruma, Inter, system-ui, sans-serif; }
+.ld[lang="dv"] :is(.ld-h2, .ld-hero h1) { font-family: Aammu, Faruma, Fraunces, Georgia, serif; font-weight: 400; letter-spacing: 0; }
 .ld[lang="dv"] .ld-h2 { line-height: 1.45; }
-.ld[lang="dv"] .ld-brand-name small { letter-spacing: 0; font-size: clamp(11px, .9vw, 14px); font-weight: 400; margin-top: .25em; }
 .ld[lang="dv"] .ld-tag { letter-spacing: 0; font-size: 14px; }
 .ld[lang="dv"] :is(.ld-lead, .ld-why-item p, .ld-feat, .ld-cls-card p, .ld-foot p) { line-height: 1.9; }
 .ld[lang="dv"] :is(.ld-callig-tr, .ld-remark p) { font-style: normal; line-height: 1.8; }
