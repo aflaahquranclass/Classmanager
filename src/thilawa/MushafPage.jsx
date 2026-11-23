@@ -10,7 +10,8 @@
 // teacher tap words (`selectedKey`: the word the pop-up is for); `letters`
 // (Arabic letters) shows those letters in orange. `ayahMarks`
 // ({ "2:6": "new" | "short" | "both" }) fills those ayah numbers with the
-// activity's colour (where a New Hifz or Short Muraja'ah starts and ends);
+// activity's colour (where a New Hifz or Short Muraja'ah starts and ends;
+// for a class's recitation "today" | "next" | "todaynext");
 // `onAyahTap({ verseKey, page, line, el })` lets the teacher tap ayah numbers
 // (`selectedAyah`: the one a menu is open for). A word is one glyph in these
 // fonts, so a word with any of them is drawn from its text in the King Fahd
@@ -19,7 +20,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, memo } from "react";
 import { createPortal } from "react-dom";
-import { Maximize2, Minimize2, X, Menu, ChevronLeft, ChevronRight } from "lucide-react";
+import { Maximize2, Minimize2, X, Menu, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react";
 import { pageToUnit, UNITS_PER_LINE, LINES_PER_PAGE, TOTAL_PAGES, JUZ_START_PAGES, SURAHS, surahsOnPages } from "../hifz/quran.js";
 import { buildLines } from "./mushafLines.js";
 import { MISTAKE_CATEGORIES, wordHasLetter, letterParts } from "./engine.js";
@@ -188,7 +189,10 @@ export function MushafPager({ page, onNext = null, onPrev = null, children }) {
 // `edge`: things that sit on the screen's edge or slide over it (e.g. the
 // letters tab on a phone), put on the page body too, above full screen while
 // it's on.
-export function MushafPresent({ children, page = null, tools = null, onNext = null, onPrev = null, quick = null, edge = null, who = null, startFull = true }) {
+// `finish` ({ label, onClick, busy }): the first button is Finish in place of
+// Exit (e.g. Listen & mark: save everything and close); Exit full screen is
+// then under More.
+export function MushafPresent({ children, page = null, tools = null, onNext = null, onPrev = null, quick = null, edge = null, who = null, startFull = true, finish = null }) {
   const [full, setFull] = useState(startFull);
   const [menu, setMenu] = useState(false);
   const native = useRef(false); // the browser's own full screen is on because of us
@@ -311,13 +315,20 @@ export function MushafPresent({ children, page = null, tools = null, onNext = nu
           </div>
         )}
         <div className="mf-tools" role="toolbar" aria-label="Mushaf controls">
-          <button type="button" className="mf-tool" onClick={exit} aria-label="Exit full screen"><Minimize2 size={18} aria-hidden="true" /><span>Exit</span></button>
+          {finish
+            ? <button type="button" className="mf-tool mf-finish" disabled={finish.busy} onClick={finish.onClick}><CheckCircle2 size={18} aria-hidden="true" /><span>{finish.label || "Finish"}</span></button>
+            : <button type="button" className="mf-tool" onClick={exit} aria-label="Exit full screen"><Minimize2 size={18} aria-hidden="true" /><span>Exit</span></button>}
           {tools}
           {quick}
           <button type="button" className={`mf-tool ${menu ? "mf-tool-on" : ""}`} onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label={menu ? "Hide the page controls" : "Show the page controls"}>
             {menu ? <X size={18} aria-hidden="true" /> : <Menu size={18} aria-hidden="true" />}<span>{menu ? "Less" : "More"}</span>
           </button>
         </div>
+        {finish && menu && (
+          <div className="mf-more">
+            <button type="button" className="mf-tool" onClick={exit} aria-label="Exit full screen"><Minimize2 size={18} aria-hidden="true" /><span>Exit</span></button>
+          </div>
+        )}
       </div>
       <div className="mf-content">{children}</div>
       {/* Like a printed Mushaf: the next page is to the left. */}
@@ -372,6 +383,11 @@ const presentCss = `
   .mf-tool:hover, .mf-tools .hz-btn:hover { background: #F1F6FC; }
   .mf-tool:active, .mf-tools .hz-btn:active { transform: scale(0.97); }
   .mf-tool-on { background: #E8F1FB; border-color: #9CC3EC; }
+  .mf-tool.mf-finish { background: #13795B; border-color: #13795B; color: #FFFFFF; }
+  .mf-tool.mf-finish:hover { background: #0F6249; }
+  .mf-tool.mf-finish:disabled { opacity: 0.7; cursor: default; }
+  .mf-more { display: flex; justify-content: center; margin: 2px 0 4px; }
+  .mf-more .mf-tool { max-width: 180px; }
   .mf-tool:focus-visible, .mf-side:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
   .mf-edge { position: fixed; top: 0; right: 0; width: 0; height: 0; z-index: 1500; }
   .mf-edge-full { z-index: 3001; }
@@ -519,6 +535,10 @@ ${["plain", "fixed", ...MISTAKE_CATEGORIES.map((c) => c.id)].map((n) => `  @keyf
   .mp-ayah-new::before, .mp-end.mp-ayah-tap.mp-ayah-new:hover::before { background: #176FD1; }
   .mp-ayah-short::before, .mp-end.mp-ayah-tap.mp-ayah-short:hover::before { background: #0A7F96; }
   .mp-ayah-both::before, .mp-end.mp-ayah-tap.mp-ayah-both:hover::before { background: linear-gradient(90deg, #176FD1 50%, #0A7F96 50%); }
+  /* The class's recitation (ClassLesson): today's in green, the next one in purple. */
+  .mp-ayah-today::before, .mp-end.mp-ayah-tap.mp-ayah-today:hover::before { background: #13795B; }
+  .mp-ayah-next::before, .mp-end.mp-ayah-tap.mp-ayah-next:hover::before { background: #7A4FD0; }
+  .mp-ayah-todaynext::before, .mp-end.mp-ayah-tap.mp-ayah-todaynext:hover::before { background: linear-gradient(90deg, #13795B 50%, #7A4FD0 50%); }
   .mp-ayah-sel::after { content: ""; position: absolute; inset: -0.12em; border-radius: 50%; border: 0.06em dashed #123B67; pointer-events: none; }
   .mp-surah { display: flex; align-items: center; justify-content: center; height: var(--mp-lh, 1.95em); }
   .mp-frame { position: relative; width: 100%; height: 1.55em; display: flex; align-items: center; justify-content: center; border-radius: 0.3em;

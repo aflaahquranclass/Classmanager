@@ -22,7 +22,7 @@ const pickerCss = `
   .sp-hint { margin: 8px 0 0; color: #567493; font-size: 13px; }
 `;
 
-export default function SurahAyahPicker({ id, onPick }) {
+export default function SurahAyahPicker({ id, onPick, label = "Surah (fills the pages)" }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -60,7 +60,7 @@ export default function SurahAyahPicker({ id, onPick }) {
     <div>
       <style>{pickerCss}</style>
       <div className="hz-field" style={{ marginTop: 0 }}>
-        <label htmlFor={`${id}-surah`}>Surah (fills the pages)</label>
+        <label htmlFor={`${id}-surah`}>{label}</label>
         <div className="sp-search">
           <Search size={17} aria-hidden="true" />
           <input id={`${id}-surah`} className="hz-input" type="text" autoComplete="off" placeholder="Search by name or number, e.g. Mulk or 67"

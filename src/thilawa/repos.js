@@ -243,6 +243,11 @@ export function createMemoryThilawaRepo(store, studentId, { asStudent = false, t
 //   setReadingPage(id, page) (teacher: where the class stopped)
 //   listTopics() → topics, newest first             addTopic({ topic, note, taughtOn }) (teacher)
 //   deleteTopic(id) (teacher)                       subscribe(onChange) → stop
+//   listRecitations() → { kind: "done" | "next", recitedOn, first, last, fromPage, toPage, label }, the next one first, then newest day first
+//   saveRecitation({ recitedOn, first, last, fromPage, toPage, label }) (teacher; replaces that day's)
+//   setNextRecitation(span | null) (teacher; replaces the next one, or clears it)
+//   startNextRecitation(day) (teacher; the next one becomes that day's)
+//   deleteRecitation(id) (teacher)
 
 const classReadingFromDb = (r) => ({
   id: r.id, classId: r.class_id, teacherId: r.teacher_id, fromPage: r.from_page, toPage: r.to_page,
@@ -250,12 +255,19 @@ const classReadingFromDb = (r) => ({
   endedAt: r.ended_at || null, createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const classTopicFromDb = (r) => ({ id: r.id, classId: r.class_id, teacherId: r.teacher_id, topic: r.topic, note: r.note || "", taughtOn: r.taught_on, createdAt: r.created_at });
-export const CLASS_MAPS = { classReadingFromDb, classTopicFromDb };
+const classRecitationFromDb = (r) => ({
+  id: r.id, classId: r.class_id, teacherId: r.teacher_id, kind: r.kind, recitedOn: r.recited_on || null,
+  first: r.first_ayah, last: r.last_ayah, fromPage: r.from_page, toPage: r.to_page, label: r.label || "", createdAt: r.created_at,
+});
+export const CLASS_MAPS = { classReadingFromDb, classTopicFromDb, classRecitationFromDb };
 
 const byNewest = (a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
 const topicOrder = (a, b) => (a.taughtOn < b.taughtOn ? 1 : a.taughtOn > b.taughtOn ? -1 : byNewest(a, b));
+const recitationOrder = (a, b) => (a.kind !== b.kind ? (a.kind === "next" ? -1 : 1)
+  : a.recitedOn < b.recitedOn ? 1 : a.recitedOn > b.recitedOn ? -1 : byNewest(a, b));
 
 export function createSupabaseClassRepo(supabase, classId, teacherId = null) {
+  const recitationRow = (r) => ({ class_id: classId, teacher_id: teacherId, first_ayah: r.first, last_ayah: r.last, from_page: r.fromPage, to_page: r.toPage, label: r.label?.trim() || null });
   const check = ({ data, error }) => {
     if (error) throw new Error(error.message);
     return data;
@@ -288,9 +300,26 @@ export function createSupabaseClassRepo(supabase, classId, teacherId = null) {
       }));
     },
     async deleteTopic(id) { check(await supabase.from("thilawa_class_topics").delete().eq("id", id).eq("class_id", classId)); },
+    listRecitations: together(async () => check(await supabase.from("thilawa_class_recitations").select("*").eq("class_id", classId)
+      .order("recited_on", { ascending: false, nullsFirst: true }).order("created_at", { ascending: false }).limit(200)).map(classRecitationFromDb).sort(recitationOrder)),
+    async saveRecitation(r) {
+      check(await supabase.from("thilawa_class_recitations").delete().eq("class_id", classId).eq("kind", "done").eq("recited_on", r.recitedOn));
+      check(await supabase.from("thilawa_class_recitations").insert({ ...recitationRow(r), kind: "done", recited_on: r.recitedOn }));
+    },
+    async setNextRecitation(r) {
+      check(await supabase.from("thilawa_class_recitations").delete().eq("class_id", classId).eq("kind", "next"));
+      if (r) check(await supabase.from("thilawa_class_recitations").insert({ ...recitationRow(r), kind: "next", recited_on: null }));
+    },
+    async startNextRecitation(day) {
+      const next = check(await supabase.from("thilawa_class_recitations").select("id").eq("class_id", classId).eq("kind", "next").maybeSingle());
+      if (!next) return;
+      check(await supabase.from("thilawa_class_recitations").delete().eq("class_id", classId).eq("kind", "done").eq("recited_on", day));
+      check(await supabase.from("thilawa_class_recitations").update({ kind: "done", recited_on: day }).eq("id", next.id).eq("class_id", classId));
+    },
+    async deleteRecitation(id) { check(await supabase.from("thilawa_class_recitations").delete().eq("id", id).eq("class_id", classId)); },
     subscribe(onChange) {
       const channel = supabase.channel(`thilawa-class-${classId}-${Math.random().toString(36).slice(2)}`);
-      for (const table of ["thilawa_class_readings", "thilawa_class_topics"]) {
+      for (const table of ["thilawa_class_readings", "thilawa_class_topics", "thilawa_class_recitations"]) {
         channel.on("postgres_changes", { event: "*", schema: "public", table, filter: `class_id=eq.${classId}` }, () => onChange());
       }
       channel.subscribe();
@@ -301,7 +330,7 @@ export function createSupabaseClassRepo(supabase, classId, teacherId = null) {
 
 // In memory (tests and the localhost demo). asStudent: read only.
 export function createClassMemoryStore() {
-  return { readings: [], topics: [], nextId: 1, tick: 0, listeners: new Set() };
+  return { readings: [], topics: [], recitations: [], nextId: 1, tick: 0, listeners: new Set() };
 }
 export function createMemoryClassRepo(store, classId, { asStudent = false, teacherId = null } = {}) {
   const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -309,6 +338,7 @@ export function createMemoryClassRepo(store, classId, { asStudent = false, teach
   const teacherOnly = () => { if (asStudent) throw new Error("Only the teacher can do this."); };
   const changed = () => { for (const fn of store.listeners) fn(); };
   const mine = (r) => r.classId === classId;
+  const recitationRow = (r) => ({ id: `r${store.nextId++}`, classId, teacherId, first: r.first, last: r.last, fromPage: r.fromPage, toPage: r.toPage, label: r.label?.trim() || "", createdAt: stamp() });
   return {
     classId,
     async getReading() { const r = store.readings.find((x) => mine(x) && !x.endedAt); return r ? clone(r) : null; },
@@ -337,6 +367,28 @@ export function createMemoryClassRepo(store, classId, { asStudent = false, teach
       changed();
     },
     async deleteTopic(id) { teacherOnly(); store.topics = store.topics.filter((t) => !(t.id === id && mine(t))); changed(); },
+    async listRecitations() { return clone((store.recitations || []).filter(mine).sort(recitationOrder)); },
+    async saveRecitation(r) {
+      teacherOnly();
+      store.recitations = (store.recitations || []).filter((x) => !(mine(x) && x.kind === "done" && x.recitedOn === r.recitedOn));
+      store.recitations.push({ ...recitationRow(r), kind: "done", recitedOn: r.recitedOn });
+      changed();
+    },
+    async setNextRecitation(r) {
+      teacherOnly();
+      store.recitations = (store.recitations || []).filter((x) => !(mine(x) && x.kind === "next"));
+      if (r) store.recitations.push({ ...recitationRow(r), kind: "next", recitedOn: null });
+      changed();
+    },
+    async startNextRecitation(day) {
+      teacherOnly();
+      const next = (store.recitations || []).find((x) => mine(x) && x.kind === "next");
+      if (!next) return;
+      store.recitations = store.recitations.filter((x) => !(mine(x) && x.kind === "done" && x.recitedOn === day));
+      next.kind = "done"; next.recitedOn = day;
+      changed();
+    },
+    async deleteRecitation(id) { teacherOnly(); store.recitations = (store.recitations || []).filter((r) => !(r.id === id && mine(r))); changed(); },
     subscribe(onChange) { store.listeners.add(onChange); return () => store.listeners.delete(onChange); },
   };
 }

@@ -11,17 +11,24 @@
 // A class lesson (see ClassLesson.jsx) adds `classmates`: [{ id, name, done }]
 // for a dropdown of the class in place of the name, `onStudent(id)` to switch
 // to another student (their own marks show), and `onFinished` to call after
-// Finish instead of closing.
+// Finish instead of closing. `ayah` ({ marks, onTap, selected, close, extra },
+// see RecitationMarking.jsx) lets the teacher tap ayah numbers too (the
+// class's recitation); `extra` is shown under the page.
+// In full screen, Finish (in place of Exit) saves everything and closes:
+// marks still saving, every student's unsaved note, this reading finished;
+// `onFinishAll()` finishes the rest (a class: every other student who read),
+// and `repoFor(studentId)` gives another student's repo for their note.
 
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { lockScroll } from "../scrollLock.js";
-import { ChevronLeft, ChevronRight, CheckCircle2, Presentation } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle2, Presentation, StickyNote } from "lucide-react";
 import MushafPage, { MushafPresent, MushafPager } from "./MushafPage.jsx";
 import { TOTAL_PAGES, describePages, pageLabel } from "./engine.js";
 import { MistakePopup } from "./MistakeCategories.jsx";
 import LettersPanel, { LetterChips } from "./LettersPanel.jsx";
 import Whiteboard from "./Whiteboard.jsx";
+import NotePanel from "./NotePanel.jsx";
 
 const CSS = `
   .lm { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; background: #F4F8FC; color: #123B67; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
@@ -68,13 +75,16 @@ const CSS = `
   }
 `;
 
-export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose, classmates = null, onStudent = null, onFinished = null, startPage = null, onPage: onPageTurn = null }) {
+export default function ListenScreen({ student, assignment: a, mistakes, repo, refresh, onClose, classmates = null, onStudent = null, onFinished = null, startPage = null, onPage: onPageTurn = null, ayah = null, onFinishAll = null, repoFor = null }) {
   const [page, setPage] = useState(startPage ?? a.fromPage);
   const [goto, setGoto] = useState(null); // the page number being typed
   const [selectedKey, setSelectedKey] = useState(null);
   const [anchor, setAnchor] = useState(null); // the selected word on screen
   const [lettersOpen, setLettersOpen] = useState(false); // the letters table
   const [board, setBoard] = useState(false); // the whiteboard
+  const [noteOpen, setNoteOpen] = useState(false); // the note for the student
+  const [drafts, setDrafts] = useState({}); // student id → the note being written
+  const [noteShared, setNoteShared] = useState({}); // student id → false: the note is kept private
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const lesson = a.kind === "lesson";
@@ -164,6 +174,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
   }, [onClose]);
 
   const tapWord = (w) => {
+    ayah?.close();
     setSelectedKey(w.key);
     setAnchor(w.el);
     if (open.some((m) => wordKey(m) === w.key)) return; // a marked word is only selected
@@ -176,6 +187,30 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
     setBusy(false);
     const ok = await run(() => repo.setAssignmentChecked(a.id, true));
     if (ok) (onFinished || onClose)();
+  };
+  // Finish in full screen: save everything, then close.
+  const finishAll = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await Promise.all([...queues.current.values()].map((q) => q.chain));
+      for (const [sid, text] of Object.entries(drafts)) {
+        if (!text?.trim()) continue;
+        const r = sid === student.id ? repo : repoFor?.(sid);
+        if (!r) continue;
+        await r.addNote({ body: text, visibleToStudent: noteShared[sid] !== false });
+        setDrafts((d) => ({ ...d, [sid]: "" }));
+      }
+      if (!a.checkedAt) await repo.setAssignmentChecked(a.id, true);
+      await onFinishAll?.();
+      await refresh();
+    } catch (e) {
+      setError(e.message);
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    onClose();
   };
   const onPage = open.filter((m) => m.page === page).length;
 
@@ -201,23 +236,28 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
         <div className="lm-inner">
           {a.instructions && <div className="hz-task-notes">{a.instructions}</div>}
           <LetterChips letters={a.letters} inMushaf />
-          {error && <div className="hz-error" role="alert">{error}</div>}
           {/* Letters and the whiteboard are one tap away, pinned at the top in full screen too, with the student's name. */}
-          <MushafPresent page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}
+          <MushafPresent page={page} finish={{ label: "Finish", onClick: finishAll, busy }} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}
             who={classmates ? (
               <select className="lm-who" value={student.id} disabled={busy} onChange={(e) => onStudent(e.target.value)} aria-label="Student reading">
                 {classmates.map((s) => <option key={s.id} value={s.id}>{s.name}{s.done ? " ✓" : ""}</option>)}
               </select>
             ) : student.name}
             quick={<>
-              <button type="button" className="hz-btn hz-btn-outline lm-board lm-letters" onClick={() => { setSelectedKey(null); setLettersOpen(true); }} aria-expanded={lettersOpen}
+              <button type="button" className="hz-btn hz-btn-outline lm-board lm-letters" onClick={() => { setSelectedKey(null); setNoteOpen(false); setLettersOpen(true); }} aria-expanded={lettersOpen}
                 aria-label={`Letters to improve${a.letters.length ? ` (${a.letters.length} chosen)` : ""}`} title="Letters to improve">
                 <i lang="ar" aria-hidden="true">أب</i><span>Letters</span>{a.letters.length > 0 && <b aria-hidden="true">{a.letters.length}</b>}
               </button>
               <button type="button" className="hz-btn hz-btn-outline lm-board" onClick={() => { setSelectedKey(null); setBoard(true); }} aria-label="Whiteboard" title="Whiteboard"><Presentation size={18} aria-hidden="true" /><span>Whiteboard</span></button>
+              <button type="button" className="hz-btn hz-btn-outline lm-board lm-letters" onClick={() => { setSelectedKey(null); setLettersOpen(false); setNoteOpen(true); }} aria-expanded={noteOpen}
+                aria-label={`Note for ${student.name}`} title="Note for the student"><StickyNote size={18} aria-hidden="true" /><span>Note</span>{drafts[student.id]?.trim() && <b aria-hidden="true">•</b>}</button>
             </>}
             edge={lettersOpen && <LettersPanel key={student.id} value={a.letters} studentName={student.name} busy={busy} onClose={() => setLettersOpen(false)}
-              onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />}>
+              onChange={(letters) => run(() => repo.setAssignmentLetters(a.id, letters))} />
+              || noteOpen && <NotePanel key={student.id} repo={repo} studentName={student.name} draft={drafts[student.id] || ""}
+                onDraft={(t) => setDrafts((d) => ({ ...d, [student.id]: t }))}
+                shared={noteShared[student.id] !== false} onShared={(v) => setNoteShared((x) => ({ ...x, [student.id]: v }))} onSaved={() => refresh().catch(() => {})} onClose={() => setNoteOpen(false)} />}>
+          {error && <div className="hz-error" role="alert">{error}</div>}
           <div className="lm-nav">
             <button className="hz-btn hz-btn-outline" disabled={page >= TOTAL_PAGES} onClick={next} aria-label="Next page"><ChevronLeft size={18} aria-hidden="true" /><span>Next</span></button>
             <div className="lm-nav-title">{pageLabel(page)}
@@ -231,7 +271,8 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
             <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
           </div>
           <MushafPager page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}>
-            {(p, current) => <MushafPage page={p} marks={marks} onWordTap={current ? tapWord : null} selectedKey={current ? selectedKey : null} showCorrected letters={a.letters} />}
+            {(p, current) => <MushafPage page={p} marks={marks} onWordTap={current ? tapWord : null} selectedKey={current ? selectedKey : null} showCorrected letters={a.letters}
+              ayahMarks={ayah?.marks || null} onAyahTap={current && ayah ? (w) => { setSelectedKey(null); ayah.onTap(w); } : null} selectedAyah={current ? ayah?.selected || null : null} />}
           </MushafPager>
           {selected && (
             <MistakePopup key={`${student.id}|${selectedKey}`} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
@@ -239,6 +280,7 @@ export default function ListenScreen({ student, assignment: a, mistakes, repo, r
               onCorrected={() => change(selected, { correctedAt: new Date().toISOString() }, (r, id) => r.setMistakeCorrected(id, true))}
               onRemove={() => change(selected, { removed: true }, (r, id) => r.deleteMistake(id))} />
           )}
+          {ayah?.extra}
           </MushafPresent>
         </div>
       </div>

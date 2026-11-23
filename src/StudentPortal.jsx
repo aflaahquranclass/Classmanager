@@ -3,7 +3,7 @@ import { BookOpen, BookOpenText, Flame, LayoutDashboard, LogOut, ContactRound, L
 import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL } from "./shared.jsx";
 import { supabase } from "./supabaseClient.js";
 import CheckMyReading, { hifzReadingTasks } from "./checkReading/CheckMyReading.jsx";
-import { describePages } from "./thilawa/engine.js";
+import { describePages, ayahSpan } from "./thilawa/engine.js";
 import HifzTracker, { HifzProgress, ACTIVITY_INFO, HIFZ_CSS, useHifz, GoalYearDialog, lastLesson } from "./HifzTracker.jsx";
 import { HOME_CSS, NextStepButton, QuickTiles } from "./StudentHome.jsx";
 import { createSupabaseHifzRepo, createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
@@ -67,6 +67,10 @@ if (DEMO) {
   c.openReading({ fromPage: 562, toPage: 563, firstAyah: 5242, lastAyah: 5256, label: "Al-Mulk 1–15", page: 563 });
   c.addTopic({ topic: "Noon sakinah and tanween: Ikhfa", note: "15 letters. Practise with Al-Mulk 1–5.", taughtOn: "2026-11-03" });
   c.addTopic({ topic: "Madd tabee'i", note: "", taughtOn: "2026-11-05" });
+  // The ayahs the class recited (the last one stays coloured until another is marked), and the next one.
+  c.saveRecitation({ ...ayahSpan(5242, 5246), recitedOn: "2026-11-19" });
+  c.saveRecitation({ ...ayahSpan(5247, 5251), recitedOn: "2026-11-20" });
+  c.setNextRecitation(ayahSpan(5252, 5256));
   t.addNote({ body: "Private: needs help with qalqalah.", visibleToStudent: false });
   const h = createMemoryHifzRepo(hifzDemoStore, "demo", { teacherId: "demo-teacher" });
   const today = maldivesToday();
@@ -304,10 +308,10 @@ const NAV = [
   { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
   { key: "hifz", label: "Hifz Tracker", Icon: BookOpenText, program: "hifz" },
   { key: "hifz-progress", label: "Hifz progress", Icon: LineChart, program: "hifz" },
-  { key: "thilawa-class", label: "Class Reading", Icon: BookOpen, program: "thilawa" },
-  { key: "thilawa", label: "Thilawa progress", Icon: BookOpenCheck, program: "thilawa" },
+  { key: "thilawa-class", label: "Class", Icon: BookOpen, program: "thilawa" },
   { key: "thilawa-assigned", label: "Teacher's Reading", Icon: ListChecks, program: "thilawa" },
   { key: "thilawa-free", label: "Free Reading", Icon: BookMarked, program: "thilawa" },
+  { key: "thilawa", label: "Thilawa progress", Icon: BookOpenCheck, program: "thilawa" },
   { key: "check-reading", label: "Check my Reading", Icon: Mic },
   { key: "attendance", label: "Attendance", Icon: CalendarCheck },
   { key: "exams", label: "Exams", Icon: FileText },
@@ -493,8 +497,10 @@ export default function StudentPortal() {
     ...(doesHifz && doesThilawa ? [] : [{ key: "finance", label: "Fees", Icon: Wallet }]),
   ].map((t) => ({ ...t, active: view === t.key, onClick: () => setView(t.key) }));
   const th = thilawa;
-  const streakNow = dash === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
-  const week = thisWeek(maldivesToday(), (dash === "thilawa" ? th?.streak.calendar : summary?.streak.calendar) || []);
+  // The streak of the program on screen: a Thilawa page shows the Thilawa streak, a Hifz page the Hifz one.
+  const streakOf = view.startsWith("thilawa") ? "thilawa" : view.startsWith("hifz") ? "hifz" : dash;
+  const streakNow = streakOf === "thilawa" ? th?.streak.current ?? 0 : hasPlan ? summary.streak.current : 0;
+  const week = thisWeek(maldivesToday(), (streakOf === "thilawa" ? th?.streak.calendar : summary?.streak.calendar) || []);
   const quotes = useMotivation(ready && !DEMO);
 
   // Signing in uses the shared full-screen sign-in layout.
@@ -736,7 +742,7 @@ export default function StudentPortal() {
           </HifzProgress>
         )}
         {view === "thilawa-class" && doesThilawa && <StudentClassReading classRepo={classRepo} data={thilawa} onGo={setView} />}
-        {view === "thilawa" && doesThilawa && <ThilawaTracker data={thilawa} onGo={setView} />}
+        {view === "thilawa" && doesThilawa && <ThilawaTracker data={thilawa} />}
         {view === "thilawa-assigned" && doesThilawa && <AssignedReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "thilawa-free" && doesThilawa && <FreeReading repo={thilawaRepo} data={thilawa} refresh={refreshThilawa} />}
         {view === "demo-teacher-hifz" && DEMO && (
@@ -773,7 +779,7 @@ export default function StudentPortal() {
         )}
 
         {view === "dashboard" && dash === "thilawa" && (
-          <ThilawaHome data={th} classReading={classState ? classState.reading : undefined} topics={classState?.topics} onGo={setView}>
+          <ThilawaHome data={th} classReading={classState ? classState.reading : undefined} recitations={classState?.recitations} onGo={setView}>
             <section className="sp-card sp-hadith" aria-label="Hadith">
               <span className="sp-accent" aria-hidden="true" />
               <h3>Hadith</h3>

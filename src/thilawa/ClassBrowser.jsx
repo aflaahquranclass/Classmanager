@@ -6,9 +6,11 @@
 // line of badges on a class card; classActions({ name, students }) → optional
 // buttons beside an open class's name; classPanel({ name, students }) → shown
 // above an open class's students (e.g. its class reading). The parent keeps `query` and `openClass` so
-// they stay put while a student is open.
+// they stay put while a student is open. With a classPanel, the class's
+// students are folded away under a "Show students" button until tapped.
 
-import { Search, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { Search, Users, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
 import { groupByClass } from "./programRules.js";
 
 const CSS = `
@@ -32,11 +34,29 @@ const CSS = `
   .cb-head span { color: #567493; font-size: 13px; }
   .cb-head .cb-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
   .cb-label { margin: 18px 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #567493; }
+  .cb-toggle { width: 100%; margin: 18px 0 12px; display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; border: 1px solid #DCEBF8; background: #FFFFFF; color: #123B67;
+    font: 700 15px/1.2 Inter, ui-sans-serif, system-ui, sans-serif; text-align: left; cursor: pointer; box-shadow: 0 6px 18px rgba(18,59,103,0.06); -webkit-tap-highlight-color: transparent; }
+  .cb-toggle:hover { background: #F7FAFD; }
+  .cb-toggle:focus-visible { outline: 2px solid #176FD1; outline-offset: 2px; }
+  .cb-toggle-icon { flex-shrink: 0; width: 34px; height: 34px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #EAF3FD; color: #176FD1; }
+  .cb-toggle > span:nth-child(2) { flex: 1; min-width: 0; }
+  .cb-toggle small { display: block; margin-top: 2px; font-weight: 400; font-size: 13px; color: #567493; }
+  .cb-toggle > svg { flex-shrink: 0; color: #567493; transition: transform 0.18s; }
+  .cb-toggle[aria-expanded="true"] > svg { transform: rotate(180deg); }
   .cb-sub { margin: 14px 0 8px; font-size: 14px; font-weight: 700; color: #123B67; }
 `;
 
+// Classes whose students the teacher has shown, kept while the portal is
+// open (the list goes away while a student is open, and comes back as it was).
+const shownClasses = new Set();
+
 export default function ClassBrowser({ students, query, onQuery, openClass, onOpenClass, renderStudent, summary, classActions, classPanel, gridClass }) {
   const classes = groupByClass(students);
+  const [, redraw] = useState(0);
+  const toggleShown = (name) => {
+    if (shownClasses.has(name)) shownClasses.delete(name); else shownClasses.add(name);
+    redraw((n) => n + 1);
+  };
   const q = query.trim().toLowerCase();
   const plural = (n) => `${n} student${n === 1 ? "" : "s"}`;
 
@@ -80,8 +100,16 @@ export default function ClassBrowser({ students, query, onQuery, openClass, onOp
           {classActions && <span className="cb-actions">{classActions(open)}</span>}
         </div>
         {classPanel?.(open)}
-        {classPanel && <div className="cb-label">Students</div>}
-        {studentGrid(open.students)}
+        {classPanel ? (
+          <>
+            <button type="button" className="cb-toggle" aria-expanded={shownClasses.has(open.name)} onClick={() => toggleShown(open.name)}>
+              <span className="cb-toggle-icon" aria-hidden="true"><Users size={18} /></span>
+              <span>{shownClasses.has(open.name) ? "Hide students" : "Show students"}<small>{plural(open.students.length)}</small></span>
+              <ChevronDown size={20} aria-hidden="true" />
+            </button>
+            {shownClasses.has(open.name) && studentGrid(open.students)}
+          </>
+        ) : studentGrid(open.students)}
       </>
     ) : <div className="cb-grid">{classes.map(classCard)}</div>;
   }

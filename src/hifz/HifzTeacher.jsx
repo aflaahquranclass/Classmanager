@@ -632,11 +632,16 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   };
   const clearDraft = (a) => setDrafts((d) => { const n = { ...d }; delete n[a]; return n; });
   const tapAyah = (w) => { setSelectedKey(null); setAyahMenu(w); };
-  // The ayah numbers to colour: each marked portion's start and end, and a start waiting for its end.
+  // The ayah numbers to colour: each marked portion's start and end, and a
+  // start waiting for its end. Until the next portion is marked, the day's own
+  // marked portion stays coloured (marked on an earlier day, it shows on the
+  // days after until another part is marked).
   const nextMarks = () => ayahMarksOf(MARKED.map((a) => {
     if (pendingStart?.activity === a) return { activity: a, startAyah: pendingStart.ayah, open: true };
     const t = nextTarget(a);
-    return t.marked ? { activity: a, startAyah: t.portion.startAyah, endAyah: t.portion.endAyah } : null;
+    if (t.marked) return { activity: a, startAyah: t.portion.startAyah, endAyah: t.portion.endAyah };
+    const current = dayOf(marking).find((x) => x.activity === a && x.startAyah);
+    return current ? { activity: a, startAyah: current.startAyah, endAyah: current.endAyah } : null;
   }));
   const ayahMenuBox = () => {
     const n = ayahNumber(ayahMenu.verseKey);
@@ -757,6 +762,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
           <div className="ht-full-inner">
             <TaskReader task={marking} who={student.name} mistakes={mistakes} onWordTap={tapWord} selectedKey={selectedKey} showCorrected
               fade={false} compact ayahMarks={nextMarks()} onAyahTap={tapAyah} selectedAyah={ayahMenu?.verseKey || null}
+              finish={allDone ? { label: "Close", onClick: closeMarking } : { label: "Finish", onClick: finishDay, busy: busy || !!pendingStart }}
               header={<TaskTabs tasks={dayOf(marking)} current={marking} onPick={openMarking} done={(x) => !!x.completedAt} />}>
             {selected && (
               <MistakePopup key={selectedKey} anchor={anchor} mistake={selected} busy={false} onClose={() => setSelectedKey(null)}
@@ -765,6 +771,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
                 onRemove={() => change(selected, { removed: true }, (id) => repo.deleteMistake(id))} />
             )}
             {ayahMenu && ayahMenuBox()}
+            {error && <div className="hz-error" role="alert">{error}</div>}
             </TaskReader>
             {nextClassPanel()}
           </div>

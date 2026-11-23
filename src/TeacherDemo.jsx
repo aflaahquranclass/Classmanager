@@ -8,7 +8,7 @@ import { TeacherThilawa } from "./thilawa/ThilawaTeacher.jsx";
 import { TeacherHifz } from "./hifz/HifzTeacher.jsx";
 import { createThilawaMemoryStore, createMemoryThilawaRepo, createClassMemoryStore, createMemoryClassRepo } from "./thilawa/repos.js";
 import { createHifzMemoryStore, createMemoryHifzRepo } from "./hifz/taskRepos.js";
-import { ayahPages } from "./thilawa/engine.js";
+import { ayahPages, ayahSpan } from "./thilawa/engine.js";
 import { pageToUnit } from "./hifz/quran.js";
 import { maldivesToday } from "./dates.js";
 import { SplashDone } from "./splash.jsx";
@@ -45,6 +45,10 @@ const hifzStore = createHifzMemoryStore();
   await cls.openReading({ fromPage: mulk.fromPage, toPage: mulk.toPage, firstAyah: mulk.first, lastAyah: mulk.last, label: mulk.label, page: 563 });
   await cls.addTopic({ topic: "Noon sakinah and tanween: Ikhfa", note: "15 letters. Practise with Al-Mulk 1–5.", taughtOn: "2026-11-03" });
   await cls.addTopic({ topic: "Madd tabee'i", note: "", taughtOn: "2026-11-05" });
+  // The ayahs recited on the last few days (Today's recitation history).
+  for (const [day, from, to] of [["2026-11-17", 1, 5], ["2026-11-19", 6, 10], ["2026-11-20", 11, 15]]) {
+    await cls.saveRecitation({ ...ayahSpan(mulk.first + from - 1, mulk.first + to - 1), recitedOn: day });
+  }
   const levels = [[55, 60], [70, 65], [40, 50], [80, 75]];
   for (const [i, s] of THILAWA_STUDENTS.entries()) {
     const t = createMemoryThilawaRepo(thilawaStore, s.id, { teacherId: TEACHER });

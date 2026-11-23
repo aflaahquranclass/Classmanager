@@ -4,7 +4,7 @@
 // A reading row is { id, readOn: "YYYY-MM-DD", fromPage, toPage, assignmentId, createdAt }.
 
 import { SURAHS, JUZ_START_PAGES, TOTAL_PAGES, surahsOnPages, juzOfPage } from "../hifz/quran.js";
-import { PAGE_FIRST_AYAH, TOTAL_AYAHS, SURAH_AYAH_COUNTS, SURAH_FIRST_AYAH } from "../hifz/ayahs.js";
+import { PAGE_FIRST_AYAH, TOTAL_AYAHS, SURAH_AYAH_COUNTS, SURAH_FIRST_AYAH, ayahRef } from "../hifz/ayahs.js";
 import { AYAH_START_LINE, AYAH_END_LINE } from "../hifz/ayahLines.js";
 import { computeStreak, diffDays, addDays, localDate } from "../hifz/engine.js";
 
@@ -64,6 +64,21 @@ export function ayahPages(surah, fromAyah, toAyah = fromAyah) {
   const name = SURAHS[surah - 1].name;
   const whole = a === 1 && b === count;
   return { surah, fromAyah: a, toAyah: b, first: first + a - 1, last: first + b - 1, whole, fromPage: page(AYAH_START_LINE[first + a - 2]), toPage: page(AYAH_END_LINE[first + b - 2]), label: whole ? name : `${name} ${a}${a === b ? "" : `–${b}`}` };
+}
+
+// From ayah a to ayah b (1–6236, either order, both included), for the class's
+// recitation: { first, last, fromPage, toPage, label }, the label being
+// "Al-Mulk 16–20", "Al-Mulk 28 – Al-Qalam 5", or the surah's name when whole.
+export function ayahSpan(a, b = a) {
+  const first = Math.min(TOTAL_AYAHS, Math.max(1, Math.round(Math.min(a, b))));
+  const last = Math.min(TOTAL_AYAHS, Math.max(first, Math.round(Math.max(a, b))));
+  const page = (line) => Math.floor(line / 15) + 1;
+  const x = ayahRef(first), y = ayahRef(last);
+  const nx = SURAHS[x.surah - 1].name, ny = SURAHS[y.surah - 1].name;
+  const label = x.surah !== y.surah ? `${nx} ${x.ayah} – ${ny} ${y.ayah}`
+    : x.ayah === 1 && y.ayah === SURAH_AYAH_COUNTS[x.surah - 1] ? nx
+    : x.ayah === y.ayah ? `${nx} ${x.ayah}` : `${nx} ${x.ayah}–${y.ayah}`;
+  return { first, last, fromPage: page(AYAH_START_LINE[first - 1]), toPage: page(AYAH_END_LINE[last - 1]), label };
 }
 
 // Surahs matching a search: by number prefix, or by name ignoring spaces,

@@ -1,7 +1,7 @@
-// Student portal: Thilawa (reading the Quran by looking). Kept simple, three
-// screens — the student's last recitation in the Mushaf with the words to
-// correct highlighted (plus levels and the teacher's notes), the reading the
-// teacher set (ticked when done) and free reading.
+// Student portal: Thilawa (reading the Quran by looking). Each screen has one
+// job: Progress (levels, Khatam, lessons, the teacher's notes), the reading
+// the teacher set (ticked when done) and free reading. The class Mushaf is
+// the Class page (ClassThilawa.jsx); the dashboard is ThilawaHome.jsx.
 // Uses the .hz-* styles from HifzTracker.jsx plus the .th-* styles below.
 
 import { useState, useEffect } from "react";
@@ -60,38 +60,17 @@ export const thilawaCss = () => `
   .th-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
   .th-today { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
   .th-today span { background: #DDF5E9; color: #156B45; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
-  .th-recite { padding: 0 !important; overflow: hidden; border-radius: 20px; }
-  .th-recite-head { position: relative; display: flex; align-items: center; gap: 16px; padding: 20px 22px; color: #FFFFFF; overflow: hidden;
-    background: linear-gradient(120deg, #0D4F85 0%, #176FD1 55%, #0A94B1 100%); }
-  .th-recite-head::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 90% -30%, rgba(255,255,255,0.28), transparent 60%); }
-  .th-recite-head > * { position: relative; z-index: 1; }
-  .th-recite-icon { flex-shrink: 0; width: 54px; height: 54px; border-radius: 16px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.35); display: flex; align-items: center; justify-content: center; }
-  .th-recite-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-  .th-recite-title small { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.85; }
-  .th-recite-title h2 { margin: 0; font-size: clamp(20px, 4.6vw, 28px); font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
-  .th-recite-title span { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; opacity: 0.92; }
-  .th-recite-count { flex-shrink: 0; min-width: 96px; padding: 10px 14px; border-radius: 16px; background: #FFFFFF; color: #123B67; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 2px; box-shadow: 0 8px 20px rgba(8,40,80,0.25); }
-  .th-recite-count b { font-size: 34px; line-height: 1; color: #C2410C; }
-  .th-recite-count span { font-size: 12px; font-weight: 700; color: #567493; }
-  .th-recite-ok { color: #1E8A5A; }
-  .th-recite-ok span { color: #1E8A5A; }
-  .th-recite-body { padding: 16px 20px 20px; }
-  .th-recite-empty { margin: 0; padding: 16px 22px 20px; color: #567493; font-size: 15px; line-height: 1.5; }
-  .th-recite-hint { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: #123B67; font-size: 15px; font-weight: 600; }
-  .th-recite-hint svg { color: #176FD1; flex-shrink: 0; }
-  .th-recite-key { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
-  .th-recite-key span { display: inline-flex; align-items: center; gap: 8px; padding: 5px 6px 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; }
-  .th-recite-key .th-key-ar { font-family: "Noto Naskh Arabic", "Geeza Pro", serif; font-size: 15px; font-weight: 600; }
-  .th-recite-key b { min-width: 22px; height: 22px; border-radius: 999px; background: rgba(255,255,255,0.75); display: inline-flex; align-items: center; justify-content: center; font: 700 12px/1 Inter, system-ui, sans-serif; }
-  @media (max-width: 520px) {
-    .th-recite-head { flex-wrap: wrap; padding: 16px; gap: 12px; }
-    .th-recite-icon { width: 44px; height: 44px; border-radius: 13px; }
-    .th-recite-count { flex-direction: row; gap: 8px; min-width: 0; width: 100%; justify-content: center; padding: 8px 12px; }
-    .th-recite-count b { font-size: 26px; }
-    .th-recite-body { padding: 12px 6px 14px; }
-    .th-recite-body > .th-recite-hint, .th-recite-body > .th-recite-key, .th-recite-body > .lc { margin-left: 8px !important; margin-right: 8px !important; }
-    .th-recite .mp-page { padding: 4% 2.5% 2%; border-radius: 10px; }
-  }
+  .th-khatam { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+  .th-khatam b { font-size: 28px; color: #1452A8; }
+  .th-khatam span { font-size: 14px; color: #567493; }
+  .th-lessons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .th-lessons li { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-top: 1px solid #EEF3F8; }
+  .th-lessons li:first-child { border-top: none; }
+  .th-lesson-date { flex-shrink: 0; width: 96px; font-size: 13px; color: #567493; }
+  .th-lessons li > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .th-lessons b { font-size: 15px; color: #123B67; overflow-wrap: anywhere; }
+  .th-lesson-letters { font: 600 16px/1.4 "Noto Naskh Arabic", "Geeza Pro", serif; color: #E8650A; }
+  .th-badge-words { background: #FCE4E4; color: #B23B3B; display: inline-flex; align-items: center; gap: 4px; }
   .th-hadith { background: linear-gradient(135deg, #FFFBF0, #FFFFFF); border: 1px solid #F1E0B0; border-radius: 14px; padding: 14px 16px; color: #5C4410; font-size: 14px; line-height: 1.6; }
   .th-hadith b { display: block; color: #7A5410; margin-bottom: 4px; }
   @media (max-width: 520px) {
@@ -128,99 +107,63 @@ export function LevelMeter({ kind, value, change = 0 }) {
   );
 }
 
-// ---------- last recitation ----------
-// The reading or lesson the teacher listened to last, open in the Mushaf with
-// the words to correct highlighted (no list: the highlights are the list).
-export function LastRecitation({ data }) {
-  const a = data?.lastRecitation;
-  const marks = data?.lastMarks || [];
-  const [page, setPage] = useState(null);
-  if (!a) {
-    return (
-      <section className="hz-card th-recite" aria-label="Your last recitation">
-        <header className="th-recite-head">
-          <span className="th-recite-icon"><BookOpen size={26} aria-hidden="true" /></span>
-          <div className="th-recite-title"><small>Your last recitation</small><h2>Nothing yet</h2></div>
-        </header>
-        <p className="th-recite-empty">When your teacher listens to you read, the page shows here with the words to correct highlighted.</p>
-      </section>
-    );
-  }
-  const { fromPage, toPage } = pagesWithMarks(a, marks);
-  const at = page ?? marks.map((m) => m.page).sort((x, y) => x - y)[0] ?? a.fromPage;
-  // The highlighter key: each kind of mistake marked, with how many.
-  const kinds = [];
-  for (const m of marks) {
-    const c = mistakeCategory(m.category);
-    const k = kinds.find((x) => x.id === (c?.id ?? null));
-    if (k) k.n += 1;
-    else kinds.push({ id: c?.id ?? null, label: c?.ar ?? "To correct", ar: !!c, style: c ? mistakeColors(c.id) : { background: "#FBD5CC", color: "#8A2E1A", boxShadow: "0 0 0 1px #F2A595" }, n: 1 });
-  }
-  return (
-    <section className="hz-card th-recite" aria-label="Your last recitation">
-      <header className="th-recite-head">
-        <span className="th-recite-icon"><BookOpen size={26} aria-hidden="true" /></span>
-        <div className="th-recite-title">
-          <small>Your last recitation</small>
-          <h2>{a.instructions || describePages(a.fromPage, a.toPage).split(" · ")[0]}</h2>
-          <span><CalendarDays size={14} aria-hidden="true" /> {fmtWhen(a.checkedAt || a.createdAt)} · {a.fromPage === a.toPage ? `Page ${a.fromPage}` : `Pages ${a.fromPage}–${a.toPage}`}</span>
-        </div>
-        {marks.length
-          ? <div className="th-recite-count"><b>{marks.length}</b><span>word{marks.length === 1 ? "" : "s"} to correct</span></div>
-          : <div className="th-recite-count th-recite-ok"><CheckCircle2 size={28} aria-hidden="true" /><span>MashaAllah!</span></div>}
-      </header>
-      <div className="th-recite-body">
-        <p className="th-recite-hint">{marks.length
-          ? <><Highlighter size={16} aria-hidden="true" /> Practise the highlighted words before your next class.</>
-          : <><CheckCircle2 size={16} aria-hidden="true" /> No words to correct this time. Keep it up!</>}</p>
-        {kinds.length > 0 && (
-          <div className="th-recite-key" aria-label="Highlighter colours">
-            {kinds.map((k) => <span key={k.id ?? "plain"} style={k.style} lang={k.ar ? "ar" : undefined} className={k.ar ? "th-key-ar" : undefined}>{k.label}<b>{k.n}</b></span>)}
-          </div>
-        )}
-        <LetterChips letters={a.letters} style={{ margin: "0 0 12px" }} inMushaf />
-        <Reader from={fromPage} to={toPage} page={at} onPage={setPage} marks={marks} letters={a.letters} />
-      </div>
-    </section>
-  );
-}
+// ---------- progress ----------
+// The student's progress, with no Mushaf (the Class page has it): their
+// Tajweed and fluency levels, how far through the Quran their reading is
+// (Khatam), their lessons with the teacher, and all of the teacher's notes.
 
-// ---------- Thilawa tracker ----------
-
-export function ThilawaTracker({ data, onGo }) {
+export function ThilawaTracker({ data }) {
   if (!data) return <div className="hz"><div className="hz-card hz-muted">Loading your Thilawa…</div></div>;
-  const { levels, notes } = data;
+  const { levels, notes, progress, counts, lessons } = data;
   const last = levels.latest;
+  const wordsIn = (l) => data.mistakes.filter((m) => m.assignmentId === l.id && !m.correctedAt);
   return (
     <div className="hz">
-      <LastRecitation data={data} />
-
-      <section className="hz-card" aria-label="Read now">
-        <h2 className="hz-h2"><BookMarked size={22} aria-hidden="true" />Read now</h2>
-        <div className="hz-rev">
-          <div>
-            <strong style={{ color: "#123B67" }}>Teacher's Reading</strong>
-            <span className="hz-muted">{data.openAssignments ? `${data.openAssignments} reading${data.openAssignments === 1 ? "" : "s"} waiting for you` : "All done. MashaAllah!"}</span>
-            <button className="hz-btn hz-btn-outline" onClick={() => onGo("thilawa-assigned")}>Open<ArrowRight size={16} aria-hidden="true" /></button>
-          </div>
-          <div>
-            <strong style={{ color: "#123B67" }}>Free Reading</strong>
-            <span className="hz-muted">Carry on from page {data.nextFreePage}</span>
-            <button className="hz-btn hz-btn-outline" onClick={() => onGo("thilawa-free")}>Open<ArrowRight size={16} aria-hidden="true" /></button>
-          </div>
-        </div>
-      </section>
-
       <section className="hz-card" aria-label="Tajweed and fluency levels">
         <h2 className="hz-h2"><Trophy size={22} aria-hidden="true" />My Levels</h2>
         <div className="th-levels">
           <LevelMeter kind="tajweed" value={last?.tajweed} change={levels.tajweedChange} />
           <LevelMeter kind="fluency" value={last?.fluency} change={levels.fluencyChange} />
         </div>
-        <p className="hz-muted" style={{ marginBottom: 0 }}>
-          {last ? <>Assessed by your teacher on {fmtDate(last.assessedOn)}.{last.comment && <> “{last.comment}”</>}</> : "Your teacher will assess your Tajweed and how fluently you read. Your levels show here."}
-        </p>
+        {last && <p className="hz-muted" style={{ marginBottom: 0 }}>{fmtDate(last.assessedOn)}{last.comment && <> · “{last.comment}”</>}</p>}
       </section>
+
+      <section className="hz-card" aria-label="Khatam">
+        <h2 className="hz-h2"><BookMarked size={22} aria-hidden="true" />Khatam{progress.khatams > 0 && <span className="hz-muted" style={{ fontWeight: 400 }}>· {progress.khatams} done</span>}</h2>
+        <div className="th-khatam">
+          <b>{progress.percent}%</b>
+          <span>{progress.count} of {TOTAL_PAGES} pages</span>
+        </div>
+        <div className="hz-bar" role="progressbar" aria-label="Khatam" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}><div style={{ width: `${progress.percent}%` }} /></div>
+        <div className="th-meta" style={{ marginTop: 10 }}>
+          <span>{counts.surahs} surah{counts.surahs === 1 ? "" : "s"}</span>
+          <span>{counts.juz} juz</span>
+        </div>
+      </section>
+
+      {lessons.length > 0 && (
+        <section className="hz-card" aria-label="Lessons with your teacher">
+          <h2 className="hz-h2"><BookOpen size={22} aria-hidden="true" />Lessons</h2>
+          <ul className="th-lessons">
+            {lessons.map((l) => {
+              const n = wordsIn(l).length;
+              return (
+                <li key={l.id}>
+                  <span className="th-lesson-date">{fmtWhen(l.checkedAt || l.createdAt)}</span>
+                  <div>
+                    <b>{l.instructions || describePages(l.fromPage, l.toPage).split(" · ")[0]}</b>
+                    {l.letters?.length > 0 && <span className="th-lesson-letters" lang="ar">{l.letters.join(" ")}</span>}
+                  </div>
+                  {l.checkedAt
+                    ? (n ? <span className="hz-badge th-badge-words"><Highlighter size={12} aria-hidden="true" /> {n}</span>
+                      : <span className="hz-badge hz-badge-completed"><CheckCircle2 size={12} aria-hidden="true" /> MashaAllah</span>)
+                    : <span className="hz-badge hz-badge-pending">In class</span>}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       {notes.length > 0 && (
         <section className="hz-card" aria-label="Teacher's notes">
@@ -240,7 +183,7 @@ export function ThilawaTracker({ data, onGo }) {
 // through the whole Mushaf; `from`–`to` is the part being read (counted in the
 // title, with a way back when the reader goes past it). With onTick/onUntick each page can be
 // ticked as read today. `header` goes above the page.
-export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [], letters = [], header = null }) {
+export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, busy, footer, marks = [], letters = [], header = null, ayahMarks = null }) {
   const read = readToday?.has(page);
   // Like a printed Mushaf: the next page is to the left.
   const next = () => { if (page < TOTAL_PAGES) onPage(page + 1); };
@@ -261,7 +204,7 @@ export function Reader({ from, to, page, onPage, readToday, onTick, onUntick, bu
         <button className="hz-btn hz-btn-outline" disabled={page <= 1} onClick={prev} aria-label="Previous page"><span>Previous</span><ChevronRight size={18} aria-hidden="true" /></button>
       </div>
       <MushafPager page={page} onNext={page < TOTAL_PAGES ? next : null} onPrev={page > 1 ? prev : null}>
-        {(p) => <MushafPage page={p} marks={marks} letters={letters} />}
+        {(p) => <MushafPage page={p} marks={marks} letters={letters} ayahMarks={ayahMarks} />}
       </MushafPager>
       {onTick && (read
         ? <button className="hz-btn hz-btn-primary th-read-btn th-read-done" disabled={busy} onClick={() => onUntick(page)} title="Tap to undo"><CheckCircle2 size={18} aria-hidden="true" />Read today · tap to undo</button>
@@ -327,7 +270,6 @@ export function AssignedReading({ repo, data, refresh }) {
     <div className="hz">
       <section className="hz-card" aria-label="Reading from your teacher">
         <h2 className="hz-h2"><ListChecks size={22} aria-hidden="true" />Teacher's Reading</h2>
-        <p className="hz-muted" style={{ marginTop: 0 }}>Read what your teacher set, then tick it.</p>
         {error && <div className="hz-error" role="alert" style={{ marginBottom: 12 }}>{error}</div>}
         {assignments.length === 0 ? <p className="hz-muted" style={{ margin: 0 }}>Your teacher hasn't set any reading yet.</p> : (
           <div className="th-list">
@@ -360,29 +302,6 @@ export function AssignedReading({ repo, data, refresh }) {
         )}
       </section>
 
-      {data.lessons.length > 0 && (
-        <section className="hz-card" aria-label="Lessons with your teacher">
-          <h2 className="hz-h2"><BookOpen size={22} aria-hidden="true" />Lessons with your teacher</h2>
-          <div className="th-list">
-            {data.lessons.map((l) => (
-              <article key={l.id} className="th-item">
-                <div className="th-item-body">
-                  <span className="th-item-title">{describePages(l.fromPage, l.toPage)}</span>
-                  {l.instructions && <div className="th-instr">{l.instructions}</div>}
-                  <LetterChips letters={l.letters} />
-                  <div className="th-meta">
-                    <span><CalendarDays size={13} aria-hidden="true" /> {fmtWhen(l.createdAt)}</span>
-                    {l.checkedAt
-                      ? <span className="hz-badge hz-badge-empty"><Highlighter size={12} aria-hidden="true" /> {listenedLabel(l)}</span>
-                      : <span className="hz-badge hz-badge-pending">In progress</span>}
-                  </div>
-                </div>
-                <button className="hz-btn hz-btn-outline" onClick={() => { setOpen(l.id); setPage(marksOf(l)[0]?.page ?? l.fromPage); }}>Open</button>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   );
 }
