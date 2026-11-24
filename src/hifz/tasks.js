@@ -11,9 +11,10 @@
 //          teacher tapped on the Mushaf; start/end are then worked out from them.
 //          studentDoneAt: the student says they've finished; completedAt: the
 //          teacher listened and approved (only then is it done and the next one set).
+//          New Hifz comes from the plan; Short and Long Muraja'ah only from the
+//          teacher (picked, or marked on the Mushaf).
 // profile: the plan the teacher sets —
-//   { memorized: [[s, e], …], direction: "forward" | "juz_reverse", startUnit,
-//     newUnits, shortPages, longStartUnit, longMode: "juz" | "pages", longPages }
+//   { memorized: [[s, e], …], direction: "forward" | "juz_reverse", startUnit, newUnits }
 //   newUnits: how much New Hifz a day (half-line units; 30 = a page).
 //   direction/startUnit: where the Hifz starts and which way it goes (on to
 //   the end, or juz by juz towards the front; see directionFor); it orders
@@ -22,8 +23,8 @@
 // mistake: { id, page, line, verseKey, position, wordText, note, taskId, correctedAt, createdAt }
 
 import { TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, unitToPage, pageToUnit } from "./quran.js";
-import { unitsOf, union, intersect, subtract, toSet, computeStreak, localDate, addDays, memorizedAll, newHifzSequence, positionIn, takeFirst } from "./engine.js";
-import { juzOfPage, juzEndUnit, JUZ_START_PAGES, wholeJuz } from "./quran.js";
+import { unitsOf, union, intersect, subtract, toSet, computeStreak, localDate, addDays, memorizedAll, newHifzSequence } from "./engine.js";
+import { juzOfPage, juzEndUnit, wholeJuz } from "./quran.js";
 import { countAyahs, TOTAL_AYAHS, ayahRef, SURAH_AYAH_COUNTS } from "./ayahs.js";
 import { AYAH_START_LINE, AYAH_END_LINE, AYAH_START_POS, AYAH_END_POS } from "./ayahLines.js";
 import { SURAHS } from "./quran.js";
@@ -167,7 +168,7 @@ export const taskPages = (t) => {
 
 // Where each path starts when the teacher hasn't picked the exact page.
 export const PATH_STARTS = { forward: pageToUnit(2), juz_reverse: pageToUnit(582) };
-export const DEFAULT_PLAN = { memorized: [], direction: "forward", startUnit: null, newUnits: UNITS_PER_PAGE, shortPages: 1, longStartUnit: null, longMode: "juz", longPages: 2 };
+export const DEFAULT_PLAN = { memorized: [], direction: "forward", startUnit: null, newUnits: UNITS_PER_PAGE };
 export const planOf = (profile) => ({ ...DEFAULT_PLAN, ...(profile || {}) });
 
 // Which way New Hifz goes from where the student starts: on to the end of the
@@ -192,8 +193,7 @@ export function legacyProfile(legacy) {
   const s = legacy.settings;
   return {
     memorized: memorizedAll(s, legacy.rows || []), goalYear: s.goalYear, fromLegacy: true,
-    direction: s.direction, startUnit: s.startUnit, shortPages: s.shortTarget / UNITS_PER_PAGE,
-    longStartUnit: s.longStartUnit, longMode: "pages", longPages: s.longTarget / UNITS_PER_PAGE,
+    direction: s.direction, startUnit: s.startUnit,
   };
 }
 
@@ -294,91 +294,32 @@ export const mistakeInTask = (m, task) => {
 };
 export const mistakesForTask = (task, mistakes) => mistakes.filter((m) => !m.correctedAt && mistakeInTask(m, task));
 
-// ---------- suggestions for the teacher's next task ----------
-// Worked out from the student's plan, so the teacher only adjusts when needed.
+// ---------- New Hifz from the plan ----------
+// Only New Hifz is worked out from the student's plan. Short and Long
+// Muraja'ah are whatever the teacher sets: picked by surah, ayah and page, or
+// marked on the Mushaf (see MANUAL_ACTIVITIES).
+
+export const PLANNED_ACTIVITIES = ["new"];
+export const MANUAL_ACTIVITIES = ["short", "long"];
 
 const lastOf = (tasks, activity) => tasks.filter((t) => t.activity === activity).sort(byDateThenMade).pop() || null;
 
-// The portion that naturally comes next for an activity:
-//  new   — the next part of the Hifz path that is neither memorised nor
-//          already set, the same size as the last New Hifz (1 page at first);
-//          if the last New Hifz was due (today or before) and isn't done, the
-//          same part again;
-//  short — the plan's number of Short Muraja'ah pages straight before the
-//          New Hifz (e.g. New Hifz Al-A'raf 58–67 with 4 pages → Al-A'raf
-//          31–57): the most recently memorised part of the path;
-//  long  — from where Long Muraja'ah is up to (the plan's start, then the
-//          end of the last Long Muraja'ah) to the end of that juz, or the
-//          plan's number of pages; only memorised pages, wrapping back to the
-//          beginning after the last. Not done when due → the same part again.
+// The New Hifz that naturally comes next: the next part of the Hifz path
+// that is neither memorised nor already set, the same size as the plan's
+// New Hifz a day (1 page at first); if the last New Hifz was due (today or
+// before) and isn't done, the same part again. null for Short and Long
+// Muraja'ah, which the teacher sets.
 export function suggestPortion(activity, tasks, memorized, profile = null, today = null) {
+  if (activity !== "new") return null;
   const plan = planOf(profile);
-  const path = hifzPath(plan);
   const last = lastOf(tasks, activity);
-  // Today's results: a part that was due and isn't done comes again.
-  if (last && today && activity !== "short" && !last.completedAt && last.taskDate <= today) return { start: last.start, end: last.end, repeat: true };
-  if (activity === "new") {
-    const size = plan.newUnits || UNITS_PER_PAGE;
-    const set = tasks.filter((t) => t.activity === "new").map(range);
-    const left = subtract(path, union(memorized, set));
-    if (!left.length) return null;
-    const [s, e] = left[0];
-    return { start: s, end: Math.min(s + size, e) };
-  }
-  if (activity === "short") {
-    // Before the New Hifz that's set and not done yet, else the one that comes next.
-    const openNew = tasks.filter((t) => t.activity === "new" && !t.completedAt).sort(byDateThenMade)[0];
-    const next = openNew || suggestPortion("new", tasks, memorized, plan, today);
-    return shortBefore(next ? next.start : null, memorized, plan);
-  }
-  if (!memorized.length) return null;
-  let pos = last ? last.end : plan.longStartUnit ?? memorized[0][0];
-  // Only memorised pages; back to the beginning after the last one.
-  const block = memorized.find(([, e]) => e > pos) || memorized[0];
-  pos = Math.max(pos, block[0]);
-  if (pos >= block[1]) pos = block[0];
-  const end = plan.longMode === "pages"
-    ? Math.min(pos + Math.round(plan.longPages * UNITS_PER_PAGE), block[1])
-    : Math.min(juzEndUnit(juzOfPage(unitToPage(pos))), block[1]);
-  return { start: pos, end: Math.max(end, pos + UNITS_PER_LINE) };
-}
-
-// Short Muraja'ah for a New Hifz starting at `newStart`: the plan's number of
-// pages straight before it — e.g. New Hifz Al-A'raf 58–67 with 4 pages →
-// Al-A'raf 31–57. On the An-Naba path the New Hifz at the start of a juz is
-// preceded by the end of the juz memorised before it (Juz 29 p. 562 → the end
-// of Juz 30); otherwise it's simply the pages before it in the Mushaf.
-// Without a New Hifz: the end of what's memorised along the path.
-export function shortBefore(newStart, memorized, profile = null) {
-  const plan = planOf(profile);
-  const size = Math.round(plan.shortPages * UNITS_PER_PAGE);
-  if (newStart != null) {
-    let end = newStart;
-    if (plan.direction === "juz_reverse") {
-      // At the very start of a juz on the An-Naba path, the pages before it
-      // on the path are the end of the following juz.
-      const path = hifzPath(plan);
-      const pos = positionIn(path, newStart);
-      const before = pos ? takeFirst(path, pos)[0].filter(([s, e]) => e > s) : [];
-      const last = before[before.length - 1];
-      if (last && last[1] !== newStart) end = last[1];
-      else if (!last) {
-        // The very start of the path, at the start of a juz (e.g. Juz 28 with
-        // Juz 29–30 memorised before): the end of the juz after it, if known.
-        const j = juzOfPage(unitToPage(newStart));
-        const after = juzEndUnit(j + 1);
-        if (j < 30 && newStart === pageToUnit(JUZ_START_PAGES[j - 1]) && memorized.some(([s, e]) => s < after && e >= after)) end = after;
-      }
-    }
-    if (end <= 0) return null;
-    // On the An-Naba path, stay inside the juz (the juz before it isn't memorised yet).
-    const floor = plan.direction === "juz_reverse" ? pageToUnit(JUZ_START_PAGES[juzOfPage(unitToPage(end - 1)) - 1]) : 0;
-    return { start: Math.max(floor, end - size), end };
-  }
-  const onPath = intersect(hifzPath(plan), memorized);
-  const latest = onPath.length ? onPath[onPath.length - 1] : memorized[memorized.length - 1];
-  if (!latest) return null;
-  return { start: Math.max(latest[0], latest[1] - size), end: latest[1] };
+  if (last && today && !last.completedAt && last.taskDate <= today) return { start: last.start, end: last.end, repeat: true };
+  const size = plan.newUnits || UNITS_PER_PAGE;
+  const set = tasks.filter((t) => t.activity === "new").map(range);
+  const left = subtract(hifzPath(plan), union(memorized, set));
+  if (!left.length) return null;
+  const [s, e] = left[0];
+  return { start: s, end: Math.min(s + size, e) };
 }
 
 // ---------- class days (from the timetable) ----------
@@ -406,10 +347,11 @@ export function suggestDate(tasks, today, schedule = null) {
 
 // ---------- tasks generated from the plan ----------
 
-// Tasks to create so every activity has one waiting: for each of New Hifz,
-// Short and Long Muraja'ah with no open (not done) task, the next one on the
-// student's next class day — today, if today is a class day and the last one
-// was before today. `drafts` (by activity) are the teacher's confirmed edits.
+// Tasks to create: when New Hifz has no open (not done) task, the next one
+// from the plan on the student's next class day — today, if today is a class
+// day and the last one was before today. `drafts` (by activity) are the
+// teacher's confirmed next tasks; for Short and Long Muraja'ah they are the
+// only thing set (nothing comes from the plan).
 export function nextTasksToSet({ tasks, memorized, profile, today, schedule = null, drafts = {} }) {
   const out = [];
   let all = [...tasks];
@@ -435,11 +377,4 @@ export function previewNext(task, { tasks, memorized, profile, today, schedule =
   const mem = union(memorized, ...sim.filter((t) => t.activity === "new" && t.completedAt === "~").map((t) => [range(t)]));
   return nextTasksToSet({ tasks: sim, memorized: mem, profile, today: task.taskDate > today ? task.taskDate : today, schedule })
     .find((r) => r.activity === task.activity) || null;
-}
-
-// "Next" after a task: the same activity on the student's next class day.
-export function nextAfter(task, tasks, memorized, today, profile = null, schedule = null) {
-  const day = nextClassDay(schedule, task.taskDate > today ? task.taskDate : today);
-  const portion = suggestPortion(task.activity, tasks, memorized, profile, today);
-  return portion && portion.start < TOTAL_UNITS ? { activity: task.activity, taskDate: day, ...portion } : null;
 }

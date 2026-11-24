@@ -17,7 +17,7 @@ import { HIFZ_CSS, ACTIVITY_INFO, PositionPicker, TaskReader, TaskTabs, useHifz,
 import { TOTAL_UNITS, UNITS_PER_LINE, pageToUnit, unitToPage, juzOfPage, juzStartUnit, wholeJuz, describeRange, describeAmount } from "./quran.js";
 import { unitsOf, toSet, union, subtract, localDate } from "./engine.js";
 import { downloadClassTasks } from "./taskImage.js";
-import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE, ayahNumber, ayahPortion, ayahMarksOf, nextClassDay, memorizedParts, surahsRange, surahRuns, describeSurahRun } from "./tasks.js";
+import { ACTIVITIES, classTaskSheet, mistakesForTask, summarizeHifz, planOf, PATH_STARTS, directionFor, memorizedRanges, describeAyahs, ayahAtLine, ayahName, nextTasksToSet, previewNext, teacherTaskList, TIMEZONE, ayahNumber, ayahPortion, ayahMarksOf, nextClassDay, memorizedParts, surahsRange, surahRuns, describeSurahRun, MANUAL_ACTIVITIES } from "./tasks.js";
 import { ayahRef, countAyahs } from "./ayahs.js";
 import SurahSelect from "./SurahSelect.jsx";
 import { createSupabaseHifzRepo, HIFZ_TASK_MAPS } from "./taskRepos.js";
@@ -226,10 +226,9 @@ const portionSummary = (r) => `${describeRange([r.start, r.end])} · ${describeA
 // ---------- the student's Hifz plan ----------
 // Just two things: what the student has memorised — whole juz (from the
 // front or the back of the Quran) and/or whole surahs, one by one or as a
-// range — and where Hifz starts. Everything else (how much New Hifz a day,
-// Short and Long Muraja'ah) keeps its default or saved value; portions are
-// worked out from the plan (tasks.js: suggestPortion), and skip what's
-// memorised. The target year is the student's own.
+// range — and where Hifz starts. New Hifz is worked out from it (tasks.js:
+// suggestPortion) and skips what's memorised; Short and Long Muraja'ah are
+// set by the teacher. The target year is the student's own.
 
 const JUZ_COUNTS = Array.from({ length: 31 }, (_, i) => i);
 
@@ -322,8 +321,7 @@ function ProfileEditor({ profile, tasks = [], onSave, onCancel, busy }) {
   const removeSurahs = (run) => { setSurahNote(""); set(update(juzSide, juzCount, surahs.filter((r) => r !== run))); };
 
   const memorizedUnits = unitsOf(plan.memorized);
-  const longStart = plan.longStartUnit ?? plan.memorized[0]?.[0] ?? pageToUnit(1);
-  const save = () => onSave({ ...plan, longStartUnit: longStart });
+  const save = () => onSave(plan);
 
   return (
     <div className="ht-plan">
@@ -479,6 +477,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const [ayahMenu, setAyahMenu] = useState(null); // { verseKey, page, el }: the ayah number just tapped
   const [pendingStart, setPendingStart] = useState(null); // { activity, ayah }: a start waiting for its end
   const [pinnedDay, setPinnedDay] = useState(null); // the class day the teacher is choosing parts for (see classParts)
+  const [settingPart, setSettingPart] = useState(null); // activity with nothing set whose Set form is open
   useBackLayer(!!markingId, () => closeMarking(), "teacher-hifz-mushaf");
   const generating = useRef(false);
   // Marking is instant: a tapped word is highlighted (and its pop-up opens)
@@ -497,9 +496,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     try { await fn(); await refresh(); return true; } catch (e) { setError(e.message); return false; } finally { setBusy(false); }
   };
 
-  // Tasks come from the Hifz plan: keep one waiting for each of New Hifz,
-  // Short and Long Muraja'ah on the student's class days (e.g. after the
-  // plan is first saved, or a task the student ticked done at home).
+  // New Hifz comes from the Hifz plan: keep one waiting on the student's
+  // class days (e.g. after the plan is first saved). Short and Long
+  // Muraja'ah are only what the teacher sets (Set, Next task, or ayahs
+  // marked on the Mushaf) — never from the plan.
   const planReady = !!data && data.hasProfile && !data.profile?.fromLegacy;
   useEffect(() => {
     if (!planReady || generating.current) return;
@@ -618,11 +618,15 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     }).finally(() => { generating.current = false; });
   };
   const nextBox = (t) => {
-    const next = nextOf(t);
+    const manual = MANUAL_ACTIVITIES.includes(t.activity);
+    // Short and Long Muraja'ah: nothing comes next until the teacher sets it
+    // (starting from this one's portion, on the next class day).
+    const next = nextOf(t) || (manual ? { taskDate: nextClassDay(student.schedule, t.taskDate > today ? t.taskDate : today), start: t.start, end: t.end, notes: "" } : null);
     if (!next) return <div className="ht-next"><span className="hz-muted">Nothing comes next on the plan.</span></div>;
+    const set = !!drafts[t.activity];
     return (
       <div className="ht-next">
-        <div className="ht-next-head"><ArrowRight size={16} aria-hidden="true" />Next {ACTIVITY_INFO[t.activity].title} · {fmtDay(next.taskDate)}{drafts[t.activity] ? " · confirmed" : ""}</div>
+        <div className="ht-next-head"><ArrowRight size={16} aria-hidden="true" />{manual && !set ? "Set the next" : "Next"} {ACTIVITY_INFO[t.activity].title} · {fmtDay(next.taskDate)}{set ? " · confirmed" : ""}</div>
         <EditTask key={`${t.id}-${next.taskDate}-${next.start}-${next.end}`} task={{ ...next, id: `next-${t.id}`, notes: next.notes || "" }} busy={busy} saveLabel="Confirm"
           onCancel={() => setNextOpen(null)}
           onSave={(d) => { setDrafts((prev) => ({ ...prev, [t.activity]: d })); setNextOpen(null); }} />
@@ -680,15 +684,14 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
     if (await confirmDialog({ title: `Delete this ${what}?`, message: "This can't be undone.", confirmLabel: "Delete" })) run(fn);
   };
 
-  // ---- the next class's New Hifz and Short Muraja'ah, marked on the Mushaf ----
+  // ---- the next class's parts, marked on the Mushaf ----
   // While listening to a day's tasks the teacher taps the ayah number where
-  // the next class's portion starts, then where it ends. It's for the task
-  // that comes after that day's one: the open task already set for a later
-  // day (changed at once), or else the one Finish sets (kept as the
-  // teacher's confirmed next task until then). The marked
-  // portion stays on its day until the teacher changes it. Long Muraja'ah
-  // still comes from the plan.
-  const MARKED = ["new", "short"];
+  // the next class's New Hifz, Short or Long Muraja'ah starts, then where it
+  // ends. It's for the task that comes after that day's one: the open task
+  // already set for a later day (changed at once), or else the one Finish
+  // sets (kept as the teacher's confirmed next task until then). The marked
+  // portion stays on its day until the teacher changes it.
+  const MARKED = ACTIVITIES;
   const nextTarget = (a) => {
     const day = marking.taskDate;
     const later = tasks.filter((x) => x.activity === a && !x.completedAt && x.taskDate > day).sort((x, y) => (x.taskDate < y.taskDate ? -1 : 1))[0];
@@ -737,7 +740,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
       for (const a of MARKED) {
         const t = nextTarget(a);
         if (t.kind === "draft" && t.marked && (t.portion.startAyah === n || t.portion.endAyah === n)) {
-          opts.push({ key: `clear-${a}`, label: `Clear ${ACTIVITY_INFO[a].title} (back to the plan)`, quiet: true, run: () => clearDraft(a) });
+          opts.push({ key: `clear-${a}`, label: a === "new" ? `Clear ${ACTIVITY_INFO[a].title} (back to the plan)` : `Clear the marked ${ACTIVITY_INFO[a].title}`, quiet: true, run: () => clearDraft(a) });
         }
       }
     }
@@ -761,12 +764,6 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
   const nextClassPanel = () => {
     const rows = ACTIVITIES.map((a) => {
       const { title } = ACTIVITY_INFO[a];
-      if (a === "long") {
-        const dayTask = dayOf(marking).find((x) => x.activity === "long");
-        const later = tasks.find((x) => x.activity === "long" && !x.completedAt && x.taskDate > marking.taskDate);
-        const p = later || (dayTask && !dayTask.completedAt ? nextOf(dayTask) : null);
-        return { a, title, text: p ? portionSummary(p) : "From the plan", sub: "From the plan, as before", plan: true };
-      }
       if (pendingStart?.activity === a) return { a, title, text: `Starts at ${ayahName(ayahRef(pendingStart.ayah))}`, sub: "Now tap the ayah number where it ends" };
       const t = nextTarget(a);
       const when = fmtDay(t.taskDate);
@@ -774,7 +771,10 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
         const sub = t.kind === "draft" ? `Marked · set for ${when} when you press Finish` : `Marked · set for ${when}`;
         return { a, title, text: `${describeAyahs(t.portion)} · ${describeRange([t.portion.start, t.portion.end])}`, sub };
       }
-      if (t.portion) return { a, title, text: portionSummary(t.portion), sub: `From the plan · ${when} · tap ayah numbers to change it`, plan: true };
+      if (t.portion) {
+        const from = a === "new" && !drafts[a] && t.kind === "draft" ? "From the plan" : t.kind === "draft" ? "Confirmed" : "Set";
+        return { a, title, text: portionSummary(t.portion), sub: `${from} · ${when} · tap ayah numbers to change it`, plan: true };
+      }
       return { a, title, text: "Nothing set", sub: "Tap the ayah number where it starts", plan: true };
     });
     const dates = MARKED.map((a) => nextTarget(a).taskDate);
@@ -794,7 +794,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 
   // Finish (Listen & mark): every task of the day being listened to that
   // isn't done yet is approved at once, and each one's next task is set on
-  // the next class day — as marked on the Mushaf, or from the plan — in one
+  // the next class day — as marked on the Mushaf, or (New Hifz) from the plan — in one
   // insert, so the student gets one notification. Then the Mushaf closes.
   const finishDay = () => {
     const open = dayOf(marking).filter((t) => !t.completedAt);
@@ -819,7 +819,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
 
   // Listen & mark, full screen: the day's tasks in the whole Mushaf, with
   // tabs to look at each. Tap words to mark mistakes, and ayah numbers to
-  // mark the next class's New Hifz and Short Muraja'ah. Finish: the whole
+  // mark the next class's New Hifz, Short and Long Muraja'ah. Finish: the whole
   // day is done (see finishDay).
   const listenAndMark = () => {
     const { title } = ACTIVITY_INFO[marking.activity];
@@ -903,7 +903,7 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
             <span className="ht-task-tags">
               {count > 0 && <span className="hz-mistake-badge" title="Words marked"><Highlighter size={12} aria-hidden="true" />{count}</span>}
               {done && <span className="ht-ready-tag" title={`Finished ${fmtDate(t.studentDoneAt.slice(0, 10))}`}><CheckCheck size={14} aria-hidden="true" />Student finished</span>}
-              {part && !part.done && !done && (
+              {part && (
                 <button type="button" role="switch" className="ht-give" aria-checked={part.given} disabled={busy}
                   aria-label={`Give ${title} ${classDay === today ? "today" : `on ${fmtDay(classDay)}`}`}
                   title={part.given ? `Switch off: moves to ${fmtDay(laterDay)}` : `Switch on: given ${classDay === today ? "today" : `on ${fmtDay(classDay)}`}`}
@@ -926,6 +926,53 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
           </div>
           {confirmed && nextOpen !== t.id && <div className="ht-task-portion" style={{ fontSize: 13 }}>Next (confirmed) · {fmtDay(confirmed.taskDate)} · {describeRange([confirmed.start, confirmed.end])}</div>}
           {nextOpen === t.id && markingId !== t.id && nextBox(t)}
+        </div>
+      </li>
+    );
+  };
+
+  // A part with nothing set: still shown, with its Given switch (off) and Set
+  // — pick the portion by surah, ayah and page for the class day. (While
+  // listening, the next class's parts can be marked on the Mushaf too.)
+  const lastPortion = (a) => {
+    const own = [...tasks].filter((t) => t.activity === a).sort((x, y) => (x.taskDate < y.taskDate ? -1 : 1)).pop();
+    const ref = own || openTasks.find((t) => t.activity === "new") || tasks.find((t) => t.activity === "new");
+    return ref ? { start: ref.start, end: ref.end } : { start: pageToUnit(1), end: pageToUnit(2) };
+  };
+  const emptyRow = (a) => {
+    const { title, Icon } = ACTIVITY_INFO[a];
+    const part = classParts.find((p) => p.a === a);
+    const when = classDay === today ? "today" : `on ${fmtDay(classDay)}`;
+    if (settingPart === a) {
+      return (
+        <li key={`empty-${a}`} className="ht-row ht-row-open">
+          <div className="ht-row-head"><Icon size={18} aria-hidden="true" /><b>Set {title}</b></div>
+          <EditTask task={{ id: `set-${a}`, taskDate: classDay, ...lastPortion(a), notes: "" }} busy={busy} saveLabel={`Set ${title}`} onCancel={() => setSettingPart(null)}
+            onSave={(d) => run(() => repo.addTasks([{ activity: a, ...d }])).then((ok) => ok && setSettingPart(null))} />
+        </li>
+      );
+    }
+    return (
+      <li key={`empty-${a}`} className="ht-task ht-task-off ht-task-empty">
+        <span className={`ht-task-tile ht-tile-${a}`}><Icon size={20} aria-hidden="true" /></span>
+        <div className="ht-task-main">
+          <div className="ht-task-top">
+            <b>{title}</b>{part?.done ? <span className="ht-day ht-day-today">Done today</span> : <span className="ht-day">Not set</span>}
+            <span className="ht-task-tags">
+              <button type="button" role="switch" className="ht-give" aria-checked={false} disabled={busy}
+                aria-label={`Give ${title} ${when}`} title={`Switch on: set ${title} ${when}`} onClick={() => setSettingPart(a)}>
+                Not given<i aria-hidden="true" />
+              </button>
+            </span>
+          </div>
+          <div className="ht-task-portion">
+            {a === "new" && !planReady ? "Save the Hifz plan above, or set it yourself."
+              : a === "new" ? "Nothing left on the plan. Set it yourself."
+              : "Nothing set. Pick the portion, or tap ayah numbers in Listen & mark."}
+          </div>
+          <div className="ht-task-actions">
+            <button className="hz-btn hz-btn-outline" disabled={busy} onClick={() => setSettingPart(a)}><Pencil size={15} aria-hidden="true" />Set {title}</button>
+          </div>
         </div>
       </li>
     );
@@ -963,16 +1010,17 @@ export function TeacherHifzStudent({ student, repo, onBack, onChanged, onMarked 
       <section className="hz-card" aria-label="Tasks">
         <h2 className="hz-h2"><CalendarDays size={22} aria-hidden="true" />Tasks</h2>
         <p className="hz-muted" style={{ marginTop: 0 }}>
-          {planReady
-            ? <>Set from the Hifz plan · {student.schedule?.days?.length === 7 ? "every day" : student.schedule?.days?.length ? student.schedule.days.join(", ") : "class days"}</>
-            : "Save the Hifz plan above to start."}
+          {planReady ? "New Hifz from the Hifz plan" : "New Hifz starts once the Hifz plan above is saved"} · Short and Long Muraja'ah as you set them (Set, or tap ayah numbers in Listen & mark)
+          {" "}· {student.schedule?.days?.length === 7 ? "every day" : student.schedule?.days?.length ? student.schedule.days.join(", ") : "class days"}
         </p>
-        {/* New Hifz, Short Muraja'ah, Long Muraja'ah always in that order; approved ones go to History and the next one takes their place. */}
         {ready > 0 && (
           <div className="ht-ready-note" role="status"><CheckCheck size={18} aria-hidden="true" /><span><b>{ready} task{ready === 1 ? "" : "s"} finished by the student.</b> Listen, then approve.</span></div>
         )}
-        {openTasks.length === 0 && planReady && <p className="hz-muted" style={{ margin: 0 }}>Setting the next tasks…</p>}
-        {openTasks.length > 0 && <ul className="ht-rows">{openTasks.map(taskRow)}</ul>}
+        {/* Always the three parts — New Hifz, Short Muraja'ah, Long Muraja'ah — in that order, each with its Given switch; approved ones go to History and the next one takes their place. */}
+        <ul className="ht-rows">{ACTIVITIES.flatMap((a) => {
+          const list = openTasks.filter((t) => t.activity === a);
+          return list.length ? list.map(taskRow) : [emptyRow(a)];
+        })}</ul>
       </section>
 
       <HistorySection tasks={tasks} mistakes={mistakes} today={today} busy={busy}
