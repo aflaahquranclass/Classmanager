@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { PORTAL } from "./portal.js";
 import { ConfirmHost } from "./ConfirmDialog.jsx";
 import { SplashDone } from "./splash.jsx";
+import { keepAppUpdated } from "./appUpdate.js";
 
 // The main domain shows the public website. Portal subdomains (and ?portal=
 // on localhost) go straight to their portal. There is no combined staff
@@ -55,3 +56,6 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   });
 }
+
+// A page left open picks up a new deploy (see appUpdate.js).
+if (import.meta.env.PROD) keepAppUpdated();

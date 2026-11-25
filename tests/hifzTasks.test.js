@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { pageToUnit, UNITS_PER_PAGE, TOTAL_UNITS, wholeJuz } from "../src/hifz/quran.js";
-import { summarizeHifz, suggestPortion, suggestDate, mistakesForTask, taskPages, legacyProfile, nextClassDay, nextTasksToSet, previewNext, directionFor, hifzPath, teacherTaskList, classTaskSheet, describeAyahs, surahRange, surahsRange, surahRuns, describeSurahRun, memorizedParts } from "../src/hifz/tasks.js";
+import { summarizeHifz, mistakesForTask, taskPages, legacyProfile, nextClassDay, setByApproval, taskRowOf, teacherTaskList, classTaskSheet, describeAyahs, surahRange, surahsRange, surahRuns, describeSurahRun, memorizedParts } from "../src/hifz/tasks.js";
 import { countAyahs, SURAH_AYAH_COUNTS } from "../src/hifz/ayahs.js";
 import { union } from "../src/hifz/engine.js";
 import { loadHifz } from "../src/hifz/taskService.js";
@@ -35,29 +35,6 @@ test("overdue, today and upcoming are split by date; today is ordered New, Short
   assert.equal(s.upcoming.length, 1);
   assert.equal(s.hasProfile, false);
 });
-
-test("New Hifz follows the path; Short and Long Muraja'ah never come from the plan", () => {
-  const done = "2026-10-30T10:00:00Z";
-  // From Al-Baqarah: pages 2–49 known, half of page 50 just done.
-  const fwd = { direction: "forward", startUnit: pageToUnit(2), newUnits: P / 2 };
-  const tasks = [task("2026-10-30", "new", [pageToUnit(50), pageToUnit(50) + P / 2], done)];
-  const memorized = [[pageToUnit(2), pageToUnit(50) + P / 2]];
-  assert.deepEqual(suggestPortion("new", tasks, memorized, fwd), { start: pageToUnit(50) + P / 2, end: pageToUnit(51) });
-  // Short and Long Muraja'ah: only what the teacher sets.
-  assert.equal(suggestPortion("short", tasks, memorized, fwd), null);
-  assert.equal(suggestPortion("long", [task("2026-10-30", "long", pages(10, 21))], memorized, fwd), null);
-
-  // From An-Naba: Juz 30 known, Juz 29 started (pages 562–563).
-  const rev = { direction: "juz_reverse", startUnit: pageToUnit(582) };
-  const memRev = [pages(562, 563), pages(582, 604)];
-  assert.deepEqual(suggestPortion("new", [], memRev, rev), { start: pageToUnit(564), end: pageToUnit(565) });
-  // A New Hifz already set (not done yet) isn't suggested again.
-  assert.equal(suggestPortion("new", [task("2026-11-01", "new", pages(564, 564))], memRev, rev).start, pageToUnit(565));
-
-  assert.equal(suggestDate(tasks, TODAY), TODAY);
-  assert.equal(suggestDate([task(TODAY, "new", pages(1, 1))], TODAY), "2026-11-01");
-});
-
 
 test("task pages, mistakes on a task, and the old plan as a starting point", () => {
   const t = task(TODAY, "new", [pageToUnit(5, 8), pageToUnit(7, 3)]);
@@ -117,54 +94,46 @@ test("teacher sets and changes tasks and mistakes; the student finishes, the tea
 });
 
 
-test("next class day comes from the timetable; a part not done comes again", () => {
+test("next class day comes from the timetable", () => {
   // 2026-10-31 is a Saturday. Classes on Sun, Tue, Thu.
   const sched = { days: ["Sun", "Tue", "Thu"] };
   assert.equal(nextClassDay(sched, "2026-10-31"), "2026-11-01");          // Sat → Sun
   assert.equal(nextClassDay(sched, "2026-11-01"), "2026-11-03");          // Sun → Tue
   assert.equal(nextClassDay(sched, "2026-11-01", true), "2026-11-01");    // today is a class day
   assert.equal(nextClassDay(null, "2026-11-01"), "2026-11-02");           // no timetable: next day
-  assert.equal(suggestDate([task("2026-11-01", "new", pages(1, 1))], "2026-11-01", sched), "2026-11-03");
-
-  const plan = { direction: "forward", startUnit: pageToUnit(2) };
-  const memorized = [pages(2, 20)];
-  const due = task("2026-11-01", "new", pages(21, 21));                   // today's New Hifz, not done
-  const p = suggestPortion("new", [due], memorized, plan, "2026-11-01");
-  assert.deepEqual([p.start, p.end, p.repeat], [pageToUnit(21), pageToUnit(22), true]);
-  // Done → the next part; set for a later day (not due yet) → carry on after it.
-  assert.equal(suggestPortion("new", [{ ...due, completedAt: "2026-11-01T10:00:00Z" }], [pages(2, 21)], plan, "2026-11-01").start, pageToUnit(22));
-  assert.equal(suggestPortion("new", [{ ...due, taskDate: "2026-11-03" }], memorized, plan, "2026-11-01").start, pageToUnit(22));
 });
 
-test("only New Hifz is generated from the plan; Short and Long Muraja'ah are the teacher's", () => {
-  const sched = { days: ["Sun", "Tue", "Thu"] };
-  // Hifz from p. 2, pages 2–157 known, 1 page a day.
-  const plan = { direction: "forward", startUnit: pageToUnit(2), newUnits: P };
-  const memorized = [pages(2, 157)];
-  // Plan just saved on Sunday 1 Nov (a class day): today's New Hifz only.
-  const first = nextTasksToSet({ tasks: [], memorized, profile: plan, today: "2026-11-01", schedule: sched });
-  assert.deepEqual(first.map((r) => [r.activity, r.taskDate, r.start, r.end]), [["new", "2026-11-01", pageToUnit(158), pageToUnit(159)]]);
-  // The teacher sets Short and Long Muraja'ah themself.
-  const set = [...first, { activity: "short", taskDate: "2026-11-01", ...{ start: pageToUnit(150), end: pageToUnit(152) } }, { activity: "long", taskDate: "2026-11-01", start: pageToUnit(2), end: pageToUnit(10) }]
-    .map((r, i) => ({ ...r, notes: "", id: `t${i}`, completedAt: null, createdAt: `2026-11-01T0${i}` }));
-  assert.equal(nextTasksToSet({ tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched }).length, 0);
-  // While listening on Sunday: Tuesday's New Hifz comes from the plan; nothing comes after Short or Long.
-  const nNew = previewNext(set[0], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched });
-  assert.deepEqual([nNew.taskDate, nNew.start], ["2026-11-03", pageToUnit(159)]);
-  assert.equal(previewNext(set[1], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched }), null);
-  assert.equal(previewNext(set[2], { tasks: set, memorized, profile: plan, today: "2026-11-01", schedule: sched }), null);
-  // Approved with nothing set next: no new Short Muraja'ah; one the teacher confirmed is set.
-  const doneShort = set.map((t, i) => (i === 1 ? { ...t, completedAt: "2026-11-01T10:00:00Z" } : t));
-  assert.equal(nextTasksToSet({ tasks: doneShort, memorized, profile: plan, today: "2026-11-01", schedule: sched }).length, 0);
-  const confirmed = nextTasksToSet({ tasks: doneShort, memorized, profile: plan, today: "2026-11-01", schedule: sched, drafts: { short: { taskDate: "2026-11-03", start: pageToUnit(152), end: pageToUnit(154), notes: "" } } });
-  assert.deepEqual(confirmed.map((r) => [r.activity, r.taskDate, r.start]), [["short", "2026-11-03", pageToUnit(152)]]);
-  // A task the student ticked done at home: the teacher's page fills in the next one.
-  const doneNew = set.map((t, i) => (i === 0 ? { ...t, completedAt: "2026-11-01T10:00:00Z" } : t));
-  const after = nextTasksToSet({ tasks: doneNew, memorized: [pages(2, 158)], profile: plan, today: "2026-11-01", schedule: sched });
-  assert.deepEqual(after.map((r) => [r.activity, r.taskDate, r.start]), [["new", "2026-11-03", pageToUnit(159)]]);
-  // The teacher's confirmed change is used instead.
-  const drafted = nextTasksToSet({ tasks: doneNew, memorized: [pages(2, 158)], profile: plan, today: "2026-11-01", schedule: sched, drafts: { new: { start: pageToUnit(159), end: pageToUnit(159) + P / 2, taskDate: "2026-11-05", notes: "Half today" } } });
-  assert.deepEqual([drafted[0].taskDate, drafted[0].end, drafted[0].notes], ["2026-11-05", pageToUnit(159) + P / 2, "Half today"]);
+test("the next task is only what the teacher chose, marked ayahs and all", async () => {
+  const { ayahPortion } = await import("../src/hifz/tasks.js");
+  // Marked on the Mushaf: An-Nas, then the teacher goes back to Al-Falaq.
+  const marked = { taskDate: "2026-11-26", notes: "", ...ayahPortion(6231, 6236) };
+  assert.deepEqual(taskRowOf("new", marked), { activity: "new", taskDate: "2026-11-26", start: marked.start, end: marked.end, notes: "", startAyah: 6231, endAyah: 6236 });
+  // Confirmed by page and line (no ayahs): no ayah fields.
+  const row = taskRowOf("short", { taskDate: "2026-11-26", start: pageToUnit(600), end: pageToUnit(602), notes: "Twice" });
+  assert.deepEqual(row, { activity: "short", taskDate: "2026-11-26", start: pageToUnit(600), end: pageToUnit(602), notes: "Twice" });
+});
+
+test("undoing an approval removes only the next task that approving it set", () => {
+  const at = (iso) => ({ createdAt: iso });
+  // Approved on the teacher's phone at 10:07:06 (its clock); the database marked it at 10:07:06.475.
+  const approved = { ...task("2026-11-24", "new", pages(604, 604)), completedAt: "2026-11-24T10:07:06.156Z", updatedAt: "2026-11-24T10:07:06.475Z" };
+  // Set by Approve straight after (database clock).
+  const setNext = { ...task("2026-11-26", "new", pages(603, 603)), ...at("2026-11-24T10:07:07.020Z") };
+  assert.equal(setByApproval(approved, [approved, setNext]).id, setNext.id);
+  // Finish on a slow connection: three approvals, then the insert.
+  assert.equal(setByApproval(approved, [approved, { ...setNext, ...at("2026-11-24T10:07:20.000Z") }]).id, setNext.id);
+  // Set by the teacher later (Set, or marked on the Mushaf), or made before the approval: kept.
+  const teacherSet = { ...task("2026-11-26", "new", pages(603, 603)), ...at("2026-11-24T10:08:00Z") };
+  assert.equal(setByApproval(approved, [approved, teacherSet]), null);
+  assert.equal(setByApproval(approved, [approved, { ...setNext, ...at("2026-11-24T10:05:00Z") }]), null);
+  // Without the database's time (the demo), the approval time itself.
+  assert.equal(setByApproval({ ...approved, updatedAt: undefined }, [approved, setNext]).id, setNext.id);
+  // Another part, one the student has started, or a done one: kept.
+  assert.equal(setByApproval(approved, [approved, { ...setNext, activity: "short" }]), null);
+  assert.equal(setByApproval(approved, [approved, { ...setNext, studentDoneAt: "2026-11-24T12:00:00Z" }]), null);
+  assert.equal(setByApproval(approved, [approved, { ...setNext, completedAt: "2026-11-24T12:00:00Z" }]), null);
+  // Not approved: nothing to undo.
+  assert.equal(setByApproval({ ...approved, completedAt: null }, [setNext]), null);
 });
 
 test("whole juz from the front or the back", () => {
@@ -172,23 +141,6 @@ test("whole juz from the front or the back", () => {
   assert.deepEqual(wholeJuz("last", 3), [pageToUnit(542), TOTAL_UNITS]); // Juz 28–30
   assert.deepEqual(wholeJuz("last", 1), pages(582, 604));
   assert.deepEqual(wholeJuz("first", 30), [0, TOTAL_UNITS]);
-});
-
-test("the way New Hifz goes follows from where the student starts", () => {
-  // Starting in Juz 30 (An-Naba): juz by juz towards the front.
-  assert.equal(directionFor(pageToUnit(582)), "juz_reverse");
-  assert.equal(directionFor(pageToUnit(590), [pages(582, 589)]), "juz_reverse");
-  // Juz 29–30 known, starting at Juz 28: on towards the front too.
-  assert.equal(directionFor(pageToUnit(542), [wholeJuz("last", 2)]), "juz_reverse");
-  assert.deepEqual(hifzPath({ startUnit: pageToUnit(542), direction: directionFor(pageToUnit(542), [wholeJuz("last", 2)]) }).slice(0, 2),
-    [pages(542, 561), pages(522, 541)]);
-  // From Al-Baqarah (even with Juz 30 known), or after Juz 1–2: on to the end.
-  assert.equal(directionFor(pageToUnit(2)), "forward");
-  assert.equal(directionFor(pageToUnit(2), [wholeJuz("last", 1)]), "forward");
-  assert.equal(directionFor(pageToUnit(42), [wholeJuz("first", 2)]), "forward");
-  assert.equal(directionFor(pageToUnit(2), [wholeJuz("first", 2)]), "forward");
-  // Juz 30 known but not Juz 29, starting in Juz 28: Juz 29 still lies ahead.
-  assert.equal(directionFor(pageToUnit(542), [wholeJuz("last", 1)]), "forward");
 });
 
 test("teacher's list: not done yet, New, Short, Long in that order", () => {
@@ -274,10 +226,6 @@ test("marked ayahs go with the task, and are cleared when its pages are typed in
   await repo.updateTask(t.id, { start: pageToUnit(4), end: pageToUnit(5) }); // typed by page
   [t] = await repo.listTasks();
   assert.deepEqual([t.startAyah, t.endAyah], [null, null]);
-  // The plan's next task keeps a confirmed (marked) portion's ayahs.
-  const rows = nextTasksToSet({ tasks: [], memorized: [], profile: { memorized: [], direction: "forward" }, today: "2026-11-11",
-    drafts: { new: { taskDate: "2026-11-12", ...ayahPortion(13, 17) } } });
-  assert.equal(rows.find((r) => r.activity === "new").startAyah, 13);
 });
 
 // ---------- memorised surahs (a plan with no whole juz) ----------
@@ -313,10 +261,12 @@ test("a saved plan splits back into whole juz and surahs for the editor", () => 
   assert.equal(describeSurahRun([78, 114]), "An-Naba – An-Nas");
 });
 
-test("memorised surahs count in the tracker, and New Hifz skips them", () => {
-  const profile = { memorized: union([surahRange(67)], [surahsRange(112, 114)]), direction: "forward", startUnit: pageToUnit(562) };
+test("memorised surahs count in the tracker, with approved New Hifz added", () => {
+  const profile = { memorized: union([surahRange(67)], [surahsRange(112, 114)]) };
   const s = summarizeHifz({ profile, tasks: [] }, TODAY);
   assert.equal(s.stats.ayahs, 30 + 15);
-  // The path starts at Al-Mulk, which is known: New Hifz starts at Al-Qalam.
-  assert.equal(suggestPortion("new", [], s.memorized, profile).start, surahRange(68)[0]);
+  // An-Nas back to Al-Kafirun, surah by surah: Al-Kafirun approved, Al-Kawthar set (not done).
+  const kafirun = { ...task("2026-11-24", "new", surahRange(109)), completedAt: "2026-11-24T10:00:00Z" };
+  const after = summarizeHifz({ profile, tasks: [kafirun, task("2026-11-26", "new", surahRange(108))] }, TODAY);
+  assert.equal(after.stats.ayahs, 30 + 15 + 6);
 });

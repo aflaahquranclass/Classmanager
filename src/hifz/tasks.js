@@ -10,21 +10,20 @@
 //          startAyah/endAyah (1–6236, both included, or null): the ayahs the
 //          teacher tapped on the Mushaf; start/end are then worked out from them.
 //          studentDoneAt: the student says they've finished; completedAt: the
-//          teacher listened and approved (only then is it done and the next one set).
-//          New Hifz comes from the plan; Short and Long Muraja'ah only from the
-//          teacher (picked, or marked on the Mushaf).
-// profile: the plan the teacher sets —
-//   { memorized: [[s, e], …], direction: "forward" | "juz_reverse", startUnit, newUnits }
-//   newUnits: how much New Hifz a day (half-line units; 30 = a page).
-//   direction/startUnit: where the Hifz starts and which way it goes (on to
-//   the end, or juz by juz towards the front; see directionFor); it orders
-//   New Hifz and tells which pages were memorised most recently.
+//          teacher listened and approved (only then is it done, and the next
+//          one the teacher chose is set).
+//          Nothing is set automatically: New Hifz, Short and Long Muraja'ah
+//          are all the teacher's (picked by surah, ayah and page, or marked on
+//          the Mushaf).
+// profile: the Hifz plan — what the student has memorised —
+//   { memorized: [[s, e], …] } (older plans also keep direction, startUnit
+//   and newUnits; nothing is worked out from them any more).
 // goalYear: the year the student wants to finish by (the student sets it).
 // mistake: { id, page, line, verseKey, position, wordText, note, taskId, correctedAt, createdAt }
 
 import { TOTAL_UNITS, UNITS_PER_PAGE, UNITS_PER_LINE, unitToPage, pageToUnit } from "./quran.js";
-import { unitsOf, union, intersect, subtract, toSet, computeStreak, localDate, addDays, memorizedAll, newHifzSequence } from "./engine.js";
-import { juzOfPage, juzEndUnit, wholeJuz } from "./quran.js";
+import { unitsOf, union, intersect, subtract, toSet, computeStreak, localDate, addDays, memorizedAll } from "./engine.js";
+import { wholeJuz } from "./quran.js";
 import { countAyahs, TOTAL_AYAHS, ayahRef, SURAH_AYAH_COUNTS } from "./ayahs.js";
 import { AYAH_START_LINE, AYAH_END_LINE, AYAH_START_POS, AYAH_END_POS } from "./ayahLines.js";
 import { SURAHS } from "./quran.js";
@@ -166,26 +165,8 @@ export const taskPages = (t) => {
   return pages;
 };
 
-// Where each path starts when the teacher hasn't picked the exact page.
-export const PATH_STARTS = { forward: pageToUnit(2), juz_reverse: pageToUnit(582) };
 export const DEFAULT_PLAN = { memorized: [], direction: "forward", startUnit: null, newUnits: UNITS_PER_PAGE };
 export const planOf = (profile) => ({ ...DEFAULT_PLAN, ...(profile || {}) });
-
-// Which way New Hifz goes from where the student starts: on to the end of the
-// Quran, or juz by juz towards the front (the usual Juz Amma path) when there
-// is nothing left after the start's juz — it's in Juz 30, or everything after
-// it is memorised already (e.g. Juz 29–30 known, starting in Juz 28).
-export function directionFor(startUnit, memorized = []) {
-  const juz = juzOfPage(unitToPage(startUnit));
-  if (juz === 30) return "juz_reverse";
-  return unitsOf(subtract([[juzEndUnit(juz), TOTAL_UNITS]], memorized)) === 0 ? "juz_reverse" : "forward";
-}
-
-// The New Hifz path in order (see engine.newHifzSequence).
-export const hifzPath = (profile) => {
-  const plan = planOf(profile);
-  return newHifzSequence({ direction: plan.direction, startUnit: plan.startUnit ?? PATH_STARTS[plan.direction] ?? PATH_STARTS.forward });
-};
 
 // The starting point from a student's old self-made plan, if they had one.
 export function legacyProfile(legacy) {
@@ -294,32 +275,25 @@ export const mistakeInTask = (m, task) => {
 };
 export const mistakesForTask = (task, mistakes) => mistakes.filter((m) => !m.correctedAt && mistakeInTask(m, task));
 
-// ---------- New Hifz from the plan ----------
-// Only New Hifz is worked out from the student's plan. Short and Long
-// Muraja'ah are whatever the teacher sets: picked by surah, ayah and page, or
-// marked on the Mushaf (see MANUAL_ACTIVITIES).
+// ---------- approving, and undoing it ----------
 
-export const PLANNED_ACTIVITIES = ["new"];
-export const MANUAL_ACTIVITIES = ["short", "long"];
-
-const lastOf = (tasks, activity) => tasks.filter((t) => t.activity === activity).sort(byDateThenMade).pop() || null;
-
-// The New Hifz that naturally comes next: the next part of the Hifz path
-// that is neither memorised nor already set, the same size as the plan's
-// New Hifz a day (1 page at first); if the last New Hifz was due (today or
-// before) and isn't done, the same part again. null for Short and Long
-// Muraja'ah, which the teacher sets.
-export function suggestPortion(activity, tasks, memorized, profile = null, today = null) {
-  if (activity !== "new") return null;
-  const plan = planOf(profile);
-  const last = lastOf(tasks, activity);
-  if (last && today && !last.completedAt && last.taskDate <= today) return { start: last.start, end: last.end, repeat: true };
-  const size = plan.newUnits || UNITS_PER_PAGE;
-  const set = tasks.filter((t) => t.activity === "new").map(range);
-  const left = subtract(hifzPath(plan), union(memorized, set));
-  if (!left.length) return null;
-  const [s, e] = left[0];
-  return { start: s, end: Math.min(s + size, e) };
+// The next task approving `task` set: the open one of the same activity made
+// right after the approval (Approve and Finish add it straight after marking
+// the task done) that the student hasn't started. A task the teacher set
+// later themself (Set, or marked on the Mushaf) isn't it, so undoing an
+// approval never deletes the teacher's own next task. The approval's time is
+// the task's updatedAt (the database's clock, like createdAt) when known.
+const SET_WITH_APPROVAL_MS = 30000;
+export function setByApproval(task, tasks) {
+  if (!task.completedAt) return null;
+  const approved = Date.parse(task.updatedAt || task.completedAt);
+  return tasks
+    .filter((x) => {
+      if (x.id === task.id || x.activity !== task.activity || x.completedAt || x.studentDoneAt || !x.createdAt) return false;
+      const after = Date.parse(x.createdAt) - approved;
+      return after >= -1000 && after <= SET_WITH_APPROVAL_MS;
+    })
+    .sort(byDateThenMade)[0] || null;
 }
 
 // ---------- class days (from the timetable) ----------
@@ -339,42 +313,9 @@ export function nextClassDay(schedule, after, orSame = false) {
   return addDays(after, 1);
 }
 
-// The day new tasks most likely belong to: the next class day, or today when
-// today is a class day that has nothing set yet.
-export function suggestDate(tasks, today, schedule = null) {
-  return tasks.some((t) => t.taskDate === today) ? nextClassDay(schedule, today) : nextClassDay(schedule, today, true);
-}
-
-// ---------- tasks generated from the plan ----------
-
-// Tasks to create: when New Hifz has no open (not done) task, the next one
-// from the plan on the student's next class day — today, if today is a class
-// day and the last one was before today. `drafts` (by activity) are the
-// teacher's confirmed next tasks; for Short and Long Muraja'ah they are the
-// only thing set (nothing comes from the plan).
-export function nextTasksToSet({ tasks, memorized, profile, today, schedule = null, drafts = {} }) {
-  const out = [];
-  let all = [...tasks];
-  for (const a of ACTIVITIES) {
-    if (all.some((t) => t.activity === a && !t.completedAt)) continue;
-    const last = lastOf(all, a);
-    const day = last && last.taskDate >= today ? nextClassDay(schedule, last.taskDate) : nextClassDay(schedule, today, true);
-    const d = drafts[a];
-    const p = d || suggestPortion(a, all, memorized, profile, today);
-    if (!p) continue;
-    const row = { activity: a, taskDate: d?.taskDate || day, start: p.start, end: p.end, notes: d?.notes || "" };
-    if (d?.startAyah) Object.assign(row, { startAyah: d.startAyah, endAyah: d.endAyah });
-    out.push(row);
-    all = [...all, { ...row, id: `planned-${a}`, completedAt: null, createdAt: "~" }];
-  }
-  return out;
-}
-
-// What comes after an open task if today's part is done: the next class
-// day's task for the same activity (as if that day's open tasks were done).
-export function previewNext(task, { tasks, memorized, profile, today, schedule = null }) {
-  const sim = tasks.map((t) => (!t.completedAt && t.taskDate <= task.taskDate ? { ...t, completedAt: "~" } : t));
-  const mem = union(memorized, ...sim.filter((t) => t.activity === "new" && t.completedAt === "~").map((t) => [range(t)]));
-  return nextTasksToSet({ tasks: sim, memorized: mem, profile, today: task.taskDate > today ? task.taskDate : today, schedule })
-    .find((r) => r.activity === task.activity) || null;
-}
+// The row to add for the next task the teacher chose (Next task, or marked on
+// the Mushaf): { taskDate, start, end, notes, startAyah?, endAyah? } → a task.
+export const taskRowOf = (activity, next) => ({
+  activity, taskDate: next.taskDate, start: next.start, end: next.end, notes: next.notes || "",
+  ...(next.startAyah ? { startAyah: next.startAyah, endAyah: next.endAyah } : {}),
+});
