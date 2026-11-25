@@ -105,6 +105,12 @@ def read_wav(data):
         raw = w.readframes(w.getnframes())
     if width != 2:
         raise ValueError("16-bit WAV only")
+    # A made-up sample rate or channel count would make resampling below
+    # allocate gigabytes and stop the server.
+    if not 8000 <= rate <= 48000 or not 1 <= ch <= 2:
+        raise ValueError("8–48 kHz, mono or stereo only")
+    if len(raw) / (rate * ch * 2) > MAX_SECONDS:
+        raise ValueError(f"up to {MAX_SECONDS} s only")
     x = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
     if ch > 1:
         x = x.reshape(-1, ch).mean(axis=1)

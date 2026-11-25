@@ -123,6 +123,7 @@ export function AdminWorkshops({ showToast, onCountChange }) {
 
   const openSlip = async (r) => {
     const win = window.open("", "_blank"); // opened now so the browser doesn't block it
+    if (win) win.opener = null; // the slip's tab can't reach back into the portal
     const { data, error: err } = await supabase.storage.from(SLIP_BUCKET).createSignedUrl(r.slip_path, 600);
     if (err) { win?.close(); showToast(`Couldn’t open the slip: ${err.message}`); return; }
     if (win) win.location.href = data.signedUrl; else window.location.href = data.signedUrl;

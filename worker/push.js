@@ -104,7 +104,10 @@ export async function handlePushOut(request, env, json) {
   if (!env.VAPID_PRIVATE_JWK) return json({ configured: false, sent: 0 });
   const { messages } = await request.json().catch(() => ({}));
   if (!Array.isArray(messages)) return json({ error: "No messages" }, 400);
-  const { sent, gone } = await pushAll(messages.slice(0, 500), (m) => ({
+  // Push services are always https addresses; anything else is never fetched.
+  const valid = messages.slice(0, 500).filter((m) => typeof m?.endpoint === "string" && /^https:\/\/[^/]+\//.test(m.endpoint)
+    && typeof m.p256dh === "string" && typeof m.auth === "string");
+  const { sent, gone } = await pushAll(valid, (m) => ({
     title: m.title || "Aflaah Quran Class", body: m.body, tag: m.tag, ...(m.url ? { url: m.url } : {}),
   }), env);
   if (gone.length) {

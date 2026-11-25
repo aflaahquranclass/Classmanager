@@ -303,6 +303,10 @@ async function loadStudentForUser(userId) {
   return fromClass ? { ...data, programs: [fromClass] } : data;
 }
 
+// Check my Reading is still being built: until this is true, students see a
+// "launching soon" card instead of the page.
+const CHECK_READING_LIVE = false;
+
 // Hifz and Thilawa pages only show for students enrolled in them.
 const NAV = [
   { key: "dashboard", label: "Dashboard", Icon: LayoutDashboard },
@@ -758,7 +762,15 @@ export default function StudentPortal() {
         )}
         {view === "attendance" && <StudentAttendance records={records} />}
         {view === "finance" && <StudentFinance student={student} records={records} demo={DEMO} />}
-        {view === "check-reading" && (
+        {view === "check-reading" && !CHECK_READING_LIVE && (
+          <section className="sp-card" aria-label="Check my Reading" style={{ padding: "40px 24px", textAlign: "center" }}>
+            <span aria-hidden="true" style={{ display: "inline-grid", placeItems: "center", width: 64, height: 64, borderRadius: 20, background: "#eaf1fb", color: "#2a5ea8", marginBottom: 14 }}><Mic size={30} /></span>
+            <h2 style={{ margin: "0 0 6px", fontSize: 22, color: "#1d3f7a" }}>Check my Reading</h2>
+            <p style={{ margin: "0 0 14px", fontSize: 17, fontWeight: 700, color: "#2a5ea8" }}>Developing… Launching soon</p>
+            <p style={{ margin: 0, color: "#5b6b82" }}>InshaAllah, you will soon be able to recite here and get your reading checked.</p>
+          </section>
+        )}
+        {view === "check-reading" && CHECK_READING_LIVE && (
           <CheckMyReading studentId={student.id} demo={DEMO} tasks={[
             ...(doesHifz && summary ? hifzReadingTasks([...summary.overdue, ...summary.todayTasks].filter((t) => !t.completedAt), ACTIVITY_INFO, describeRange) : []),
             ...(doesThilawa && th ? th.assignments.filter((a) => !a.completedAt).map((a) => ({

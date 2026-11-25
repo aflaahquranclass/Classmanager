@@ -41,6 +41,14 @@ function fetchWithTimeout(input, init = {}) {
   });
 }
 
+// Opened from a "Forgot password?" email: the link signs the person in, and
+// the staff portal must then ask for a new password before anything else.
+// Read here, before the client below reads the link and clears it from the
+// address bar. An expired or used link comes back with an error instead.
+const authHash = new URLSearchParams(typeof window === "undefined" ? "" : window.location.hash.replace(/^#/, ""));
+export const passwordRecoveryLink = authHash.get("type") === "recovery";
+export const authLinkError = authHash.get("error_description") || authHash.get("error") || "";
+
 export const supabase = createClient(supabaseUrl, supabaseKey, {
   global: { fetch: fetchWithTimeout },
 });

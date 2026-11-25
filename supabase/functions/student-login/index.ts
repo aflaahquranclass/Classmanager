@@ -22,11 +22,19 @@ const cors = {
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, "Content-Type": "application/json" } });
 
-// 8 characters without look-alikes (0/O, 1/l/I), easy to read out or SMS.
-function oneTimePassword(): string {
+// 10 characters without look-alikes (0/O, 1/l/I), easy to read out or SMS.
+// Random bytes that would favour some letters (256 isn't a multiple of the
+// alphabet's length) are skipped, so every character is equally likely.
+function oneTimePassword(length = 10): string {
   const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+  const limit = 256 - (256 % alphabet.length);
+  let out = "";
+  while (out.length < length) {
+    for (const b of crypto.getRandomValues(new Uint8Array(length * 2))) {
+      if (b < limit && out.length < length) out += alphabet[b % alphabet.length];
+    }
+  }
+  return out;
 }
 
 Deno.serve(async (req) => {

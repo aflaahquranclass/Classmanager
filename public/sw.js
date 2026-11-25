@@ -109,7 +109,10 @@ self.addEventListener("push", (event) => {
 // Tapping a notification opens the app (or brings it to the front).
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
+  // Only ever opens a page of this site, whatever address the message carries.
+  let url = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin);
+  if (url.origin !== self.location.origin) url = new URL("/", self.location.origin);
+  url = url.href;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
       const win = wins.find((w) => w.url.startsWith(self.location.origin));

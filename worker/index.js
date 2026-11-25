@@ -1,6 +1,7 @@
 // The site's Cloudflare Worker. Static files (dist/) are served by the assets
-// binding; only /api/*, / and /login run this code (see run_worker_first in
-// wrangler.jsonc).
+// binding; pages (every address that isn't a file) and /api/* run this code
+// first (see run_worker_first in wrangler.jsonc), so each page gets its
+// security policy with a new nonce (securityHeaders.js).
 //
 // POST /api/dhivehi — exam remarks in correct Dhivehi (see dhivehi.js).
 //
@@ -20,6 +21,7 @@
 import { handleDhivehi } from "./dhivehi.js";
 import { handlePushOut } from "./push.js";
 import { handleRecitation } from "./recitation.js";
+import { withPagePolicy, withSecurityHeaders } from "./securityHeaders.js";
 
 const json = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
@@ -123,21 +125,30 @@ const STAFF_HOSTS = ["teachers.aflaahqc.com", "admin.aflaahqc.com"];
 async function servePage(request, env) {
   const { hostname, pathname } = new URL(request.url);
   if (pathname === "/login" && hostname === "aflaahqc.com") return Response.redirect("https://teachers.aflaahqc.com/", 301);
-  const res = await env.ASSETS.fetch(request);
+  // Always the whole page, never "not modified": each copy has its own nonce.
+  const whole = new Request(request);
+  whole.headers.delete("If-None-Match");
+  whole.headers.delete("If-Modified-Since");
+  const res = withPagePolicy(await env.ASSETS.fetch(whole), { supabaseUrl: env.SUPABASE_URL });
   if (!STAFF_HOSTS.includes(hostname)) return res;
   const out = new Response(res.body, res);
   out.headers.set("X-Robots-Tag", "noindex, nofollow");
   return out;
 }
 
+async function route(request, env) {
+  const { pathname } = new URL(request.url);
+  if (pathname === "/api/email") return asAdmin(request, env, handleEmail);
+  if (pathname === "/api/push-out") return handlePushOut(request, env, json);
+  if (pathname === "/api/dhivehi") return handleDhivehi(request, env);
+  if (pathname === "/api/recitation") return handleRecitation(request, env);
+  if (pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
+  return servePage(request, env);
+}
+
 export default {
   async fetch(request, env) {
-    const { pathname } = new URL(request.url);
-    if (pathname === "/api/email") return asAdmin(request, env, handleEmail);
-    if (pathname === "/api/push-out") return handlePushOut(request, env, json);
-    if (pathname === "/api/dhivehi") return handleDhivehi(request, env);
-    if (pathname === "/api/recitation") return handleRecitation(request, env);
-    if (pathname.startsWith("/api/")) return json({ error: "Not found" }, 404);
-    return servePage(request, env);
+    const api = new URL(request.url).pathname.startsWith("/api/");
+    return withSecurityHeaders(await route(request, env), { api });
   },
 };

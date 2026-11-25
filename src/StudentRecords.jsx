@@ -342,6 +342,7 @@ function ViewSlip({ path, demo }) {
   const open = async () => {
     setBusy(true);
     const win = window.open("", "_blank");
+    if (win) win.opener = null; // the slip's tab can't reach back into the portal
     try { const url = await slipUrl(path); if (win) win.location.href = url; else window.location.href = url; } catch { win?.close(); }
     setBusy(false);
   };

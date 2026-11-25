@@ -62,15 +62,46 @@ has Row-Level Security policies so:
 
 ## Database schema & security
 
-The full schema (tables, RLS policies, helper functions) lives in the
-Supabase project itself (Class workspace), not as SQL files in this repo.
-To view or change it, use the Supabase dashboard's SQL editor or Table
-Editor for that project.
+The schema (tables, RLS policies, helper functions) lives in the Supabase
+project itself (Class workspace); each change since October 2026 is also in
+`supabase/migrations/`. To view or change it, use the Supabase dashboard's
+SQL editor or Table Editor for that project.
 
-One dashboard setting worth turning on yourself (not something a SQL
-migration can do): **Authentication → Policies → enable "leaked password
-protection"**, which checks new passwords against known-breached password
-lists.
+Auth settings to keep on in the Supabase dashboard (not something a SQL
+migration can do):
+
+- **Authentication → Sign In / Providers → turn off "Allow new users to sign
+  up".** Every login is made by the admin (Supabase dashboard, or the
+  student-login function), so nobody needs to sign up on their own.
+- **Authentication → Policies → enable "leaked password protection"**, which
+  checks new passwords against known-breached password lists, and set the
+  minimum password length to 8.
+- **Authentication → URL Configuration**: the redirect URLs must include
+  `https://teachers.aflaahqc.com` and `https://admin.aflaahqc.com`, or
+  "Forgot password?" emails send people to the wrong page.
+
+## Browser security headers
+
+Every response carries security headers (HTTPS only, no framing by other
+sites, no MIME sniffing, microphone for this site only): `public/_headers`
+for static files and `worker/securityHeaders.js` for what the Worker serves;
+`npm test` checks the two match.
+
+The page's **Content-Security-Policy** (`pageCsp()` in
+`worker/securityHeaders.js`) lets only the app's own scripts run, so an
+injected script can't steal a signed-in session. The Worker sends it as a
+header on every page, with a new random nonce that it also puts on the page's
+`<script>` tags. That's why every page address runs the Worker first
+(`run_worker_first` in `wrangler.jsonc`), while files in `public/` and the
+build's `assets/` skip it; `npm test` checks that every file in `public/` is
+listed there. Cloudflare's Bot Fight Mode adds a script of its own to each
+page and gives it the same nonce, and Web Analytics' counter
+(`static.cloudflareinsights.com`) is allowed by name. **If the app starts
+using a new outside server** (an API, a font or image host), add it to
+`pageCsp()`, or the browser will block it. Don't add `onclick="…"`-style
+attributes. The build also writes the policy into `index.html` as a `<meta>`
+tag (with the hashes of its inline scripts) for `npx vite preview`; the
+Worker removes that copy. `npm run dev` doesn't use the policy.
 
 ## Deploying
 

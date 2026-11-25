@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { Users, Languages, GraduationCap, Wallet, ArrowRight, ChevronRight, ChevronLeft, LayoutDashboard, CalendarDays, Search, X, PartyPopper, ClipboardCheck, BookOpen, LogOut, KeyRound, Layers, CheckCircle2, XCircle, Ban, Clock, Repeat2, Trash2, AlertTriangle, Sun, CheckCheck, Shield, Eye, EyeOff, Mail, Lock, Menu, Image as ImageIcon, FileText, RotateCw, User, Phone, Plus, UserCheck, UserPlus, Bell, Star, BookOpenCheck, Quote, Megaphone, CalendarCheck, ShoppingBag } from "lucide-react";
-import { supabase } from "./supabaseClient.js";
+import { supabase, passwordRecoveryLink, authLinkError } from "./supabaseClient.js";
 import { TP, TP_SHARED_STYLES, TP_LOGO_FULL_WHITE_URL, TP_PATTERN_SIDEBAR_URL, TP_PATTERN_MAIN_URL, MONTH_NAMES, monthLabel, shiftMonth, fmtMoney, SearchableSelect } from "./shared.jsx";
 import { PORTAL } from "./portal.js";
 import { maldivesMonth, maldivesToday } from "./dates.js";
@@ -334,6 +334,58 @@ function LoginScreen({
   );
 }
 
+// Opened from a "Forgot password?" email: the link has already signed the
+// person in, so they choose a new password here before going on to the portal.
+const MIN_PASSWORD_LENGTH = 8;
+function NewPasswordScreen({ onDone, onCancel }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (password.length < MIN_PASSWORD_LENGTH) { setError(`Use at least ${MIN_PASSWORD_LENGTH} characters.`); return; }
+    if (password !== confirm) { setError("The two passwords don't match."); return; }
+    setBusy(true);
+    setError("");
+    const { data, error: err } = await supabase.auth.updateUser({ password });
+    setBusy(false);
+    if (err) { setError(/different from the old/i.test(err.message) ? "Choose a password different from your old one." : err.message); return; }
+    onDone(data.user.id);
+  };
+  return (
+    <AuthShell
+      portal={PORTAL === "admin" ? "Admin Portal" : "Teachers Portal"}
+      tagline="Choose a new password for your account."
+      features={[]}
+      title="Choose a new password"
+      subtitle="You opened a password reset link. Pick a new password to finish."
+    >
+      <form onSubmit={submit} aria-label="Choose a new password">
+        <div className="login-field">
+          <label htmlFor="np-new-password">New password</label>
+          <div className="login-input-wrap">
+            <Lock size={17} className="login-input-icon" aria-hidden="true" />
+            <input id="np-new-password" className="login-input" type="password" autoComplete="new-password" autoFocus
+              placeholder={`At least ${MIN_PASSWORD_LENGTH} characters`} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+        </div>
+        <div className="login-field">
+          <label htmlFor="np-confirm-password">Confirm new password</label>
+          <div className="login-input-wrap">
+            <Lock size={17} className="login-input-icon" aria-hidden="true" />
+            <input id="np-confirm-password" className="login-input" type="password" autoComplete="new-password"
+              placeholder="Type it again" value={confirm} onChange={(e) => setConfirm(e.target.value)} required />
+          </div>
+        </div>
+        {error && <div className="login-error" role="alert">{error}</div>}
+        <button className="login-submit" type="submit" disabled={busy}>{busy ? "Saving…" : "Save password"}</button>
+        <button className="login-secondary" type="button" onClick={onCancel}>Cancel and sign out</button>
+      </form>
+    </AuthShell>
+  );
+}
+
 // Shared shell for every Teacher Portal page (My timetable, Attendance, Class
 // records): gradient sidebar with avatar + nav, collapsing to an accessible
 // drawer on mobile. Page content is passed as children — this component only
@@ -543,9 +595,9 @@ export default function App() {
   // to decide which portal to show. RLS on every table enforces this server-side
   // too, so this is UX routing, not the actual security boundary.
   const [role, setRole] = useState("admin"); // admin | teacher
-  const [authView, setAuthView] = useState("checking"); // checking | login | app
+  const [authView, setAuthView] = useState("checking"); // checking | login | new-password | app
   // Fade out the loading screen once the sign-in page or the loaded portal shows.
-  useEffect(() => { if (authView === "login" || (authView === "app" && !loading)) hideSplash(); }, [authView, loading]);
+  useEffect(() => { if (authView === "login" || authView === "new-password" || (authView === "app" && !loading)) hideSplash(); }, [authView, loading]);
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
   const [adminEmailInput, setAdminEmailInput] = useState("");
   const [adminPasswordInput, setAdminPasswordInput] = useState("");
@@ -561,21 +613,27 @@ export default function App() {
   const [accountType, setAccountType] = useState(PORTAL || "teacher"); // teacher | admin
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [forgotPasswordStatus, setForgotPasswordStatus] = useState("");
+  const [forgotPasswordStatus, setForgotPasswordStatus] = useState(
+    authLinkError ? "That password reset link has expired or was already used. Enter your email and tap “Forgot password?” for a new one." : ""
+  );
 
   // Restore an existing Supabase session on load, and react to sign-out (e.g. token expiry).
+  // A password reset link signs the person in: they choose a new password first.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (cancelled) return;
       if (!session) { setAuthView("login"); return; }
+      if (passwordRecoveryLink) { setAuthView("new-password"); return; }
       await routeSignedInUser(session.user.id);
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_OUT") {
         setRole("admin"); setIsAdminAuthenticated(false); setLoggedInTeacherId(null);
         setAuthView("login");
+      } else if (event === "PASSWORD_RECOVERY") {
+        setAuthView("new-password");
       }
     });
     return () => { cancelled = true; sub.subscription.unsubscribe(); };
@@ -3171,6 +3229,11 @@ export default function App() {
         <div style={{ minHeight: "640px", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px", background: C.f }}>
           <LogoLoader />
         </div>
+      ) : authView === "new-password" ? (
+        <NewPasswordScreen
+          onDone={(userId) => { setForgotPasswordStatus(""); setAuthView("checking"); routeSignedInUser(userId); }}
+          onCancel={() => supabase.auth.signOut({ scope: "local" })}
+        />
       ) : authView === "login" ? (
         <LoginScreen
           fields={accountTypeFields[accountType]}
