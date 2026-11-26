@@ -92,6 +92,21 @@ export const TP_SHARED_STYLES = `
         .tp-nav-item:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 2px; }
         .tp-nav-item-active { background: #FFFFFF; color: ${TP.gradStart}; box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
         .tp-nav-item-active:hover { background: #FFFFFF; color: ${TP.gradStart}; }
+        /* Admin menu: labelled groups of tighter rows, so the whole menu fits. */
+        .tp-nav-grouped { gap: 14px; }
+        .tp-nav-group { display: flex; flex-direction: column; gap: 2px; }
+        .tp-nav-group-label {
+          padding: 0 16px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+          text-transform: uppercase; color: rgba(255,255,255,0.62);
+        }
+        .tp-nav-grouped .tp-nav-item { padding: 9px 14px; border-radius: 10px; }
+        .tp-nav-label { flex: 1; min-width: 0; }
+        .tp-nav-badge {
+          flex-shrink: 0; min-width: 20px; height: 18px; padding: 0 6px; box-sizing: border-box; border-radius: 999px;
+          display: inline-flex; align-items: center; justify-content: center;
+          background: #F2B33D; color: #3D2A05; font-size: 11px; font-weight: 700; line-height: 1;
+        }
+        .tp-nav-item-active .tp-nav-badge { background: #FDE7B8; }
         .tp-sidebar-spacer { flex: 1; }
         .tp-logout {
           position: relative; z-index: 1; display: flex; align-items: center; gap: 10px; justify-content: center;

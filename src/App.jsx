@@ -455,7 +455,9 @@ function TeacherPortalLayout({ activeSection, navItems, tabs, teacherDisplayName
 // Islamic pattern assets, and page chrome as TeacherPortalLayout (reusing
 // TP_SHARED_STYLES so nothing is duplicated), reskinned with an admin
 // avatar and an optional "Teacher login" shortcut alongside Log out.
-function AdminPortalLayout({ activeSection, navItems, portalLabel, displayName, roleLabel, onTeacherLogin, onLogout, children }) {
+// navGroups: the menu in labelled groups ({ label, items }; the first has no
+// label); an item's `count` (things waiting) shows as a badge.
+function AdminPortalLayout({ activeSection, navGroups, portalLabel, displayName, roleLabel, onTeacherLogin, onLogout, children }) {
   const [navOpen, setNavOpen] = useState(false);
   useBackLayer(navOpen, () => setNavOpen(false), "portal-menu");
 
@@ -479,18 +481,24 @@ function AdminPortalLayout({ activeSection, navItems, portalLabel, displayName, 
         </div>
         <span className="tp-bell-desktop"><NotificationBell onDark /></span>
       </div>
-      <div className="tp-nav">
-        {navItems.map(({ key, label, icon: Icon, onClick }) => (
-          <button
-            key={key}
-            type="button"
-            className={`tp-nav-item ${activeSection === key ? "tp-nav-item-active" : ""}`}
-            aria-current={activeSection === key ? "page" : undefined}
-            onClick={() => { onClick(); setNavOpen(false); }}
-          >
-            <Icon size={18} aria-hidden="true" />
-            {label}
-          </button>
+      <div className="tp-nav tp-nav-grouped">
+        {navGroups.map(({ label: groupLabel, items }, gi) => (
+          <div key={groupLabel || gi} className="tp-nav-group" role="group" aria-label={groupLabel}>
+            {groupLabel && <div className="tp-nav-group-label" aria-hidden="true">{groupLabel}</div>}
+            {items.map(({ key, label, icon: Icon, onClick, count = 0 }) => (
+              <button
+                key={key}
+                type="button"
+                className={`tp-nav-item ${activeSection === key ? "tp-nav-item-active" : ""}`}
+                aria-current={activeSection === key ? "page" : undefined}
+                onClick={() => { onClick(); setNavOpen(false); }}
+              >
+                <Icon size={18} aria-hidden="true" />
+                <span className="tp-nav-label">{label}</span>
+                {count > 0 && <span className="tp-nav-badge" aria-label={`${count} waiting`}>{count}</span>}
+              </button>
+            ))}
+          </div>
         ))}
       </div>
       <div className="tp-sidebar-spacer" />
@@ -1080,6 +1088,7 @@ export default function App() {
   const [pendingInfo, reloadPendingInfo] = usePendingInfoCount(authView === "app" && role === "admin");
   // Which Notifications tab opens next (Registrations links to its templates).
   const [notificationsTab, setNotificationsTab] = useState("compose");
+  const [registrationsView, setRegistrationsView] = useState("applications"); // which Registrations section opens
 
   const saveStudents = async (list) => {
     const previous = students;
@@ -4649,23 +4658,33 @@ export default function App() {
       ) : (
       <AdminPortalLayout
         activeSection={section}
-        navItems={[
-          { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: () => setSection("dashboard") },
-          { key: "classes", label: "Classes", icon: Layers, onClick: () => { setSection("classes"); setClassesView("classes"); } },
-          { key: "teachers", label: "Teachers", icon: GraduationCap, onClick: () => setSection("teachers") },
-          { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAdminAttendanceView("records"); } },
-          { key: "exams", label: "Exams", icon: FileText, onClick: () => setSection("exams") },
-          { key: "timetable", label: "Timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
-          { key: "finance", label: "Finance", icon: Wallet, onClick: () => setSection("finance") },
-          { key: "notifications", label: "Notifications", icon: Bell, onClick: () => { setNotificationsTab("compose"); setSection("notifications"); } },
-          { key: "registrations", label: pendingRegistrations + pendingInfo + pendingHifzTests > 0 ? `Registrations (${pendingRegistrations + pendingInfo + pendingHifzTests})` : "Registrations", icon: UserPlus, onClick: () => setSection("registrations") },
-          { key: "reviews", label: pendingReviews > 0 ? `Reviews (${pendingReviews})` : "Reviews", icon: Star, onClick: () => setSection("reviews") },
-          { key: "workshops", label: pendingWorkshops > 0 ? `Workshops (${pendingWorkshops})` : "Workshops", icon: CalendarCheck, onClick: () => setSection("workshops") },
-          { key: "store", label: pendingStoreOrders > 0 ? `Store (${pendingStoreOrders})` : "Store", icon: ShoppingBag, onClick: () => setSection("store") },
-          { key: "language", label: "Language", icon: Languages, onClick: () => setSection("language") },
-          { key: "motivation", label: "Motivation", icon: Quote, onClick: () => setSection("motivation") },
-          { key: "marketing", label: "Social Media", icon: Megaphone, onClick: () => setSection("marketing") },
-          { key: "data", label: "Data", icon: Trash2, onClick: () => setSection("data") },
+        navGroups={[
+          { items: [
+            { key: "dashboard", label: "Dashboard", icon: LayoutDashboard, onClick: () => setSection("dashboard") },
+          ] },
+          { label: "Teaching", items: [
+            { key: "classes", label: "Classes & students", icon: Layers, onClick: () => { setSection("classes"); setClassesView("classes"); } },
+            { key: "teachers", label: "Teachers", icon: GraduationCap, onClick: () => setSection("teachers") },
+            { key: "timetable", label: "Timetable", icon: CalendarDays, onClick: () => setSection("timetable") },
+            { key: "attendance", label: "Attendance", icon: ClipboardCheck, onClick: () => { setSection("attendance"); setAdminAttendanceView("records"); } },
+            { key: "exams", label: "Exams", icon: FileText, onClick: () => setSection("exams") },
+          ] },
+          { label: "Sign-ups & orders", items: [
+            { key: "registrations", label: "Registrations", count: pendingRegistrations + pendingInfo + pendingHifzTests, icon: UserPlus, onClick: () => { setRegistrationsView("applications"); setSection("registrations"); } },
+            { key: "workshops", label: "Workshops", count: pendingWorkshops, icon: CalendarCheck, onClick: () => setSection("workshops") },
+            { key: "store", label: "Store", count: pendingStoreOrders, icon: ShoppingBag, onClick: () => setSection("store") },
+            { key: "reviews", label: "Reviews", count: pendingReviews, icon: Star, onClick: () => setSection("reviews") },
+          ] },
+          { label: "Money & messages", items: [
+            { key: "finance", label: "Finance", count: pendingSlips, icon: Wallet, onClick: () => { setSection("finance"); setFinanceView("dashboard"); } },
+            { key: "notifications", label: "Notifications", icon: Bell, onClick: () => { setNotificationsTab("compose"); setSection("notifications"); } },
+            { key: "marketing", label: "Social media", icon: Megaphone, onClick: () => setSection("marketing") },
+          ] },
+          { label: "Settings", items: [
+            { key: "language", label: "Language", icon: Languages, onClick: () => setSection("language") },
+            { key: "motivation", label: "Motivation", icon: Quote, onClick: () => setSection("motivation") },
+            { key: "data", label: "Data", icon: Trash2, onClick: () => setSection("data") },
+          ] },
         ]}
         portalLabel="Admin Portal"
         displayName="Admin"
@@ -4690,6 +4709,13 @@ export default function App() {
                 <div className="tp-dashboard-page">
                   <style>{`
                     .tp-dashboard-page { position: relative; margin: -28px -32px; padding: 32px; min-height: calc(100% + 56px); overflow: hidden; box-sizing: border-box; }
+                    .tp-waiting-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+                    .tp-waiting-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid ${TP.border}; border-radius: 12px; background: #FFFFFF; cursor: pointer; text-align: left; font-family: inherit; min-height: 44px; transition: background 0.15s ease, box-shadow 0.15s ease; }
+                    .tp-waiting-item:hover { background: #F3F9FD; box-shadow: 0 3px 10px rgba(23,111,209,0.12); }
+                    .tp-waiting-item:focus-visible { outline: 2px solid ${TP.blue}; outline-offset: 2px; }
+                    .tp-waiting-icon { width: 34px; height: 34px; border-radius: 10px; background: #FDF3DC; color: #9C6B12; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+                    .tp-waiting-label { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: ${TP.navy}; }
+                    .tp-waiting-count { flex-shrink: 0; min-width: 26px; height: 26px; padding: 0 8px; box-sizing: border-box; border-radius: 999px; background: #F2B33D; color: #3D2A05; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; }
                     @media (max-width: 820px) {
                       .tp-dashboard-page { margin: -18px -16px; padding: 24px; min-height: calc(100% + 36px); }
                     }
@@ -4734,6 +4760,40 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {(() => {
+                    // Everything sent in that is still waiting for the admin, each opening where it's handled.
+                    const waiting = [
+                      { key: "slips", label: "Payment slips to check", count: pendingSlips, icon: Wallet, go: () => { setSection("finance"); setFinanceView("slips"); } },
+                      { key: "registrations", label: "Class registrations", count: pendingRegistrations, icon: UserPlus, go: () => { setRegistrationsView("applications"); setSection("registrations"); } },
+                      { key: "info", label: "Student info updates", count: pendingInfo, icon: User, go: () => { setRegistrationsView("info"); setSection("registrations"); } },
+                      { key: "hifztest", label: "Hifz test registrations", count: pendingHifzTests, icon: BookOpenCheck, go: () => { setRegistrationsView("hifztest"); setSection("registrations"); } },
+                      { key: "workshops", label: "Workshop sign-ups", count: pendingWorkshops, icon: CalendarCheck, go: () => setSection("workshops") },
+                      { key: "store", label: "Store orders", count: pendingStoreOrders, icon: ShoppingBag, go: () => setSection("store") },
+                      { key: "reviews", label: "Reviews", count: pendingReviews, icon: Star, go: () => setSection("reviews") },
+                    ].filter((w) => w.count > 0);
+                    return (
+                      <div className="tp-card" style={{ marginBottom: "18px" }}>
+                        <div style={{ fontSize: "15px", fontWeight: 600, color: TP.navy, marginBottom: waiting.length ? "12px" : "6px" }}>Waiting for you</div>
+                        {waiting.length === 0 ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: C.d }}>
+                            <CheckCircle2 size={16} aria-hidden="true" />Nothing waiting — slips, sign-ups, orders and reviews are all done.
+                          </div>
+                        ) : (
+                          <div className="tp-waiting-grid">
+                            {waiting.map(({ key, label, count, icon: Icon, go }) => (
+                              <button key={key} type="button" className="tp-waiting-item" onClick={go}>
+                                <span className="tp-waiting-icon" aria-hidden="true"><Icon size={18} /></span>
+                                <span className="tp-waiting-label">{label}</span>
+                                <span className="tp-waiting-count">{count}</span>
+                                <ArrowRight size={16} color={TP.blue} aria-hidden="true" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div className="tp-card" style={{ marginBottom: "18px" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", marginBottom: "14px" }}>
@@ -6533,6 +6593,7 @@ export default function App() {
                 onInfoCountChange={reloadPendingInfo}
                 hifzTestCount={pendingHifzTests}
                 onHifzTestCountChange={reloadPendingHifzTests}
+                initialView={registrationsView}
                 onStudentUpdated={(row) => setStudents((prev) => prev.map((x) => (x.id === row.id ? STUDENT_FROM_DB(row) : x)))}
               />}
 

@@ -61,8 +61,9 @@ const overlaps = (a, b) => a.start_time < b.endTime && b.startTime < a.end_time;
 // onEditWelcome(): open Notifications → Templates.
 // onStudentUpdated(studentRow): an info update was saved onto a student.
 // hifzTestCount / onHifzTestCountChange: waiting Hifz test registrations.
-export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0, infoCount = 0, onInfoCountChange, classes = [], teachers = [], students = [], onClassCreated, onAccepted, onEditWelcome, onStudentUpdated, hifzTestCount = 0, onHifzTestCountChange }) {
-  const [view, setView] = useState("applications");
+// initialView: the section to open first (applications, info, hifztest …).
+export function AdminRegistrations({ showToast, onCountChange, pendingCount = 0, infoCount = 0, onInfoCountChange, classes = [], teachers = [], students = [], onClassCreated, onAccepted, onEditWelcome, onStudentUpdated, hifzTestCount = 0, onHifzTestCountChange, initialView = "applications" }) {
+  const [view, setView] = useState(SECTIONS.some((s) => s.key === initialView) ? initialView : "applications");
   const section = SECTIONS.find((s) => s.key === view);
   return (
     <div className="rg-wrap">
