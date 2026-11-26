@@ -282,7 +282,7 @@ export default function WorkshopPage() {
 
 export const CSS = `
   @font-face { font-family: "Aammu"; src: url("/fonts/MV_AammuFK_Regular.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
-  @font-face { font-family: "Faruma"; src: url("/fonts/Faruma.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
+  @font-face { font-family: "Faruma"; src: url("/fonts/A_Faruma.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
   .wk { --navy: #123B67; --deep: #0D4F85; --blue: #176FD1; --teal: #0A94B1; --cyan: #22D3E0; --soft: #EEF6FA; --line: #C7DDF4; --muted: #567493;
     --grad: linear-gradient(120deg, var(--deep) 0%, var(--blue) 55%, var(--teal) 100%);
     min-height: 100vh; font-family: Faruma, Inter, system-ui, sans-serif; color: var(--navy);

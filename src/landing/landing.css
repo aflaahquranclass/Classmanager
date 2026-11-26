@@ -6,7 +6,8 @@
    for headings (.ld-dvh, the form title and field labels, and the main
    headings of the Dhivehi website). */
 @font-face { font-family: "Aammu"; src: url("/fonts/MV_AammuFK_Regular.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
-@font-face { font-family: "Faruma"; src: url("/fonts/Faruma.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
+/* Dhivehi body text: A_Faruma (headings stay Aammu). */
+@font-face { font-family: "Faruma"; src: url("/fonts/A_Faruma.ttf"); font-display: swap; unicode-range: U+0780-07BF, U+060C, U+061B, U+061F, U+FDF2; }
 
 .ld {
   --navy: #123B67; --blue: #176FD1; --teal: #18A9BD; --muted: #567493; --line: #C7DDF4; --soft: #EEF6FA;
