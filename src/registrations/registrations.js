@@ -13,7 +13,11 @@ export const CATEGORIES = [
     dvName: "ހިފްޡު ކުލާސް", dvBlurb: "ކީރިތި ޤުރުއާން ހިތުދަސްކުރާ ކުލާސް",
     // The form has a Rules step: the visitor must agree to the class rules
     // (the database checks it too, see 20261203_hifz_rules_agreement.sql).
-    rulesAgreement: true },
+    rulesAgreement: true,
+    // One form for both age groups (/register/hifz): its first step asks
+    // school students or adults. Each age group still opens and closes on its
+    // own (hifz-school, hifz-adults).
+    oneForm: true },
   { key: "foundation", en: "Foundation", dv: "ފައުންޑޭޝަން", blurb: "Start from the letters and kalimah, and learn to read.", icon: "baby",
     dvName: "ފައުންޑޭޝަން ކުލާސް", dvBlurb: "ކިޔަވަން ފަށައިގަންނަ މަރުޙަލާއަށް ޚާއްޞަ ކުލާސް" },
 ];
@@ -44,7 +48,8 @@ export const formOf = (key) => FORMS.find((f) => f.key === key);
 export const formKeyOf = (category, ageGroup) => FORMS.find((f) => f.category === category && f.ageGroup === ageGroup)?.key || "";
 export const formPath = (key) => {
   const f = formOf(key);
-  return f ? `/register/${f.category}/${ageGroupOf(f.ageGroup).slug}` : "/register";
+  if (!f) return "/register";
+  return categoryOf(f.category)?.oneForm ? `/register/${f.category}` : `/register/${f.category}/${ageGroupOf(f.ageGroup).slug}`;
 };
 export const formUrl = (key) => {
   const { hostname, origin } = window.location;

@@ -662,7 +662,7 @@ function FormLinks({ showToast }) {
             <div className="rg-top">
               <div style={{ minWidth: 0 }}>
                 <div className="rg-name">{f.en}</div>
-                <div className="rg-sub">Ages {ageGroupOf(f.ageGroup).sub} · Dhivehi form</div>
+                <div className="rg-sub">Ages {ageGroupOf(f.ageGroup).sub} · Dhivehi form{categoryOf(f.category)?.oneForm && " · one link for both age groups: visitors choose school students or adults"}</div>
               </div>
               <span className="rg-badge" style={open ? OPEN : CLOSED}>{open ? "Open" : "Closed"}</span>
             </div>

@@ -11,18 +11,21 @@ import {
 } from "../registrations/registrations.js";
 
 // Class registration, all in Dhivehi. There is one form for each class and
-// age group, /register/<class>/<school|adults> (e.g. /register/hifz/school),
+// age group, /register/<class>/<school|adults> (e.g. /register/tajweed/school),
 // which the admin opens and closes on its own (Admin → Registrations → Form
 // links). /register lists the three classes and /register/<class> its two
-// age groups; both only lead to a form.
+// age groups; both only lead to a form. Hifz is one form, /register/hifz,
+// whose first step asks school students or adults (oneForm in
+// registrations.js); /register/hifz/school and /adults open it with that
+// already chosen.
 //
-// A form goes one step at a time: a day and time, the student's details, the
-// class rules to agree to (Hifz only, see rulesAgreement in registrations.js),
-// and last the registration fee and its transfer slip. It goes to Admin →
-// Registrations; nothing here is shown publicly.
+// A form goes one step at a time: (Hifz: school students or adults,) a day
+// and time, the student's details, the class rules to agree to (Hifz only,
+// rulesAgreement), and last the registration fee and its transfer slip. It
+// goes to Admin → Registrations; nothing here is shown publicly.
 const EMPTY = { name: "", nic: "", age: "", atollIsland: "", viber: "" };
-const STEP_NAMES = { time: "ދުވަސް އަދި ގަޑި", details: "ދަރިވަރުގެ މަޢުލޫމާތު", rules: "ގަވާއިދުތައް", fee: "ރަޖިސްޓްރޭޝަން ފީ" };
-const stepsFor = (cat) => (cat.rulesAgreement ? ["time", "details", "rules", "fee"] : ["time", "details", "fee"]);
+const STEP_NAMES = { group: "ކުލާސް", time: "ދުވަސް އަދި ގަޑި", details: "ދަރިވަރުގެ މަޢުލޫމާތު", rules: "ގަވާއިދުތައް", fee: "ރަޖިސްޓްރޭޝަން ފީ" };
+const stepsFor = (cat) => [cat.oneForm && "group", "time", "details", cat.rulesAgreement && "rules", "fee"].filter(Boolean);
 // The rules shown on the Rules step: every part of the rules document but its
 // introduction, in its own (Dhivehi) words.
 const FORM_RULES = RULES.filter((c) => c.key !== "about");
@@ -33,6 +36,7 @@ const ERRORS = {
   slip: "ސްލިޕް އަޕްލޯޑް ނުކުރެވުނު. ފައިލް ބައްލަވާފައި އަލުން މަސައްކަތް ކުރައްވާ.",
   waiting: "މި އައިޑީ ކާޑު ނަންބަރުގައި ފޮނުއްވާފައިވާ ރަޖިސްޓްރޭޝަނެއް ޗެކްކުރުމަށް މިހާރުވެސް އިންތިޒާރުގައި އެބަހުރި. ވައިބަރުން ގުޅާނަން.",
   busy: "މިހާރު ވަރަށް ގިނަ ރަޖިސްޓްރޭޝަންތަކެއް ލިބެމުންދަނީ. އެއް ގަޑިއިރު ފަހުން އަލުން މަސައްކަތް ކުރައްވާ.",
+  groupClosed: "މި ކުލާހުގެ ރަޖިސްޓްރޭޝަން މިހާރު ބަންދުވެއްޖެ.",
   rules: "ކުރިއަށް ދިއުމަށް ކުލާހުގެ ގަވާއިދުތަކަށް އެއްބަސްވެވަޑައިގަންނަވާ.",
   save: "ރަޖިސްޓްރޭޝަން ނުފޮނުވުނު. އަލުން މަސައްކަތް ކުރައްވާ.",
 };
@@ -79,7 +83,9 @@ function startingPlace() {
 
 export default function RegisterPage({ navigate }) {
   const [place] = useState(startingPlace);
-  if (place.category && place.ageGroup) return <RegisterForm category={place.category} ageGroup={place.ageGroup} navigate={navigate} />;
+  if (place.category && (place.ageGroup || categoryOf(place.category).oneForm)) {
+    return <RegisterForm category={place.category} startGroup={place.ageGroup} navigate={navigate} />;
+  }
   if (place.category) return <AgeChooser category={place.category} navigate={navigate} />;
   return <ClassChooser navigate={navigate} />;
 }
@@ -141,18 +147,27 @@ function BackToSite({ navigate }) {
   );
 }
 
-// /register/<class>/<school|adults>: the form itself.
-function RegisterForm({ category, ageGroup, navigate }) {
-  const formKey = formKeyOf(category, ageGroup);
+// /register/<class>/<school|adults>, or /register/hifz: the form itself.
+// startGroup: the age group in the address ("" when the form asks for it).
+function RegisterForm({ category, startGroup, navigate }) {
   const cat = categoryOf(category);
-  const grp = ageGroupOf(ageGroup);
+  const steps = stepsFor(cat);
+  const [ageGroup, setAgeGroup] = useState(startGroup || "");
+  const formKey = formKeyOf(category, ageGroup);
+  const grp = ageGroupOf(ageGroup); // undefined until chosen on the one form
   const other = AGE_GROUPS.find((g) => g.key !== ageGroup);
-  const [formOpen, setFormOpen] = useState(null);
-  useEffect(() => { isFormOpen(formKey).then((open) => setFormOpen(open !== false)); }, [formKey]);
+  // Whether each age group's form is open ({ children: true, adults: false }),
+  // null while loading. A form for one age group only checks its own.
+  const [openGroups, setOpenGroups] = useState(null);
+  useEffect(() => {
+    const groups = cat.oneForm ? AGE_GROUPS : AGE_GROUPS.filter((g) => g.key === startGroup);
+    Promise.all(groups.map((g) => isFormOpen(formKeyOf(category, g.key))))
+      .then((list) => setOpenGroups(Object.fromEntries(groups.map((g, i) => [g.key, list[i] !== false]))));
+  }, [category, startGroup, cat.oneForm]);
   const offerings = useOfferings();
   const [offeringId, setOfferingId] = useState("");
-  const steps = stepsFor(cat);
-  const [step, setStep] = useState(0);
+  // The one form opened at /register/hifz/school starts with the group chosen.
+  const [step, setStep] = useState(() => (cat.oneForm && startGroup ? 1 : 0));
   const at = steps[step];
   const [form, setForm] = useState(EMPTY);
   const [agreed, setAgreed] = useState(false);
@@ -161,15 +176,26 @@ function RegisterForm({ category, ageGroup, navigate }) {
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
 
+  // The age group in the address is closed: ask for the group instead.
+  useEffect(() => {
+    if (cat.oneForm && openGroups && ageGroup && !openGroups[ageGroup] && step > 0) { setAgeGroup(""); setStep(0); }
+  }, [openGroups]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const slots = useMemo(
     () => (offerings || []).filter((o) => o.category === category && o.age_group === ageGroup),
     [offerings, category, ageGroup],
   );
   const offering = slots.find((o) => o.id === offeringId) || null;
-  const ageError = grp.ageError;
+  const ageError = grp?.ageError;
 
   const go = (n) => { setError(""); setStep(n); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const field = (key) => ({ id: `rg-${key}`, value: form[key], onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })) });
+
+  // The one form: choose (or change to) school students or adults, then the time.
+  const pickGroup = (key) => {
+    if (key !== ageGroup) { setAgeGroup(key); setOfferingId(""); }
+    go(steps.indexOf("time"));
+  };
 
   const chooseFile = (e) => {
     const f = e.target.files?.[0] || null;
@@ -205,7 +231,11 @@ function RegisterForm({ category, ageGroup, navigate }) {
       setSent(true);
       window.scrollTo(0, 0);
     } catch (err) {
-      if (err.message === "form-closed") { setFormOpen(false); return; }
+      if (err.message === "form-closed") {
+        setOpenGroups((m) => ({ ...m, [ageGroup]: false }));
+        if (cat.oneForm) { setAgeGroup(""); setOfferingId(""); go(0); setError(ERRORS.groupClosed); }
+        return;
+      }
       if (err.message === "rules") { setAgreed(false); go(steps.indexOf("rules")); setError(ERRORS.rules); return; }
       setError(err.message === "age" ? ageError : ERRORS[err.message] || ERRORS.save);
     } finally {
@@ -213,11 +243,15 @@ function RegisterForm({ category, ageGroup, navigate }) {
     }
   };
 
-  const restart = () => { setForm(EMPTY); setAgreed(false); setFile(null); setOfferingId(""); setSent(false); go(0); };
-  const title = `${cat.dvName} · ${grp.dv}`;
+  const restart = () => {
+    setForm(EMPTY); setAgreed(false); setFile(null); setOfferingId(""); setSent(false);
+    if (cat.oneForm) setAgeGroup("");
+    go(0);
+  };
+  const title = grp ? `${cat.dvName} · ${grp.dv}` : cat.dvName;
 
-  if (formOpen === null) return <section className="ld-sec ld-soft ld-rv" />;
-  if (!formOpen) {
+  if (openGroups === null) return <section className="ld-sec ld-soft ld-rv" />;
+  if (!Object.values(openGroups).some(Boolean)) {
     return (
       <Card done>
         <Lock size={44} aria-hidden="true" />
@@ -242,14 +276,15 @@ function RegisterForm({ category, ageGroup, navigate }) {
   const back = step > 0 && (
     <button type="button" className="ld-btn ld-btn-outline" onClick={() => go(step - 1)}><ArrowLeft size={18} aria-hidden="true" /> ފަހަތަށް</button>
   );
+  const timeStep = steps.indexOf("time");
   const picks = [
-    { step: -1, text: title, fixed: true },
-    step > 0 && offering && { step: 0, text: `${fmtDaysDv(offering.days)} · ${fmtTimeDv(offering.start_time)} – ${fmtTimeDv(offering.end_time)}` },
+    cat.oneForm ? step > 0 && grp && { step: 0, text: grp.dv } : { step: -1, text: title, fixed: true },
+    step > timeStep && offering && { step: timeStep, text: `${fmtDaysDv(offering.days)} · ${fmtTimeDv(offering.start_time)} – ${fmtTimeDv(offering.end_time)}` },
   ].filter(Boolean);
 
   return (
     <Card>
-      <Head title={title} sub={`${cat.dvBlurb} · ${grp.dvSub}`} />
+      <Head title={title} sub={grp ? `${cat.dvBlurb} · ${grp.dvSub}` : cat.dvBlurb} />
 
       <ol className="ld-wz-steps" aria-label="ފިޔަވަޅުތައް" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
         {steps.map((s, i) => (
@@ -271,6 +306,25 @@ function RegisterForm({ category, ageGroup, navigate }) {
       <div className="ld-wz-title">
         <h2 className="ld-dv">ފިޔަވަޅު {step + 1}: {STEP_NAMES[at]}</h2>
       </div>
+
+      {at === "group" && (
+        <>
+          <div className="ld-wz-options">
+            {AGE_GROUPS.map((g) => {
+              const Icon = GROUP_ICONS[g.key];
+              const open = openGroups[g.key];
+              return (
+                <button key={g.key} type="button" className={`ld-wz-option ${ageGroup === g.key ? "on" : ""}`} disabled={!open} onClick={() => pickGroup(g.key)}>
+                  <span className="ld-icon"><Icon size={24} aria-hidden="true" /></span>
+                  <span className="ld-wz-option-text"><b>{g.dv}</b><small>{open ? g.dvSub : "މިހާރު ރަޖިސްޓްރޭޝަން ބަންދު"}</small></span>
+                  <ArrowRight size={20} aria-hidden="true" />
+                </button>
+              );
+            })}
+          </div>
+          {error && <p className="ld-rv-error" role="alert">{error}</p>}
+        </>
+      )}
 
       {at === "time" && (
         <>
@@ -316,8 +370,8 @@ function RegisterForm({ category, ageGroup, navigate }) {
             <input className="ld-input" {...field("viber")} type="tel" inputMode="tel" dir="ltr" required minLength={5} maxLength={20} pattern="[+0-9 \-]{5,20}" placeholder="7xxxxxx" autoComplete="tel" />
           </div>
           {error && <p className="ld-rv-error" role="alert">{error}</p>}
-          {error === ageError && (
-            <button type="button" className="ld-btn ld-btn-outline" onClick={() => navigate(formPath(formKeyOf(category, other.key)))}>{other.dvForm} <ArrowRight size={18} aria-hidden="true" /></button>
+          {error === ageError && (!cat.oneForm || openGroups[other.key]) && (
+            <button type="button" className="ld-btn ld-btn-outline" onClick={() => (cat.oneForm ? pickGroup(other.key) : navigate(formPath(formKeyOf(category, other.key))))}>{cat.oneForm ? other.dv : other.dvForm} <ArrowRight size={18} aria-hidden="true" /></button>
           )}
           <div className="ld-wz-nav">
             {back}
