@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
-import { CheckCircle2, Send, Upload, Landmark, FileText, ArrowLeft, ArrowRight, CalendarDays, Clock, Lock, Users, GraduationCap } from "lucide-react";
+import { CheckCircle2, Send, Upload, Landmark, FileText, ArrowLeft, ArrowRight, CalendarDays, Clock, Lock, Users, GraduationCap, ShieldCheck, ExternalLink } from "lucide-react";
 import { BANK } from "../payments/slips.js";
 import { ICONS, FormHeader } from "./parts.jsx";
+import { RULES } from "./content.js";
 import { useOfferings } from "./ClassesSection.jsx";
 import {
   AGE_GROUPS, FORM_CATEGORY_ORDER, REG_SLIP_ACCEPT, REG_SLIP_MAX_BYTES,
@@ -15,17 +16,24 @@ import {
 // links). /register lists the three classes and /register/<class> its two
 // age groups; both only lead to a form.
 //
-// A form goes one step at a time: a day and time, the student's details, and
-// last the registration fee and its transfer slip. It goes to Admin →
+// A form goes one step at a time: a day and time, the student's details, the
+// class rules to agree to (Hifz only, see rulesAgreement in registrations.js),
+// and last the registration fee and its transfer slip. It goes to Admin →
 // Registrations; nothing here is shown publicly.
 const EMPTY = { name: "", nic: "", age: "", atollIsland: "", viber: "" };
-const STEPS = ["ދުވަސް އަދި ގަޑި", "ދަރިވަރުގެ މަޢުލޫމާތު", "ރަޖިސްޓްރޭޝަން ފީ"];
+const STEP_NAMES = { time: "ދުވަސް އަދި ގަޑި", details: "ދަރިވަރުގެ މަޢުލޫމާތު", rules: "ގަވާއިދުތައް", fee: "ރަޖިސްޓްރޭޝަން ފީ" };
+const stepsFor = (cat) => (cat.rulesAgreement ? ["time", "details", "rules", "fee"] : ["time", "details", "fee"]);
+// The rules shown on the Rules step: every part of the rules document but its
+// introduction, in its own (Dhivehi) words.
+const FORM_RULES = RULES.filter((c) => c.key !== "about");
+const RULES_AGREE = "މަތީގައިވާ އަފްލާޙް ޤުރްއާން ކުލާހުގެ އުސޫލުތަކާއި ގަވާއިދުތައް އަޅުގަނޑު ކިޔައި، އެ ގަވާއިދުތަކަށް އަޅުގަނޑު އެއްބަސްވަމެވެ.";
 const GROUP_ICONS = { children: GraduationCap, adults: Users };
 const ERRORS = {
   closed: "މި ގަޑީގެ ރަޖިސްޓްރޭޝަން މިހާރު ބަންދުވެއްޖެ. ފަހަތަށް ގޮސް އެހެން ގަޑިއެއް ޚިޔާރުކުރައްވާ.",
   slip: "ސްލިޕް އަޕްލޯޑް ނުކުރެވުނު. ފައިލް ބައްލަވާފައި އަލުން މަސައްކަތް ކުރައްވާ.",
   waiting: "މި އައިޑީ ކާޑު ނަންބަރުގައި ފޮނުއްވާފައިވާ ރަޖިސްޓްރޭޝަނެއް ޗެކްކުރުމަށް މިހާރުވެސް އިންތިޒާރުގައި އެބަހުރި. ވައިބަރުން ގުޅާނަން.",
   busy: "މިހާރު ވަރަށް ގިނަ ރަޖިސްޓްރޭޝަންތަކެއް ލިބެމުންދަނީ. އެއް ގަޑިއިރު ފަހުން އަލުން މަސައްކަތް ކުރައްވާ.",
+  rules: "ކުރިއަށް ދިއުމަށް ކުލާހުގެ ގަވާއިދުތަކަށް އެއްބަސްވެވަޑައިގަންނަވާ.",
   save: "ރަޖިސްޓްރޭޝަން ނުފޮނުވުނު. އަލުން މަސައްކަތް ކުރައްވާ.",
 };
 
@@ -143,8 +151,11 @@ function RegisterForm({ category, ageGroup, navigate }) {
   useEffect(() => { isFormOpen(formKey).then((open) => setFormOpen(open !== false)); }, [formKey]);
   const offerings = useOfferings();
   const [offeringId, setOfferingId] = useState("");
+  const steps = stepsFor(cat);
   const [step, setStep] = useState(0);
+  const at = steps[step];
   const [form, setForm] = useState(EMPTY);
+  const [agreed, setAgreed] = useState(false);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -167,12 +178,18 @@ function RegisterForm({ category, ageGroup, navigate }) {
     setFile(f);
   };
 
-  // Step 2 → 3: the browser checks the fields; this checks the age fits.
+  // Details → next step: the browser checks the fields; this checks the age fits.
   const detailsDone = (e) => {
     e.preventDefault();
     const age = Number(form.age);
     if ((grp.maxAge && age > grp.maxAge) || (grp.minAge && age < grp.minAge)) { setError(ageError); return; }
-    go(2);
+    go(step + 1);
+  };
+
+  const rulesDone = (e) => {
+    e.preventDefault();
+    if (!agreed) { setError(ERRORS.rules); return; }
+    go(step + 1);
   };
 
   const submit = async (e) => {
@@ -183,19 +200,20 @@ function RegisterForm({ category, ageGroup, navigate }) {
     try {
       await submitRegistration({
         form: formKey, classId: offering.id, name: form.name.trim(), nic: form.nic.trim(), age: Number(form.age),
-        atollIsland: form.atollIsland.trim(), viber: form.viber.trim(), file,
+        atollIsland: form.atollIsland.trim(), viber: form.viber.trim(), agreed, file,
       });
       setSent(true);
       window.scrollTo(0, 0);
     } catch (err) {
       if (err.message === "form-closed") { setFormOpen(false); return; }
+      if (err.message === "rules") { setAgreed(false); go(steps.indexOf("rules")); setError(ERRORS.rules); return; }
       setError(err.message === "age" ? ageError : ERRORS[err.message] || ERRORS.save);
     } finally {
       setBusy(false);
     }
   };
 
-  const restart = () => { setForm(EMPTY); setFile(null); setOfferingId(""); setSent(false); go(0); };
+  const restart = () => { setForm(EMPTY); setAgreed(false); setFile(null); setOfferingId(""); setSent(false); go(0); };
   const title = `${cat.dvName} · ${grp.dv}`;
 
   if (formOpen === null) return <section className="ld-sec ld-soft ld-rv" />;
@@ -233,11 +251,11 @@ function RegisterForm({ category, ageGroup, navigate }) {
     <Card>
       <Head title={title} sub={`${cat.dvBlurb} · ${grp.dvSub}`} />
 
-      <ol className="ld-wz-steps" aria-label="ފިޔަވަޅުތައް">
-        {STEPS.map((s, i) => (
+      <ol className="ld-wz-steps" aria-label="ފިޔަވަޅުތައް" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+        {steps.map((s, i) => (
           <li key={s} className={i === step ? "on" : i < step ? "done" : ""} aria-current={i === step ? "step" : undefined}>
             <span className="ld-wz-num">{i < step ? <CheckCircle2 size={16} aria-hidden="true" /> : i + 1}</span>
-            <span className="ld-wz-name">{s}</span>
+            <span className="ld-wz-name">{STEP_NAMES[s]}</span>
           </li>
         ))}
       </ol>
@@ -251,10 +269,10 @@ function RegisterForm({ category, ageGroup, navigate }) {
       </div>
 
       <div className="ld-wz-title">
-        <h2 className="ld-dv">ފިޔަވަޅު {step + 1}: {STEPS[step]}</h2>
+        <h2 className="ld-dv">ފިޔަވަޅު {step + 1}: {STEP_NAMES[at]}</h2>
       </div>
 
-      {step === 0 && (
+      {at === "time" && (
         <>
           {offerings === null && <p className="ld-f-note">ކުލާހުގެ ގަޑިތައް ލޯޑުވަނީ…</p>}
           {offerings && slots.length === 0 && <p className="ld-rv-error">މި ކުލާހަށް މިހާރު ހުޅުވިފައިވާ ގަޑިއެއް ނެތް. ވެއިޓިންގ ލިސްޓަށް ނަން ލިޔުއްވުމަށް އަޅުގަނޑުމެންނާ ގުޅުއްވާ.</p>}
@@ -274,7 +292,7 @@ function RegisterForm({ category, ageGroup, navigate }) {
         </>
       )}
 
-      {step === 1 && (
+      {at === "details" && (
         <form className="ld-wz-form" onSubmit={detailsDone}>
           <div className="ld-f">
             <Label text="ދަރިވަރުގެ ފުރިހަމަ ނަން" required htmlFor="rg-name" />
@@ -308,7 +326,42 @@ function RegisterForm({ category, ageGroup, navigate }) {
         </form>
       )}
 
-      {step === 2 && offering && (
+      {at === "rules" && (
+        <form className="ld-wz-form" onSubmit={rulesDone} noValidate>
+          <div className={`ld-rg-rules ${error === ERRORS.rules ? "bad" : ""}`}>
+            <div className="ld-rg-pay-head"><ShieldCheck size={20} aria-hidden="true" /> ކުލާހުގެ އުސޫލުތަކާއި ގަވާއިދުތައް</div>
+            <p>ރަޖިސްޓަރީވުމުގެ ކުރިން ތިރީގައިވާ ގަވާއިދުތައް ކިޔުއްވާ.</p>
+            <div className="ld-rg-rules-list" tabIndex={0} aria-label="ކުލާހުގެ ގަވާއިދުތައް">
+              {FORM_RULES.map((c) => (
+                <section key={c.key}>
+                  <h3>{c.title.dv}</h3>
+                  {c.cards.map((card, i) => (
+                    <div key={card.num || i}>
+                      {card.title && <h4><span dir="ltr">{card.num}</span> {card.title.dv}</h4>}
+                      {card.intro && <p>{card.intro.dv}</p>}
+                      <ol>
+                        {card.items.map((item) => <li key={item.en}>{item.term && <b>{item.term.dv}: </b>}{item.dv}</li>)}
+                      </ol>
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </div>
+            <a className="ld-rg-rules-link" href="/rules" target="_blank" rel="noopener">ގަވާއިދުތައް ވެބްސައިޓުގައި ބައްލަވާ <ExternalLink size={15} aria-hidden="true" /></a>
+            <label className="ld-rg-check">
+              <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); setError(""); }} />
+              <span>{RULES_AGREE}</span>
+            </label>
+          </div>
+          {error && <p className="ld-rv-error" role="alert">{error}</p>}
+          <div className="ld-wz-nav">
+            {back}
+            <button type="submit" className="ld-btn ld-btn-primary">ކުރިއަށް <ArrowRight size={18} aria-hidden="true" /></button>
+          </div>
+        </form>
+      )}
+
+      {at === "fee" && offering && (
         <form className="ld-wz-form" onSubmit={submit}>
           <div className="ld-rg-pay">
             <div className="ld-rg-pay-head"><Landmark size={20} aria-hidden="true" /> {`${fmtMvrDv(offering.registration_fee)}ގެ ރަޖިސްޓްރޭޝަން ފީ ދައްކަވާ`}</div>

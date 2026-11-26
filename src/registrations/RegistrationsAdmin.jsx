@@ -248,6 +248,7 @@ function Applications({ showToast, onCountChange, classes, teachers, students, o
                   <dt>Atoll &amp; island</dt><dd dir="auto">{opened.atoll_island}</dd>
                   <dt>Viber</dt><dd>{opened.viber}</dd>
                   {opened.registration_fee != null && <><dt>Registration fee</dt><dd>{fmtMvr(opened.registration_fee)}</dd></>}
+                  {opened.rules_agreed_at && <><dt>Class rules</dt><dd>Agreed {new Date(opened.rules_agreed_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</dd></>}
                 </dl>
 
                 <div className="rg-links-row">

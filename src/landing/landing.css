@@ -727,6 +727,21 @@
 .ld-rg-pay dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 14px; }
 .ld-rg-pay dt { color: var(--muted); }
 .ld-rg-pay dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+/* The Rules step of the Hifz forms: the class rules in a scrolling box and
+   the tick box to agree to them. */
+.ld-rg-rules { display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 14px; background: var(--soft); border: 1px solid var(--line); }
+.ld-rg-rules.bad { border-color: #F04438; }
+.ld-rg-rules > p { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.8; }
+.ld-rg-rules-list { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; border-radius: 10px; background: #fff; border: 1px solid var(--line); }
+.ld-rg-rules-list section + section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ld-rg-rules-list h3 { margin: 0 0 6px; font-size: 16px; color: var(--g1); }
+.ld-rg-rules-list h4 { margin: 10px 0 4px; font-size: 14.5px; color: var(--navy); }
+.ld-rg-rules-list p { margin: 0 0 4px; font-size: 14px; line-height: 1.9; color: #2B3C4E; }
+.ld-rg-rules-list ol { margin: 0; padding-inline-start: 22px; font-size: 14px; line-height: 1.9; color: #2B3C4E; }
+.ld-rg-rules-list li + li { margin-top: 4px; }
+.ld-rg-rules-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; font-size: 14px; font-weight: 600; color: var(--blue); }
+.ld-rg-check { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #fff; border: 1px solid var(--line); font-size: 15px; font-weight: 600; line-height: 1.8; color: var(--navy); cursor: pointer; }
+.ld-rg-check input { flex-shrink: 0; width: 22px; height: 22px; margin: 3px 0 0; accent-color: var(--blue); }
 .ld-rg-acc { font-family: ui-monospace, Menlo, monospace; font-size: 15px; letter-spacing: .04em; user-select: all; white-space: nowrap; }
 .ld-rg-file { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 12px 14px; border: 1.5px dashed var(--blue); border-radius: 12px; background: #fff; color: var(--blue); font-size: 14px; font-weight: 600; cursor: pointer; overflow-wrap: anywhere; }
 .ld-rg-file.on { border-style: solid; color: var(--navy); }

@@ -10,7 +10,10 @@ export const CATEGORIES = [
   { key: "tajweed", en: "Tajweed (Tilawa)", dv: "ތަޖްވީދު (ތިލާވާ)", blurb: "Recite the Quran correctly with the rules of tajweed.", icon: "mic",
     dvName: "ތަޖްވީދު ކުލާސް", dvBlurb: "ކީރިތި ޤުރުއާން ބަލައިގެން ކިޔެވުމާއި ތަޖްވީދުގެ ފިލާވަޅުތައް" },
   { key: "hifz", en: "Hifz", dv: "ހިތުދަސްކުރުން", blurb: "Memorise the Quran with a daily plan and revision.", icon: "book",
-    dvName: "ހިފްޡު ކުލާސް", dvBlurb: "ކީރިތި ޤުރުއާން ހިތުދަސްކުރާ ކުލާސް" },
+    dvName: "ހިފްޡު ކުލާސް", dvBlurb: "ކީރިތި ޤުރުއާން ހިތުދަސްކުރާ ކުލާސް",
+    // The form has a Rules step: the visitor must agree to the class rules
+    // (the database checks it too, see 20261203_hifz_rules_agreement.sql).
+    rulesAgreement: true },
   { key: "foundation", en: "Foundation", dv: "ފައުންޑޭޝަން", blurb: "Start from the letters and kalimah, and learn to read.", icon: "baby",
     dvName: "ފައުންޑޭޝަން ކުލާސް", dvBlurb: "ކިޔަވަން ފަށައިގަންނަ މަރުޙަލާއަށް ޚާއްޞަ ކުލާސް" },
 ];
@@ -107,19 +110,21 @@ export async function loadOpenOfferings() {
 }
 
 // Uploads the slip under new/ and files the application. The visitor can't
-// read the file back; only admins can.
-export async function submitRegistration({ form, classId, name, nic, age, atollIsland, viber, file }) {
+// read the file back; only admins can. agreed: they ticked the class rules
+// (needed for a class with rulesAgreement).
+export async function submitRegistration({ form, classId, name, nic, age, atollIsland, viber, agreed, file }) {
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
   const path = `new/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
   const up = await supabase.storage.from(REG_BUCKET).upload(path, file, { contentType: file.type || undefined });
   if (up.error) throw new Error("slip");
   const { error } = await supabase.rpc("submit_registration", {
     p_form: form, p_class_id: classId, p_name: name, p_nic: nic, p_age: age,
-    p_atoll_island: atollIsland, p_viber: viber, p_slip_path: path,
+    p_atoll_island: atollIsland, p_viber: viber, p_slip_path: path, p_agreed: agreed === true,
   });
   if (error) {
     const m = error.message;
     throw new Error(m.includes("form is closed") ? "form-closed" : m.includes("not open") ? "closed" : m.includes("age does not fit") ? "age"
+      : m.includes("rules agreement") ? "rules"
       : m.includes("already waiting") ? "waiting" : m.includes("too many") ? "busy" : "save");
   }
 }
