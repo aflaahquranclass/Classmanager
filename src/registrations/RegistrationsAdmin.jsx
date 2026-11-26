@@ -27,7 +27,7 @@ import { confirmDialog } from "../ConfirmDialog.jsx";
 import { registrationWelcomeText, sendRegistrationWelcome } from "../notifications/smsSend.js";
 import { InfoUpdates, infoCss } from "./InfoUpdatesAdmin.jsx";
 import { AdminHifzTest } from "../hifzTest/HifzTestAdmin.jsx";
-import { CATEGORIES, AGE_GROUPS, DAYS, FORMS, REG_BUCKET, categoryOf, ageGroupOf, formOf, formUrl, fmtTime, fmtDays, fmtMvr } from "./registrations.js";
+import { CATEGORIES, AGE_GROUPS, DAYS, FORMS, REG_BUCKET, categoryOf, ageGroupOf, formOf, formUrl, fmtTime, fmtTimeRange, fmtDays, fmtMvr } from "./registrations.js";
 import { maldivesMonth } from "../dates.js";
 import { ProgramPicker, programsForCategory } from "../thilawa/programs.jsx";
 
@@ -53,7 +53,9 @@ const OPEN = { color: "#1E7A4C", background: "#E3F5EA" };
 const CLOSED = { color: "#A5432C", background: "#FBE9E4" };
 const fmtWhen = (iso) => new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 const sortDays = (days) => DAYS.filter((d) => (days || []).includes(d));
-const overlaps = (a, b) => a.start_time < b.endTime && b.startTime < a.end_time;
+// A website class time (a, end optional) and an ongoing class (b) overlap; a
+// time with no end counts as its start.
+const overlaps = (a, b) => (a.end_time ? a.start_time < b.endTime && b.startTime < a.end_time : b.startTime <= a.start_time && a.start_time < b.endTime);
 
 // classes / teachers / students: the app's lists (camelCase).
 // onClassCreated(classRow): a class was made from the Accept box.
@@ -420,7 +422,7 @@ function AcceptBox({ reg, web, classes, teachers, students, showToast, onClassCr
         </div>
         {mode === "existing" ? (
           <div className="rg-pick">
-            {web && <p className="rg-sub">Classes on {fmtDays(web.days)} at {fmtTime(web.start_time)}–{fmtTime(web.end_time)}, like the student chose.</p>}
+            {web && <p className="rg-sub">Classes on {fmtDays(web.days)} at {fmtTimeRange(web.start_time, web.end_time)}, like the student chose.</p>}
             {teacherGroups.length === 0 ? (
               <div className="rg-problem">No ongoing class on these days and time. <button type="button" className="rg-linkbtn" onClick={() => setMode("new")}>Make a new class</button></div>
             ) : (
@@ -523,10 +525,11 @@ function WebClasses({ showToast }) {
   const save = async (e) => {
     e.preventDefault();
     if (!editing.days.length) { showToast("Choose at least one day."); return; }
-    if (!editing.start_time || !editing.end_time || editing.end_time <= editing.start_time) { showToast("The end time must be after the start time."); return; }
+    if (!editing.start_time) { showToast("Enter the start time."); return; }
+    if (editing.end_time && editing.end_time <= editing.start_time) { showToast("The end time must be after the start time, or leave it empty."); return; }
     const row = {
       category: editing.category, age_group: editing.age_group, days: sortDays(editing.days),
-      start_time: editing.start_time, end_time: editing.end_time,
+      start_time: editing.start_time, end_time: editing.end_time || null,
       registration_fee: Number(editing.registration_fee), monthly_fee: Number(editing.monthly_fee),
       note: editing.note.trim() || null, is_open: editing.is_open,
     };
@@ -571,7 +574,7 @@ function WebClasses({ showToast }) {
       </div>
       <div className="rg-form-grid">
         <label>Starts<input className="lc-input" type="time" required value={editing.start_time} onChange={(e) => set({ start_time: e.target.value })} /></label>
-        <label>Ends<input className="lc-input" type="time" required value={editing.end_time} onChange={(e) => set({ end_time: e.target.value })} /></label>
+        <label>Ends (optional)<input className="lc-input" type="time" value={editing.end_time} onChange={(e) => set({ end_time: e.target.value })} /></label>
         <label>Registration fee (MVR)<input className="lc-input" type="number" min="0" step="any" required value={editing.registration_fee} onChange={(e) => set({ registration_fee: e.target.value })} /></label>
         <label>Monthly fee (MVR)<input className="lc-input" type="number" min="0" step="any" required value={editing.monthly_fee} onChange={(e) => set({ monthly_fee: e.target.value })} /></label>
       </div>
@@ -605,13 +608,13 @@ function WebClasses({ showToast }) {
                 <div key={o.id} className={`rg-time ${o.is_open ? "" : "rg-closed"}`}>
                   <div className="rg-time-main">
                     <b>{fmtDays(o.days)}</b>
-                    <span className="rg-time-hours">{fmtTime(o.start_time)} – {fmtTime(o.end_time)}</span>
+                    <span className="rg-time-hours">{fmtTimeRange(o.start_time, o.end_time)}</span>
                     <span>Registration {fmtMvr(o.registration_fee)} · Monthly {fmtMvr(o.monthly_fee)}</span>
                     {o.note && <span>{o.note}</span>}
                     {!o.is_open && <span className="rg-badge" style={CLOSED}>Hidden</span>}
                   </div>
                   <div className="rg-time-actions">
-                    <button type="button" className="tp-btn-outline rg-icon" onClick={() => setEditing({ ...o, registration_fee: String(o.registration_fee), monthly_fee: String(o.monthly_fee), note: o.note || "" })} aria-label="Edit" title="Edit"><Pencil size={16} /></button>
+                    <button type="button" className="tp-btn-outline rg-icon" onClick={() => setEditing({ ...o, end_time: o.end_time || "", registration_fee: String(o.registration_fee), monthly_fee: String(o.monthly_fee), note: o.note || "" })} aria-label="Edit" title="Edit"><Pencil size={16} /></button>
                     <button type="button" className="tp-btn-outline rg-icon" onClick={() => toggleOpen(o)} aria-label={o.is_open ? "Hide from website" : "Show on website"} title={o.is_open ? "Hide from website" : "Show on website"}>{o.is_open ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                     <button type="button" className="tp-btn-outline rg-icon rg-danger" onClick={() => remove(o)} aria-label="Delete" title="Delete"><Trash2 size={16} /></button>
                   </div>

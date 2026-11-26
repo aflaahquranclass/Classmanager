@@ -7,7 +7,7 @@ import { useOfferings } from "./ClassesSection.jsx";
 import {
   AGE_GROUPS, FORM_CATEGORY_ORDER, REG_SLIP_ACCEPT, REG_SLIP_MAX_BYTES,
   submitRegistration, isFormOpen, registerPathOf, categoryOf, ageGroupOf, formKeyOf, formPath,
-  fmtTimeDv, fmtDaysDv, fmtMvrDv,
+  fmtTimeRangeDv, fmtDaysDv, fmtMvrDv,
 } from "../registrations/registrations.js";
 
 // Class registration, all in Dhivehi. There is one form for each class and
@@ -279,7 +279,7 @@ function RegisterForm({ category, startGroup, navigate }) {
   const timeStep = steps.indexOf("time");
   const picks = [
     cat.oneForm ? step > 0 && grp && { step: 0, text: grp.dv } : { step: -1, text: title, fixed: true },
-    step > timeStep && offering && { step: timeStep, text: `${fmtDaysDv(offering.days)} · ${fmtTimeDv(offering.start_time)} – ${fmtTimeDv(offering.end_time)}` },
+    step > timeStep && offering && { step: timeStep, text: `${fmtDaysDv(offering.days)} · ${fmtTimeRangeDv(offering.start_time, offering.end_time)}` },
   ].filter(Boolean);
 
   return (
@@ -335,7 +335,7 @@ function RegisterForm({ category, startGroup, navigate }) {
               <button key={o.id} type="button" className={`ld-wz-option ld-wz-slot ${offeringId === o.id ? "on" : ""}`} onClick={() => { setOfferingId(o.id); go(1); }}>
                 <span className="ld-wz-option-text">
                   <b><CalendarDays size={17} aria-hidden="true" />{fmtDaysDv(o.days)}</b>
-                  <span className="ld-wz-time"><Clock size={16} aria-hidden="true" />{fmtTimeDv(o.start_time)} – {fmtTimeDv(o.end_time)}</span>
+                  <span className="ld-wz-time"><Clock size={16} aria-hidden="true" />{fmtTimeRangeDv(o.start_time, o.end_time)}</span>
                   <span className="ld-wz-fee">މަހު ފީ: {fmtMvrDv(o.monthly_fee)}</span>
                   {o.note && <small>{o.note}</small>}
                 </span>

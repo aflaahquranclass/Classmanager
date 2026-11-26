@@ -80,6 +80,9 @@ export function fmtTime(t) {
   if (Number.isNaN(h)) return t || "";
   return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
 }
+// A website class time: "4:30 pm – 6:00 pm", or "4:30 pm" when it has no
+// end time (only the start is needed, Admin → Registrations → Website classes).
+export const fmtTimeRange = (start, end) => (end ? `${fmtTime(start)} – ${fmtTime(end)}` : fmtTime(start));
 export const fmtDays = (days) => {
   const list = DAYS.filter((d) => (days || []).includes(d));
   return list.length === 7 ? "Every day" : list.join(", ");
@@ -92,13 +95,14 @@ export function fmtTimeDv(t) {
   const part = h < 12 ? "ހެނދުނު" : h < 16 ? "މެންދުރުފަހު" : h < 19 ? "ހަވީރު" : "ރޭގަނޑު";
   return `${((h + 11) % 12) + 1}:${String(m || 0).padStart(2, "0")} ${part}`;
 }
+export const fmtTimeRangeDv = (start, end) => (end ? `${fmtTimeDv(start)} – ${fmtTimeDv(end)}` : fmtTimeDv(start));
 export const fmtDaysDv = (days) => {
   const list = DAYS.filter((d) => (days || []).includes(d));
   return list.length === 7 ? "ކޮންމެ ދުވަހަކު" : list.map((d) => DAYS_DV[d]).join("، ");
 };
 export const fmtMvrDv = (n) => `${Number(n).toLocaleString("en", { maximumFractionDigits: 2 })} ރުފިޔާ`;
 export const fmtMvr = (n) => `MVR ${Number(n).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-export const offeringLabel = (o) => `${categoryOf(o.category)?.en} · ${ageGroupOf(o.age_group)?.en} · ${fmtDays(o.days)} ${fmtTime(o.start_time)}–${fmtTime(o.end_time)}`;
+export const offeringLabel = (o) => `${categoryOf(o.category)?.en} · ${ageGroupOf(o.age_group)?.en} · ${fmtDays(o.days)} ${fmtTimeRange(o.start_time, o.end_time)}`;
 
 // Whether a form is taking registrations: true, false, or null if unknown.
 export async function isFormOpen(form) {
